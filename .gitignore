@@ -1,0 +1,6 @@
+# ignore pdf files generated
+*.pdf
+
+# ignore cache files generated
+src/__pycache__/
+__pycache__/

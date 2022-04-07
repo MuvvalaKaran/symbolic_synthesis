@@ -1,0 +1,3 @@
+[submodule "regret_synthesis_toolbox"]
+	path = regret_synthesis_toolbox
+	url = git@github.com:aria-systems-group/regret_synthesis_toolbox.git
