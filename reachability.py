@@ -157,7 +157,7 @@ if __name__ == '__main__':
     bdd = _bdd.BDD()
     transitions = transition_system(bdd)
     # q = least_fixpoint(transitions, bdd)
-    # q = forward_reachability(transitions, bdd)
+    q = forward_reachability(transitions, bdd)
 
     depth_first_search(transitions, bdd)
     # s = q.to_expr()

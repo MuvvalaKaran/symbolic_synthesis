@@ -162,8 +162,8 @@ def get_graph(print_flag: bool = False):
 
 if __name__ == "__main__":
     # testing BDD theory
-    test_constraint_vs_explicit_transition_thr()
-    sys.exit(-1)
+    # test_constraint_vs_explicit_transition_thr()
+    # sys.exit(-1)
 
     # construct a sample rwo player game and wrap it to construct its symbolic version
     transition_graph = get_graph(print_flag=True)
