@@ -4,3 +4,4 @@
 # ignore cache files generated
 src/__pycache__/
 __pycache__/
+.idea/
