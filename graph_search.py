@@ -127,8 +127,8 @@ class BDDA_star:
         self.y_list = []
         self.z_list = []
         self.setup_graph()
-        # self.transition_fun = self._build_transition_function_w_actions()
-        self.transition_fun = self._build_transition_function_w_action_costs()
+        self.transition_fun = self._build_transition_function_w_actions()
+        # self.transition_fun = self._build_transition_function_w_action_costs()
         self.estimate_fun = self._build_estimate_function()
         self.reached = []
         self.que = []
@@ -975,9 +975,9 @@ if __name__ == "__main__":
     # testing()
     # sys.exit(-1)
     # create an instance of BDDA* class and find the shortest path
-    # bdd_set_a_star = BDDA_star()
-    # bdd_set_a_star.solve(weight=0.5)
-    # bdd_set_a_star.get_path()
+    bdd_set_a_star = BDDA_star()
+    bdd_set_a_star.solve(weight=0.5)
+    bdd_set_a_star.get_path()
 
     # do BFS
     bdd_bfs = BDDA_star()
