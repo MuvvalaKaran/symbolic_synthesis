@@ -4,14 +4,14 @@
     else - robo_loc
 
     l0 - top_loc
-;    l1 - top_loc
-;    l2 - hbox_loc
-;    l3 - hbox_loc
+    l1 - top_loc
+    l2 - hbox_loc
+    l3 - hbox_loc
 ;   l4 - hbox_loc
 ;	l5 - box_loc
-	l6 - hbox_loc
+	l6 - box_loc
 	l7 - box_loc
-	l8 - hbox_loc
+	l8 - box_loc
 	l9 - box_loc
 	
     ; else region wherethe human can not reach
@@ -25,7 +25,7 @@
     b2 - box
 
     ; black boxes
-;    b3 - box
+    b3 - box
 ;   b4 - box
 )
 
@@ -34,10 +34,10 @@
     (ready else)
 
     (on b0 l7)
-    (on b1 l6)
-    (on b2 l9)
+    (on b1 l2)
+    (on b2 l6)
 
-;    (on b3 l8)
+    (on b3 l8)
 ;    (on b4 l3)
 )
 
@@ -45,11 +45,11 @@
 (:goal (and
 ; always add the config of the hbox loc here. It's fine not to include any of the box_loc config
 
-    (on b0 l9)
-    (on b1 l8)
-    (on b2 l8)
+    (on b0 l2)
+    (on b1 l6)
+    (on b2 l7)
 
-;    (on b3 l2)
+    (on b3 l8)
 ;    (on b4 l9)
 ))
 
