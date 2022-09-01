@@ -1,3 +1,4 @@
+from operator import neg
 import os
 import sys
 import copy
@@ -25,8 +26,57 @@ from src.symbolic_abstraction import SymbolicTransitionSystem
 # from symbolic_planning.src.graph_search import forward_reachability
 
 from config import *
-        
 
+
+def create_symbolic_lbl_vars(lbls, manager: Cudd, label_state_var_name: str = 'l'):
+    """
+    This function create boolean vairables used to create observation labels for each state. Note that in this method we do create
+    prime variables as they do not switch their values.
+
+    The number of variable you needs to represent the state observation depends on two factors.
+     1. The number of objects (PDDL problem file terminology) you have (informally locations)
+     2. The number of locations your observations your state observation contains
+    
+    e.g. Grid World: The observation associated with each state is only the location of that cell.
+     So, you cannot observe l2 and l1 at the same time as our robot can only be in one cell at a given time. 
+
+     Thus, the set of valid observation is {l1, l2}
+    
+    For Franka World: Say, the observation consists of the location of the robot and an object. The set of Valid locations is
+     {else, l1, l2}. The set of valid observation is {(else, else), (else, l1), (else, l2), (l1, else), (l1, l1),
+     (l1, l2), (l2, else) (l2, l1), (l2, l2)}
+
+    """
+    # create all combinations of locations - for gridworld you repeat -1
+    # possible_obs = list(product(lbls, repeat=1))
+
+    # We modify the labels so that they are inline with promela's edge labelling format in DFA.
+    #  The atomic propositions are always of the form (l2) or (!(l2))
+    possible_obs: list = []
+    for ele in lbls:
+        new_ele = f'({ele})'
+        negation_ele = f'(~({ele}))'
+        possible_obs.append(new_ele)
+        possible_obs.append(negation_ele)
+    # possible_obs = lbls  # for Frank world you have to update this
+
+    state_lbl_vars: list = []
+    lbl_state = label_state_var_name
+
+    # get the number of variables in the manager. We will assign the next idex to the next lbl variables
+    _num_of_sym_vars = cudd_manager.size()
+
+    # we subtract -2 as we have (skbn) and (!(skbn))(an agent) defined as an object. We do need to allocate a var for this agent. 
+
+    # NOTE: This might cuase issue in the future. len - 2 is hack. You should actually remove the irrelevant objects from objs 
+    num_of_lbls = len(possible_obs) - 2
+    for num_var in range(math.ceil(math.log2(num_of_lbls))):
+        _var_index = num_var + _num_of_sym_vars
+        state_lbl_vars.append(manager.bddVar(_var_index, f'{lbl_state}{num_var}'))
+
+    return state_lbl_vars, possible_obs
+
+    
 def create_symbolic_vars(num_of_facts: int, manager, curr_state_var_name: str = 'x', next_state_var_name: str = 'y') -> Tuple[list, list]:
     """
     A helper function to create log⌈num_of_facts⌉
@@ -37,10 +87,13 @@ def create_symbolic_vars(num_of_facts: int, manager, curr_state_var_name: str = 
     cur_state = curr_state_var_name
     nxt_state = next_state_var_name
 
+    # get the number of variables in the manager. We will assign the next idex to the next lbl variables
+    _num_of_sym_vars = cudd_manager.size()
 
     for num_var in range(math.ceil(math.log2(num_of_facts))):
-            curr_state_vars.append(manager.bddVar(2*num_var, f'{cur_state}{num_var}'))
-            next_state_vars.append(manager.bddVar(2*num_var + 1, f'{nxt_state}{num_var}'))
+            # _var_index = num_var + _num_of_sym_vars
+            curr_state_vars.append(manager.bddVar(_num_of_sym_vars + (2*num_var), f'{cur_state}{num_var}'))
+            next_state_vars.append(manager.bddVar(_num_of_sym_vars + (2*num_var + 1), f'{nxt_state}{num_var}'))
 
     return (curr_state_vars, next_state_vars)
 
@@ -58,10 +111,19 @@ def create_symbolic_dfa_graph(cudd_manager, formula: str, dfa_num: int):
     return curr_state, next_state, _dfa
 
 
-def create_symbolic_causal_graph(cudd_manager, problem_pddl_file: str, domain_pddl_file: str):
+def create_symbolic_causal_graph(cudd_manager,
+                                 problem_pddl_file: str,
+                                 domain_pddl_file: str,
+                                 create_lbl_vars: bool,
+                                 draw_causal_graph: bool = False):
+    """
+    A function to create an instance of causal graph which call pyperplan. We access the task related properties pyperplan
+     and create symbolic TR related to action.   
+    """
     _causal_graph_instance = CausalGraph(problem_file=problem_pddl_file,
                                          domain_file=domain_pddl_file,
-                                         draw=True)
+                                         draw=draw_causal_graph)
+
     _causal_graph_instance.build_causal_graph(add_cooccuring_edges=False, relabel=False)
     # print("No. of edges in the graph:", len(_causal_graph_instance.causal_graph._graph.edges()))
 
@@ -70,9 +132,17 @@ def create_symbolic_causal_graph(cudd_manager, problem_pddl_file: str, domain_pd
     # the number of boolean variables (|x|) = log⌈|facts|⌉ - Because facts represent all possible predicates in our causal graph 
     curr_state, next_state = create_symbolic_vars(num_of_facts=len(task_facts),
                                                   manager=cudd_manager)
+                                                  
+    if create_lbl_vars:
+        print("*****************Creating Boolean variables for Labels as well! This functionality only works for grid world!*****************")
+        objs = _causal_graph_instance.problem.objects
+        
+        lbl_state, possible_obs = create_symbolic_lbl_vars(lbls=objs,  manager=cudd_manager)
 
+        return _causal_graph_instance.task, _causal_graph_instance.problem.domain, possible_obs, \
+         curr_state, next_state, lbl_state
 
-    return _causal_graph_instance.task, _causal_graph_instance.problem.domain, curr_state, next_state, 
+    return _causal_graph_instance.task, _causal_graph_instance.problem.domain, curr_state, next_state
 
 
 def get_graph(print_flag: bool = False):
@@ -82,7 +152,7 @@ def get_graph(print_flag: bool = False):
 
     _causal_graph_instance = CausalGraph(problem_file=_problem_file_path,
                                          domain_file=_domain_file_path,
-                                         draw=True)
+                                         draw=False)
 
     _causal_graph_instance.build_causal_graph(add_cooccuring_edges=False, relabel=False)
 
@@ -108,19 +178,58 @@ def get_graph(print_flag: bool = False):
 if __name__ == "__main__":
     
     BUILD_DFA: bool = True
-    BUILD_ABSTRACTION: bool = False
+    BUILD_ABSTRACTION: bool = True
+    CREATE_VAR_LBLS: bool = True   # set this to true if you want to create Observation BDDs
     # construct a sample rwo player game and wrap it to construct its symbolic version
     # transition_graph = get_graph(print_flag=True)
     # build_symbolic_model(transition_graph)
 
+    DRAW_EXPLICIT_CAUSAL_GRAPH: bool = False
+
     domain_file_path = PROJECT_ROOT + "/pddl_files/grid_world/domain.pddl"
-    problem_file_path = PROJECT_ROOT + "/pddl_files/grid_world/problem10_10.pddl"
+    problem_file_path = PROJECT_ROOT + "/pddl_files/grid_world/problem5_5.pddl"
 
     cudd_manager = Cudd()
+    
+    if BUILD_ABSTRACTION:
+        if not CREATE_VAR_LBLS:
+            task, domain, curr_state, next_state  = create_symbolic_causal_graph(cudd_manager=cudd_manager,
+                                                                                 problem_pddl_file=problem_file_path,
+                                                                                 domain_pddl_file=domain_file_path,
+                                                                                 create_lbl_vars=False,
+                                                                                 draw_causal_graph=DRAW_EXPLICIT_CAUSAL_GRAPH)
+            sym_tr = SymbolicTransitionSystem(curr_states=curr_state,
+                                              next_states=next_state,
+                                              lbl_states=None,
+                                              observations=None,
+                                              task=task,
+                                              domain=domain,
+                                              manager=cudd_manager)
 
+        else:
+            task, domain, possible_obs, curr_state, next_state, lbl_states  = create_symbolic_causal_graph(cudd_manager=cudd_manager,
+                                                                                            problem_pddl_file=problem_file_path,
+                                                                                            domain_pddl_file=domain_file_path,
+                                                                                            create_lbl_vars=True,
+                                                                                            draw_causal_graph=DRAW_EXPLICIT_CAUSAL_GRAPH)
+            sym_tr = SymbolicTransitionSystem(curr_states=curr_state,
+                                              next_states=next_state,
+                                              lbl_states=lbl_states,
+                                              observations=possible_obs,
+                                              task=task,
+                                              domain=domain,
+                                              manager=cudd_manager)
+
+
+        
+
+        sym_tr.create_transition_system(verbose=False, plot=False)
+        sym_tr.create_state_obs_bdd(verbose=True, plot=False)
+
+    
     if BUILD_DFA:
         # list of formula
-        formulas = ['F(l1 & F(l2 & F(l3 & F(l4))))']
+        formulas = ['F(l1)']
         # create a list of DFAs
         DFA_list = []
 
@@ -129,49 +238,44 @@ if __name__ == "__main__":
             # create boolean variables
             curr_state, next_state, _dfa = create_symbolic_dfa_graph(cudd_manager=cudd_manager, formula= fmla, dfa_num=_idx)
             # create TR corresponding to each DFA - dfa name is only used dumping graph 
-            dfa_tr = SymbolicDFA(curr_states=curr_state, next_states=next_state, manager=cudd_manager, dfa=_dfa, dfa_name=f'dfa_{_idx}')
+            dfa_tr = SymbolicDFA(curr_states=curr_state,
+                                 next_states=next_state,
+                                 ts_lbls=lbl_states,
+                                 predicate_sym_map_lbl=sym_tr.predicate_sym_map_lbl,
+                                 manager=cudd_manager,
+                                 dfa=_dfa,
+                                 dfa_name=f'dfa_{_idx}')
+
             dfa_tr.create_dfa_transition_system(verbose=True, plot=False)
-
-        # sys.exit(-1)
     
-    if BUILD_ABSTRACTION:
-        task, domain, curr_state, next_state = create_symbolic_causal_graph(cudd_manager=cudd_manager,
-                                                                            problem_pddl_file=problem_file_path,
-                                                                            domain_pddl_file=domain_file_path)
-
-        sym_tr = SymbolicTransitionSystem(curr_states=curr_state,
-                                        next_states=next_state,
-                                        task=task,
-                                        domain=domain,
-                                        manager=cudd_manager)
-        sym_tr.create_transition_system(verbose=False, plot=False)
-
-        print('Inital states: ', sym_tr.sym_init_states)
-        print('Goal states: ', sym_tr.sym_goal_states)
-        
-        giant_tr = reduce(lambda a, b: a | b, sym_tr.sym_tr_actions) 
-
-        # let do graph search from init state to a goal state
-        graph_search = SymbolicSearch(init=sym_tr.sym_init_states,
-                                    target=sym_tr.sym_goal_states,
-                                    manager=cudd_manager,
-                                    curr_vars=curr_state,
-                                    next_vars=next_state,
-                                    trans_func_list=sym_tr.sym_tr_actions,
-                                    transition_func=giant_tr,
-                                    sym_to_state=sym_tr.predicate_sym_map_curr.inv)
+    init_state = sym_tr.sym_init_states | dfa_tr.sym_init_state
+    print('Inital states: ', init_state)
+    print('Goal states: ', dfa_tr.sym_goal_state)
     
-        action_list = graph_search.symbolic_bfs(verbose=False)
+    giant_tr = reduce(lambda a, b: a | b, sym_tr.sym_tr_actions) 
 
-        # graph_search(init=sym_tr.sym_init_states,
-        #              target=sym_tr.sym_goal_states,
-        #              transition_func=giant_tr,
-        #              x_list=curr_state,
-        #              y_list=next_state)
+    # let do graph search from init state to a goal state
+    graph_search = SymbolicSearch(init=sym_tr.sym_init_states,
+                                  target=sym_tr.sym_goal_states,
+                                  manager=cudd_manager,
+                                  curr_vars=curr_state,
+                                  next_vars=next_state,
+                                  trans_func_list=sym_tr.sym_tr_actions,
+                                  transition_func=giant_tr,
+                                  sym_to_state=sym_tr.predicate_sym_map_curr.inv)
 
-        print("Sequence of actions")
-        for _a in reversed(action_list):
-            print(sym_tr.tr_action_idx_map.inv[_a])
-        
-        print("Done with the plan")
+    action_list = graph_search.symbolic_bfs(verbose=False)
+
+    # graph_search(init=sym_tr.sym_init_states,
+    #              target=sym_tr.sym_goal_states,
+    #              transition_func=giant_tr,
+    #              x_list=curr_state,
+    #              y_list=next_state)
+
+    print("Sequence of actions")
+    for _a in reversed(action_list):
+        print(sym_tr.tr_action_idx_map.inv[_a])
+    
+    print("Done with the plan")
+
     

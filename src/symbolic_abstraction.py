@@ -1,4 +1,6 @@
+import re
 import copy
+from tabnanny import verbose
 import graphviz as gv
 import math
 
@@ -19,26 +21,39 @@ from config import *
 
 class SymbolicTransitionSystem(object):
     """
-    A class to construct a symbolic transition system for each operator - in our case Action 
+    A class to construct a symbolic transition system for each operator - in our case Actions. 
+
+    curr_state: Symbolic Boolean vairables corresponding to current states
+    next_state: Symbolic Boolean vairables corresponding to next states
+    lbl_state: Symbolic Boolean vairables corresponding to labels 
+    task: Pyperplan object that contains information regarding the task 
+    domain : Pyperplan object that contains information regarding the domain
+    observations: All the possible observations for a give problem type. For grid world this is same a objects
+    manager: CUDD Manager
     """
 
-    def __init__(self, curr_states: list , next_states: list, task, domain, manager):
+    def __init__(self, curr_states: list , next_states: list, lbl_states: list, task, domain, observations, manager):
         self.sym_vars_curr = curr_states
         self.sym_vars_next = next_states
+        self.sym_vars_lbl = lbl_states
         self.init: frozenset = task.initial_state
         self.goal: frozenset = task.goals
         self.facts:dict = task.facts
         self.task: dict = task
         self.domain: dict = domain
+        self.domain_lbls = observations
         self.manager = manager
         self.actions: dict = domain.actions
         self.tr_action_idx_map: dict = {}
         self.sym_init_states = manager.bddZero()
         self.sym_goal_states = manager.bddZero()
+        self.sym_state_labels = manager.bddZero()
         self.sym_tr_actions: list = []
         self.predicate_sym_map_curr: bidict = {}
         self.predicate_sym_map_nxt: bidict = {}
+        self.predicate_sym_map_lbl: bidict = {}
         self._create_sym_var_map()
+        self._create_sym_state_label_map()
         self._initialize_bdds_for_actions()
         self._initialize_sym_init_goal_states()
         self._convert_cube_to_func(self.sym_init_states, verbose=True)
@@ -141,9 +156,6 @@ class SymbolicTransitionSystem(object):
         _action = _curr_action_name.split()[0]
         _action = _action[1:]   # remove the intial '(' braket
 
-        # if _action == 'release':
-        #     print("Release the Kraken!")
-
         # assert that its a valid name
         assert _action in _actions, "FIX THIS: Failed extracting a valid action."
 
@@ -158,9 +170,37 @@ class SymbolicTransitionSystem(object):
         self.sym_tr_actions[_idx] |= pre_sym & add_sym & ~del_sym
         
         return _action
-
-
     
+
+    def _create_sym_state_label_map(self):
+        """
+        Loop through all the facts that are reachable and assign a boolean funtion to it
+        """
+        # create all combinations of 1-true and 0-false
+        boolean_str = list(product([1, 0], repeat=len(self.sym_vars_lbl)))
+
+        # We will add dumy brackets around the label e.g. l4 ---> (l4) becuase promela parse names the edges in that fashion
+        _node_int_map_lbl = bidict({state: boolean_str[index] for index, state in enumerate(self.domain_lbls)})
+
+        assert len(boolean_str) >= len(_node_int_map_lbl), "FIX THIS: Looks like there are more lbls that boolean variables!"
+
+        # loop over all the boolean strings and convert them respective bdd vars
+        for _key, _value in _node_int_map_lbl.items():
+            _lbl_val_list = []
+            for _idx, _ele in enumerate(_value):
+                if _ele == 1:
+                    _lbl_val_list.append(self.sym_vars_lbl[_idx])
+                else:
+                    _lbl_val_list.append(~self.sym_vars_lbl[_idx])
+            
+            _bool_func_curr = reduce(lambda a, b: a & b, _lbl_val_list)
+
+            # update bidict accordingly
+            _node_int_map_lbl[_key] = _bool_func_curr
+        
+        self.predicate_sym_map_lbl = _node_int_map_lbl
+
+
     def _create_sym_var_map(self):
         """
         Loop through all the facts that are reachable and assign a boolean funtion to it
@@ -246,3 +286,30 @@ class SymbolicTransitionSystem(object):
             print("# of total symbolic release edge counts", scheck_count_release)
             print("# of total symbolic human-move edge counts", scheck_count_hmove)
             print("All done!")
+
+    
+    def create_state_obs_bdd(self, verbose: bool = False, plot: bool = False):
+        """
+        A function to create the Charactersitic function for each state observation in the domain. 
+        """
+        # this onlt works for grid world for now. A state looks like - `at skbn l#` and we are trying extract l# and add that as bdd
+        for state in self.facts:
+            split_str = re.split(" ", state)
+            _loc = split_str[-1][:-1]   # remove the trailing bracket
+
+            # look up the correspondig boolean formula associated with 
+            _state_bdd = self.predicate_sym_map_curr.get(state)
+            _obs_bdd = self.predicate_sym_map_lbl.get(f'({_loc})')
+
+            assert _obs_bdd or _state_bdd is not None, "Looks like we extracted na invalid observation. FIX THIS!!!"
+
+            self.sym_state_labels |= _state_bdd & _obs_bdd
+        
+        if verbose:
+            print("*************Printing State Observation BDD*************")
+            print(self.sym_state_labels)
+            if plot: 
+                file_path = PROJECT_ROOT + f'/plots/S2Obs_trans_func.dot'
+                file_name = PROJECT_ROOT + f'/plots/S2Obs_trans_func.pdf'
+                self.manager.dumpDot([self.sym_state_labels], file_path=file_path)
+                gv.render(engine='dot', format='pdf', filepath=file_path, outfile=file_name)

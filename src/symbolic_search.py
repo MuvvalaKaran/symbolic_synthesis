@@ -97,7 +97,7 @@ class SymbolicSearch(object):
                 if var == 2 and count % 2 != 0:
                     continue
                 if var == 2 and count % 2 == 0:
-                    _amb_var.append([self.manager.bddVar(2*_idx), ~self.manager.bddVar(2*_idx)])   # count how many vars are missing to full define the bdd
+                    _amb_var.append([self.manager.bddVar(2*_idx), ~self.manager.bddVar(2*_idx)])   # count how many vars are missing to fully define the bdd
                 if var == 0:
                     # use 2* idx as the variable are interleaved
                     var_list.append(~self.manager.bddVar(2*_idx))
