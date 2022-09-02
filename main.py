@@ -1,7 +1,7 @@
-from operator import neg
 import os
 import sys
 import copy
+import time
 import graphviz as gv
 import math
 
@@ -187,19 +187,19 @@ if __name__ == "__main__":
     DRAW_EXPLICIT_CAUSAL_GRAPH: bool = False
 
     domain_file_path = PROJECT_ROOT + "/pddl_files/grid_world/domain.pddl"
-    problem_file_path = PROJECT_ROOT + "/pddl_files/grid_world/problem5_5.pddl"
+    problem_file_path = PROJECT_ROOT + "/pddl_files/grid_world/problem10_10.pddl"
 
     cudd_manager = Cudd()
     
     if BUILD_ABSTRACTION:
         if not CREATE_VAR_LBLS:
-            task, domain, curr_state, next_state  = create_symbolic_causal_graph(cudd_manager=cudd_manager,
+            task, domain, ts_curr_state, ts_next_state  = create_symbolic_causal_graph(cudd_manager=cudd_manager,
                                                                                  problem_pddl_file=problem_file_path,
                                                                                  domain_pddl_file=domain_file_path,
                                                                                  create_lbl_vars=False,
                                                                                  draw_causal_graph=DRAW_EXPLICIT_CAUSAL_GRAPH)
-            sym_tr = SymbolicTransitionSystem(curr_states=curr_state,
-                                              next_states=next_state,
+            sym_tr = SymbolicTransitionSystem(curr_states=ts_curr_state,
+                                              next_states=ts_next_state,
                                               lbl_states=None,
                                               observations=None,
                                               task=task,
@@ -207,14 +207,14 @@ if __name__ == "__main__":
                                               manager=cudd_manager)
 
         else:
-            task, domain, possible_obs, curr_state, next_state, lbl_states  = create_symbolic_causal_graph(cudd_manager=cudd_manager,
-                                                                                            problem_pddl_file=problem_file_path,
-                                                                                            domain_pddl_file=domain_file_path,
-                                                                                            create_lbl_vars=True,
-                                                                                            draw_causal_graph=DRAW_EXPLICIT_CAUSAL_GRAPH)
-            sym_tr = SymbolicTransitionSystem(curr_states=curr_state,
-                                              next_states=next_state,
-                                              lbl_states=lbl_states,
+            task, domain, possible_obs, ts_curr_state, ts_next_state, ts_lbl_states  = create_symbolic_causal_graph(cudd_manager=cudd_manager,
+                                                                                                           problem_pddl_file=problem_file_path,
+                                                                                                           domain_pddl_file=domain_file_path,
+                                                                                                           create_lbl_vars=True,
+                                                                                                           draw_causal_graph=DRAW_EXPLICIT_CAUSAL_GRAPH)
+            sym_tr = SymbolicTransitionSystem(curr_states=ts_curr_state,
+                                              next_states=ts_next_state,
+                                              lbl_states=ts_lbl_states,
                                               observations=possible_obs,
                                               task=task,
                                               domain=domain,
@@ -229,18 +229,18 @@ if __name__ == "__main__":
     
     if BUILD_DFA:
         # list of formula
-        formulas = ['F(l1)']
+        formulas = ['F(l2)']
         # create a list of DFAs
         DFA_list = []
 
         # for now dfa_num is zero. If oyu rhave multiple DFAs then loop over them and update DFA_num
         for _idx, fmla in enumerate(formulas):
             # create boolean variables
-            curr_state, next_state, _dfa = create_symbolic_dfa_graph(cudd_manager=cudd_manager, formula= fmla, dfa_num=_idx)
+            dfa_curr_state, dfa_next_state, _dfa = create_symbolic_dfa_graph(cudd_manager=cudd_manager, formula= fmla, dfa_num=_idx)
             # create TR corresponding to each DFA - dfa name is only used dumping graph 
-            dfa_tr = SymbolicDFA(curr_states=curr_state,
-                                 next_states=next_state,
-                                 ts_lbls=lbl_states,
+            dfa_tr = SymbolicDFA(curr_states=dfa_curr_state,
+                                 next_states=dfa_next_state,
+                                 ts_lbls=ts_lbl_states,
                                  predicate_sym_map_lbl=sym_tr.predicate_sym_map_lbl,
                                  manager=cudd_manager,
                                  dfa=_dfa,
@@ -248,23 +248,38 @@ if __name__ == "__main__":
 
             dfa_tr.create_dfa_transition_system(verbose=True, plot=False)
     
-    init_state = sym_tr.sym_init_states | dfa_tr.sym_init_state
-    print('Inital states: ', init_state)
-    print('Goal states: ', dfa_tr.sym_goal_state)
+    # init_state = sym_tr.sym_init_states | dfa_tr.sym_init_state
+    # print('Inital states: ', init_state)
+    # print('Goal states: ', dfa_tr.sym_goal_state)
     
     giant_tr = reduce(lambda a, b: a | b, sym_tr.sym_tr_actions) 
 
     # let do graph search from init state to a goal state
+    start = time.time()
     graph_search = SymbolicSearch(init=sym_tr.sym_init_states,
                                   target=sym_tr.sym_goal_states,
+                                  init_TS=sym_tr.sym_init_states,
+                                  target_DFA=dfa_tr.sym_goal_state,
+                                  init_DFA=dfa_tr.sym_init_state,
                                   manager=cudd_manager,
-                                  curr_vars=curr_state,
-                                  next_vars=next_state,
-                                  trans_func_list=sym_tr.sym_tr_actions,
-                                  transition_func=giant_tr,
-                                  sym_to_state=sym_tr.predicate_sym_map_curr.inv)
+                                  ts_curr_vars=ts_curr_state,
+                                  ts_next_vars=ts_next_state,
+                                  ts_obs_vars=ts_lbl_states,
+                                  dfa_curr_vars=dfa_curr_state,
+                                  dfa_next_vars=dfa_next_state,
+                                  ts_trans_func_list=sym_tr.sym_tr_actions,
+                                  ts_transition_func=giant_tr,
+                                  dfa_transition_func=dfa_tr.dfa_bdd_tr,
+                                  ts_sym_to_curr_map=sym_tr.predicate_sym_map_curr.inv,
+                                  ts_sym_to_S2O_map=sym_tr.predicate_sym_map_lbl.inv,
+                                  dfa_sym_to_curr_map=dfa_tr.dfa_predicate_sym_map_curr.inv,
+                                  state_obs_bdd=sym_tr.sym_state_labels)
+    
+    graph_search.symbolic_bfs_wLTL(verbose=True)
+    # action_list = graph_search.symbolic_bfs(verbose=False)
+    stop = time.time()
+    print("Time took for plannig: ", stop - start)
 
-    action_list = graph_search.symbolic_bfs(verbose=False)
 
     # graph_search(init=sym_tr.sym_init_states,
     #              target=sym_tr.sym_goal_states,

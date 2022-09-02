@@ -25,8 +25,8 @@ class SymbolicDFA(object):
         self.sym_goal_state = manager.bddZero()
         self.dfa_name = dfa_name
         self.dfa_bdd_tr = manager.bddZero()
-        self.predicate_sym_map_curr: bidict = {}
-        self.predicate_sym_map_nxt: bidict = {}
+        self.dfa_predicate_sym_map_curr: bidict = {}
+        self.dfa_predicate_sym_map_nxt: bidict = {}
         self.predicate_sym_map_lbl = predicate_sym_map_lbl
         self._create_sym_var_map()
         self._initialize_dfa_init_and_goal()
@@ -35,8 +35,8 @@ class SymbolicDFA(object):
         """
         Initialize symbolic init and goal states associated with DFA 
         """
-        self.sym_init_state |= self.predicate_sym_map_curr.get(self.init)
-        self.sym_goal_state |= self.predicate_sym_map_curr.get(self.goal)
+        self.sym_init_state |= self.dfa_predicate_sym_map_curr.get(self.init)
+        self.sym_goal_state |= self.dfa_predicate_sym_map_curr.get(self.goal)
 
         assert self.sym_init_state.isZero() is False and self.sym_goal_state.isZero() is False, \
         "Couldn't build the symbolic init and goal states of DFA. FIX THIS!!!"
@@ -75,8 +75,8 @@ class SymbolicDFA(object):
             _node_int_map_curr[_key] = _bool_func_curr
             _node_int_map_next[_key] = _bool_func_nxt    
         
-        self.predicate_sym_map_curr = _node_int_map_curr
-        self.predicate_sym_map_nxt = _node_int_map_next
+        self.dfa_predicate_sym_map_curr = _node_int_map_curr
+        self.dfa_predicate_sym_map_nxt = _node_int_map_next
     
 
 
@@ -138,8 +138,8 @@ class SymbolicDFA(object):
         """
         for _curr, _nxt in self.dfa._graph.edges():
             # get the boolean formula for the corresponding edge 
-            _curr_sym = self.predicate_sym_map_curr.get(_curr) 
-            _nxt_sym = self.predicate_sym_map_nxt.get(_nxt)
+            _curr_sym = self.dfa_predicate_sym_map_curr.get(_curr) 
+            _nxt_sym = self.dfa_predicate_sym_map_nxt.get(_nxt)
             _edge_sym =  self.get_edge_boolean_formula(curr_state=_curr, nxt_state=_nxt)
            
             
