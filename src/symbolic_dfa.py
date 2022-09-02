@@ -8,6 +8,7 @@ from itertools import product
 
 from config import *
 
+
 class SymbolicDFA(object):
     """
     A class to construct a symbolic transition system for each DFA 
@@ -78,6 +79,25 @@ class SymbolicDFA(object):
         self.dfa_predicate_sym_map_curr = _node_int_map_curr
         self.dfa_predicate_sym_map_nxt = _node_int_map_next
     
+    def in_order_nnf_tree_traversal(self, expression, formula):
+        
+        if hasattr(formula, 'symbol'):
+            # get the corresponding boolean expression
+            if '!' in formula.name:
+                return ~self.predicate_sym_map_lbl.get(formula.symbol)
+            else:
+                return self.predicate_sym_map_lbl.get(formula.symbol)
+        
+        expression = self.in_order_nnf_tree_traversal(expression, formula.left)
+        if formula.name == 'AND':
+            expression = expression & self.in_order_nnf_tree_traversal(expression, formula.right)
+        elif formula.nane == 'OR':
+            expression |= self.in_order_nnf_tree_traversal(expression, formula.right)
+        # elif formula.name  == '':
+        #     expression = ~self.in_order_nnf_tree_traversal(expression, formula.right)
+        # expression = self.in_order_nnf_tree_traversal(expression, formula.right)
+
+        return expression
 
 
     def find_symbols(self, formula):
@@ -94,45 +114,32 @@ class SymbolicDFA(object):
         return symbols
 
     
-    def get_edge_boolean_formula(self, curr_state, nxt_state):
+    def get_edge_boolean_formula(self, curr_state, nxt_state, valid_dfa_edge_formula_size: int = 1):
         """
         Given an edge, extract the string and construct the boolean formula associated with this string 
-        """
-        # get the corresponding edge Boolean formula
-        # dot.edge(f'{str(edge[0])}', f'{str(edge[1])}', label=str(edge[2].get('guard_formula')))
-        
+        """        
         _guard = self.dfa._graph[curr_state][nxt_state][0]['guard']
         _guard_formula = self.dfa._graph[curr_state][nxt_state][0]['guard_formula']
 
         symbls =  self.find_symbols(_guard_formula)
 
-        # edge data has two attribute - guard and guard formula
-        print(symbls)
-
         # if symbls is empty then create True edge
         if not symbls:
             return self.manager.bddOne()
         else:
-            new_boolean_str = copy.deepcopy(_guard_formula)
-            new_boolean_str = new_boolean_str.replace("&&", "&")
-            new_boolean_str = new_boolean_str.replace("||", "|")
-            new_boolean_str = new_boolean_str.replace("!", "~")
+            if len(symbls) > valid_dfa_edge_formula_size:
+                return self.manager.bddZero()
 
-            # get the the corresponding boolean formula
-            sym_edge_formula = self.predicate_sym_map_lbl.get(new_boolean_str)
+            elif len(symbls) <= valid_dfa_edge_formula_size:
+                # for gird world, each state has only one map. But, the edges on the DFA for formula like F(l1 & F(l2))
+                #  will have edges like ((l1)&(!(l2))) and ((l1)&(l2)). While the later is not physically possbile, the first is umabiguous way of
+                #  expressing only 1 symbol. Thus, its a valid edge and we need to create a corresponding boolean formula
+                edgy_formula = self.in_order_nnf_tree_traversal(expression=self.manager.bddZero() , formula=_guard)
+                return edgy_formula
 
-            if sym_edge_formula is None:
-                sym_edge_formula = self.manager.bddZero()
-
-            # # iterate over the symbolc and replace them with symbolic boolean representation
-            # for symbol in symbls:
-            #     assert self.predicate_sym_map_lbl[symbol] is not None, "Trying to access a Boolean formula of unknown observation label"
-            #     new_boolean_str = new_boolean_str.replace(symbol, self.predicate_sym_map_lbl[symbol])
-
-            return sym_edge_formula
     
 
-    def create_dfa_transition_system(self, verbose: bool = False, plot: bool = False):
+    def create_dfa_transition_system(self, verbose: bool = False, plot: bool = False, valid_dfa_edge_formula_size: int = 1):
         """
         A function to create the TR function for each Action we hav defined in the domain
         """
@@ -140,8 +147,9 @@ class SymbolicDFA(object):
             # get the boolean formula for the corresponding edge 
             _curr_sym = self.dfa_predicate_sym_map_curr.get(_curr) 
             _nxt_sym = self.dfa_predicate_sym_map_nxt.get(_nxt)
-            _edge_sym =  self.get_edge_boolean_formula(curr_state=_curr, nxt_state=_nxt)
-           
+            _edge_sym = self.get_edge_boolean_formula(curr_state=_curr,
+                                                       nxt_state=_nxt,
+                                                       valid_dfa_edge_formula_size=valid_dfa_edge_formula_size)
             
             self.dfa_bdd_tr |= _curr_sym & _nxt_sym & _edge_sym
     

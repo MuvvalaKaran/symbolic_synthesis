@@ -184,7 +184,7 @@ class SymbolicTransitionSystem(object):
 
         assert len(boolean_str) >= len(_node_int_map_lbl), "FIX THIS: Looks like there are more lbls that boolean variables!"
 
-        # loop over all the boolean strings and convert them respective bdd vars
+        # loop over all the boolean string and convert them to their respective bdd vars
         for _key, _value in _node_int_map_lbl.items():
             _lbl_val_list = []
             for _idx, _ele in enumerate(_value):
@@ -299,7 +299,7 @@ class SymbolicTransitionSystem(object):
 
             # look up the correspondig boolean formula associated with 
             _state_bdd = self.predicate_sym_map_curr.get(state)
-            _obs_bdd = self.predicate_sym_map_lbl.get(f'({_loc})')
+            _obs_bdd = self.predicate_sym_map_lbl.get(_loc)
 
             assert _obs_bdd or _state_bdd is not None, "Looks like we extracted na invalid observation. FIX THIS!!!"
 

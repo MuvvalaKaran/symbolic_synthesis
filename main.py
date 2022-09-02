@@ -28,7 +28,7 @@ from src.symbolic_abstraction import SymbolicTransitionSystem
 from config import *
 
 
-def create_symbolic_lbl_vars(lbls, manager: Cudd, label_state_var_name: str = 'l'):
+def create_symbolic_lbl_vars(lbls, manager: Cudd, label_state_var_name: str = 'l', valid_dfa_edge_symbol_size: int = 1):
     """
     This function create boolean vairables used to create observation labels for each state. Note that in this method we do create
     prime variables as they do not switch their values.
@@ -52,13 +52,23 @@ def create_symbolic_lbl_vars(lbls, manager: Cudd, label_state_var_name: str = 'l
 
     # We modify the labels so that they are inline with promela's edge labelling format in DFA.
     #  The atomic propositions are always of the form (l2) or (!(l2))
+
+    # remove skbn form the lbls as it contributes to unnecessary variables space
+    try:
+        del lbls['skbn']
+    except KeyError:
+        print("Looks like the label 'skbn' is not an object in the PDDL problem file.")
+
+
     possible_obs: list = []
     for ele in lbls:
-        new_ele = f'({ele})'
-        negation_ele = f'(~({ele}))'
-        possible_obs.append(new_ele)
-        possible_obs.append(negation_ele)
+        # new_ele = f'({ele})'
+        # negation_ele = f'(~({ele}))'
+        possible_obs.append(ele)
+        # possible_obs.append(negation_ele)
     # possible_obs = lbls  # for Frank world you have to update this
+    if valid_dfa_edge_symbol_size > 1:
+        possible_obs = list(product(possible_obs, repeat=valid_dfa_edge_symbol_size))
 
     state_lbl_vars: list = []
     lbl_state = label_state_var_name
@@ -69,7 +79,7 @@ def create_symbolic_lbl_vars(lbls, manager: Cudd, label_state_var_name: str = 'l
     # we subtract -2 as we have (skbn) and (!(skbn))(an agent) defined as an object. We do need to allocate a var for this agent. 
 
     # NOTE: This might cuase issue in the future. len - 2 is hack. You should actually remove the irrelevant objects from objs 
-    num_of_lbls = len(possible_obs) - 2
+    num_of_lbls = len(possible_obs)
     for num_var in range(math.ceil(math.log2(num_of_lbls))):
         _var_index = num_var + _num_of_sym_vars
         state_lbl_vars.append(manager.bddVar(_var_index, f'{lbl_state}{num_var}'))
@@ -115,7 +125,8 @@ def create_symbolic_causal_graph(cudd_manager,
                                  problem_pddl_file: str,
                                  domain_pddl_file: str,
                                  create_lbl_vars: bool,
-                                 draw_causal_graph: bool = False):
+                                 draw_causal_graph: bool = False,
+                                 max_valid_formula_size: int = 1):
     """
     A function to create an instance of causal graph which call pyperplan. We access the task related properties pyperplan
      and create symbolic TR related to action.   
@@ -137,7 +148,7 @@ def create_symbolic_causal_graph(cudd_manager,
         print("*****************Creating Boolean variables for Labels as well! This functionality only works for grid world!*****************")
         objs = _causal_graph_instance.problem.objects
         
-        lbl_state, possible_obs = create_symbolic_lbl_vars(lbls=objs,  manager=cudd_manager)
+        lbl_state, possible_obs = create_symbolic_lbl_vars(lbls=objs,  manager=cudd_manager, valid_dfa_edge_symbol_size= max_valid_formula_size)
 
         return _causal_graph_instance.task, _causal_graph_instance.problem.domain, possible_obs, \
          curr_state, next_state, lbl_state
@@ -187,7 +198,7 @@ if __name__ == "__main__":
     DRAW_EXPLICIT_CAUSAL_GRAPH: bool = False
 
     domain_file_path = PROJECT_ROOT + "/pddl_files/grid_world/domain.pddl"
-    problem_file_path = PROJECT_ROOT + "/pddl_files/grid_world/problem10_10.pddl"
+    problem_file_path = PROJECT_ROOT + "/pddl_files/grid_world/problem5_5.pddl"
 
     cudd_manager = Cudd()
     
@@ -211,6 +222,7 @@ if __name__ == "__main__":
                                                                                                            problem_pddl_file=problem_file_path,
                                                                                                            domain_pddl_file=domain_file_path,
                                                                                                            create_lbl_vars=True,
+                                                                                                           max_valid_formula_size=1,
                                                                                                            draw_causal_graph=DRAW_EXPLICIT_CAUSAL_GRAPH)
             sym_tr = SymbolicTransitionSystem(curr_states=ts_curr_state,
                                               next_states=ts_next_state,
@@ -224,12 +236,14 @@ if __name__ == "__main__":
         
 
         sym_tr.create_transition_system(verbose=False, plot=False)
-        sym_tr.create_state_obs_bdd(verbose=True, plot=False)
+
+        # these spare boolean strs and boolean formulas, of form l0 & l1 & l3.  These will be used for DFA edge assignment if needed
+        sym_tr.create_state_obs_bdd(verbose=True, plot=False)   
 
     
     if BUILD_DFA:
         # list of formula
-        formulas = ['F(l2)']
+        formulas = ['F(l2 & (F(l7) & F(l3)))']
         # create a list of DFAs
         DFA_list = []
 
@@ -246,11 +260,14 @@ if __name__ == "__main__":
                                  dfa=_dfa,
                                  dfa_name=f'dfa_{_idx}')
 
-            dfa_tr.create_dfa_transition_system(verbose=True, plot=False)
+            dfa_tr.create_dfa_transition_system(verbose=True,
+                                                plot=False,
+                                                valid_dfa_edge_formula_size=len(_dfa.get_symbols()))
     
-    # init_state = sym_tr.sym_init_states | dfa_tr.sym_init_state
-    # print('Inital states: ', init_state)
-    # print('Goal states: ', dfa_tr.sym_goal_state)
+    sys.exit()
+    init_state = sym_tr.sym_init_states & dfa_tr.sym_init_state
+    print('Inital states: ', init_state)
+    print('Goal states: ', dfa_tr.sym_goal_state)
     
     giant_tr = reduce(lambda a, b: a | b, sym_tr.sym_tr_actions) 
 
