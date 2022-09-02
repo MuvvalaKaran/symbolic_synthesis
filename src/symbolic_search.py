@@ -2,6 +2,7 @@
 This file implements Symbolic Graph search algorithms
 '''
 import sys
+import copy
 
 from functools import reduce
 from cudd import Cudd, BDD, ADD
@@ -58,13 +59,13 @@ class SymbolicSearch(object):
         # self.reached = []
         # self.que = []
     
-    def pre_per_action(self, trans_action, From, ycube):
+    def pre_per_action(self, trans_action, From, ycube, x_list, y_list):
         """
          Compute the predecessors of 'From' under action specific transition function.
 
         andAbstract: Conjoin to another BDD and existentially quantify variables.
         """
-        fromY = From.swapVariables(self.x_list, self.y_list)
+        fromY = From.swapVariables(x_list, y_list)
         if type(fromY) == type(self.manager.addZero()):
             _conjoin = trans_action.bddPattern() & fromY.bddPattern()
             return _conjoin.existAbstract(ycube.bddPattern()).toADD()
@@ -134,12 +135,13 @@ class SymbolicSearch(object):
                         var_list.append(self.manager.bddVar(_idx))
 
             # check if it is not full defined
+            # og_var_ls = copy.deepcopy(var_list)
             if len(_amb_var) != 0:
                 cart_prod = list(product(*_amb_var))  # *is to pass list as iterable
                 for _ele in cart_prod:
-                    var_list.append(_ele[0])
+                    var_list.extend(_ele)
                     bddVars.append(reduce(lambda a, b: a & b, var_list))
-                    var_list.pop()
+                    var_list = list(set(var_list) - set(_ele))
             else:
                 bddVars.append(reduce(lambda a, b: a & b, var_list))
         return bddVars
@@ -161,12 +163,17 @@ class SymbolicSearch(object):
             for _idx, var in enumerate(cube):
                 if var == 2 and self.manager.bddVar(_idx) not in curr_state_list:   # not x list is better than y _list because we also have dfa vairables 
                     continue   # skipping over prime states 
-                if var == 2 and self.manager.bddVar(_idx) in curr_state_list:
-                    _amb_var.append([self.manager.bddVar(_idx), ~self.manager.bddVar(_idx)])   # count how many vars are missing to fully define the bdd
-                if var == 0:
-                    var_list.append(~self.manager.bddVar(_idx))
-                elif var == 1:
-                    var_list.append(self.manager.bddVar(_idx))
+                
+                if self.manager.bddVar(_idx) in curr_state_list:
+                    if var == 2:
+                        _amb_var.append([self.manager.bddVar(_idx), ~self.manager.bddVar(_idx)])   # count how many vars are missing to fully define the bdd
+                    elif var == 0:
+                        var_list.append(~self.manager.bddVar(_idx))
+                    elif var == 1:
+                        var_list.append(self.manager.bddVar(_idx))
+                    else:
+                        print("CUDD ERRROR, A variable is assigned an unaccounted integret assignment. FIX THIS!!")
+                        sys.exit(-1)
 
             # check if it is not full defined
             if len(_amb_var) != 0:
@@ -263,75 +270,59 @@ class SymbolicSearch(object):
             3.2 Repeat the above process, until we reach the accepting state in the DFA
         4. If a valid path exist, retrieve it.
         """
-        reached_list_TS = []
+        reached_list_composed: list = []
+        closed_composed = self.manager.bddZero()
+
+        reached_list_TS: list = []
         reached_TS = self.init_TS
         closed_TS = self.manager.bddZero()
+
         layer_TS = 0
         ts_xcube = reduce(lambda x, y: x & y, self.ts_x_list)
         ts_obs_cube = reduce(lambda x, y: x & y, self.ts_obs_list)
 
-        reached_list_DFA = []
+        reached_list_DFA: list = []
         reached_DFA = self.init_DFA
         closed_DFA = self.manager.bddZero()
         layer_DFA = 0
         
-        # self.dfa_x_list.extend(self.ts_obs_list)
         dfa_xcube = reduce(lambda x, y: x & y, self.dfa_x_list)
-        # dfa_xcube_augmented = reduce(lambda x, y: x & y, self.dfa_x_list)
 
         reached_list_TS.append(reached_TS)
         reached_list_DFA.append(reached_DFA)
+        reached_list_composed.append(reached_TS & reached_DFA)
         while not self.target_DFA <= reached_list_DFA[layer_DFA]:
 
             reached_list_TS[layer_TS] = reached_list_TS[layer_TS] & ~closed_TS
+            reached_list_DFA[layer_DFA] = reached_list_DFA[layer_DFA] & ~closed_DFA
+            reached_list_composed[layer_TS] = reached_list_composed[layer_TS]  & ~closed_composed
 
             if reached_list_TS[layer_TS] == self.manager.bddZero():
-                print("No plan found")
+                print("The specifcation is unrealizable")
                 break
 
             closed_TS |= reached_list_TS[layer_TS]
-            
-            image_bdd = self.manager.bddZero()
+            closed_DFA |= reached_list_DFA[layer_DFA]
+            closed_composed |= reached_list_composed[layer_TS]
+
+            # evolve on the Transition system
+            ts_image_bdd = self.manager.bddZero()
             for tr_action in self.ts_transition_fun_list:
                 image_c = self.image_per_action(trans_action=tr_action,
                                                 From=reached_list_TS[layer_TS],
                                                 xcube=ts_xcube,
                                                 x_list=self.ts_x_list,
                                                 y_list=self.ts_y_list)
-                image_bdd |= image_c
+                ts_image_bdd |= image_c
 
-            reached_list_TS.append(image_bdd)
-
-            # get all the observations corresponding to this image
-            obs_bdd = self.obs_bdd.restrict(image_bdd)
-            # ts_vars = obs_bdd.support().disjoin(self.manager.bddVar(6))
-            # now remove the ts vars from the observation bdds - will also work with obs_bdd.existAbstrct(ts_xcube) but might be slower
-            # obs_bdd = obs_bdd.existAbstract(ts_vars)
-
-            # you get a characteristic function which is a combination of ts_xcube and ts_obs_labels.
-            #  Intuitively, this means, based on which state you are in, your label will differ.
-            obs_bdd.existAbstract(ts_xcube)    
-
-            # check if any of the DFA edges are satisfied
-            # image_DFA = self.dfa_transition_fun.restrict(reached_list_DFA[layer_DFA] & obs_bdd.existAbstract(ts_xcube))
-            image_DFA = self.dfa_transition_fun.restrict(reached_list_DFA[layer_DFA] & obs_bdd)
-
-             # you get a characteristic function which is a combination of ts_obs_labels and dfa_xcube.
-            #  Intuitively, this means, based on which state you are in, your label will differ and accordingly you may or may not evolve on the DFA.
-            image_DFA = image_DFA.existAbstract(ts_obs_cube)   # we needs to swap vairables
-            image_DFA = image_DFA.swapVariables(self.dfa_y_list, self.dfa_x_list)
-
-            # image_DFA = self.image(From=reached_list_DFA[layer_DFA],
-            #                        xcube=dfa_xcube_augmented,
-            #                        x_list=self.dfa_x_list,
-            #                        y_list=self.dfa_y_list,
-            #                        transition_fun=self.dfa_transition_fun)
-            
-            reached_list_DFA.append(image_DFA)
+            # get the observation for all the states in the image
+            obs_bdd = self.obs_bdd.restrict(ts_image_bdd)
+            reached_list_TS.append(ts_image_bdd)
 
             if verbose:
                 # now extract the set of states that are being expanded during each iteration
-                ts_cube_string = self._convert_cube_to_func(bdd_func=reached_list_TS[layer_TS], curr_state_list=self.ts_x_list)
+                ts_cube_string = self._convert_cube_to_func(bdd_func=ts_image_bdd, curr_state_list=self.ts_x_list)
+                # ts_cube_string = self._convert_cube_to_func(bdd_func=reached_list[-1], curr_state_list=self.ts_x_list)
                 print("Abstraction State(s) Reached")
                 for _s in ts_cube_string:
                     _name = self.ts_sym_to_curr_state_map.get(_s)
@@ -345,7 +336,20 @@ class SymbolicSearch(object):
                     _name = self.ts_sym_to_S2obs_map.get(_s)
                     assert _name is not None, "Couldn't convert Cube string to its corresponding State. FIX THIS!!!"
                     print(_name)
-                
+
+            # check if any of the DFA edges are satisfied
+            image_DFA = self.dfa_transition_fun.restrict(reached_list_DFA[-1] & obs_bdd)
+
+             # you get a characteristic function which is a combination of ts_obs_labels and dfa_xcube.
+            #  Intuitively, this means, based on which state you are in, your label will differ and accordingly you may or may not evolve on the DFA.
+            # image_DFA = image_DFA.existAbstract(ts_obs_cube)   # we needs to swap vairables
+            image_DFA = image_DFA.swapVariables(self.dfa_y_list, self.dfa_x_list)
+
+            image_DFA_only = image_DFA.existAbstract(ts_obs_cube)
+            reached_list_DFA.append(image_DFA_only)   # using exist abstract removes the dependence on TA curr state related boolean variables 
+            reached_list_composed.append(image_DFA_only & ts_image_bdd)
+
+            if verbose:
                 dfa_cube_string = self._convert_cube_to_func(bdd_func=image_DFA, curr_state_list=self.dfa_x_list)
                 print("DFA State(s) Reached")
                 for _s in dfa_cube_string:
@@ -356,10 +360,34 @@ class SymbolicSearch(object):
 
             layer_TS += 1
             layer_DFA += 1
+        
+        # get the state that satisfied the accepting labels in the DFA
+        labels_that_satified_the_task = image_DFA.restrict(self.target_DFA)
+        
+        # the actual observation will be at the intersection of last set of observation and possible obs
+        satis_lbl = (labels_that_satified_the_task & obs_bdd).existAbstract(ts_xcube)
 
-        reached_list_TS[layer_TS] = reached_list_TS[layer_TS] & self.target_DFA
+        self.accepting_ts_state = self.obs_bdd.restrict(satis_lbl)
 
-        return self.retrive_bfs_action(reached_list_TS)
+        if verbose:
+            ts_S2O_cube_String = self._convert_cube_to_func_S2Obs(bdd_func=satis_lbl)
+            print("State Observation before satisfaction")
+            for _s in ts_S2O_cube_String:
+                _name = self.ts_sym_to_S2obs_map.get(_s)
+                assert _name is not None, "Couldn't convert Cube string to its corresponding State. FIX THIS!!!"
+                print(_name)
+
+            # now extract the set of states that are being expanded during each iteration
+            ts_cube_string = self._convert_cube_to_func(bdd_func=self.accepting_ts_state, curr_state_list=self.ts_x_list)
+            print("Accepting Abstraction State(s) Reached")
+            for _s in ts_cube_string:
+                _name = self.ts_sym_to_curr_state_map.get(_s)
+                assert _name is not None, "Couldn't convert Cube string to its corresponding State. FIX THIS!!!"
+                print(_name)
+
+        reached_list_composed[layer_TS] = reached_list_composed[layer_TS] & self.target_DFA & self.accepting_ts_state
+
+        return self.retrive_bfs_wLTL_actions(reached_list_composed, verbose=False)
 
 
     def retrieve_bfs(self, reached_list):
@@ -393,11 +421,58 @@ class SymbolicSearch(object):
             # for each action
             for idx, tran_func_action in enumerate(self.transition_fun_list):
                 pred = self.pre_per_action(trans_action=tran_func_action, From=current, ycube=ycube)
-
                 if pred & reached_list[layer - 1] != self.manager.bddZero():
                     current = pred & reached_list[layer - 1]
                     plan.append(idx)
 
         print(plan)
+
+        return plan
+    
+
+    def retrive_bfs_wLTL_actions(self, reached_list_composed, verbose: bool = False):
+        """
+        Retrieve the plan from symbolic BFS algorithm. The list is sequence of composed states of TS and DFA.
+        """
+        ts_ycube = reduce(lambda a, b: a & b, self.ts_y_list)
+        n = len(reached_list_composed)
+        plan = [None for _ in range(n)]
+        current = reached_list_composed[n - 1]
+        dfa_xcube = reduce(lambda x, y: x & y, self.dfa_x_list)
+
+        for layer in reversed(range(n)):
+            # for each action
+            # pred = self.manager.bddZero()
+            preds: list = []
+            for idx, tran_func_action in enumerate(self.ts_transition_fun_list):
+                preds.append(self.pre_per_action(trans_action=tran_func_action, From=current, ycube=ts_ycube, x_list=self.ts_x_list, y_list=self.ts_y_list).existAbstract(dfa_xcube))
+                # pred = pred | self.pre_per_action(trans_action=tran_func_action, From=current, ycube=ts_ycube, x_list=self.ts_x_list, y_list=self.ts_y_list)
+
+            # pred = pred.existAbstract(dfa_xcube)
+            tmp = reached_list_composed[layer - 1].existAbstract(dfa_xcube)
+
+            if verbose:
+                # now extract the set of states that are being expanded during each iteration
+                ts_cube_string = self._convert_cube_to_func(bdd_func=pred, curr_state_list=self.ts_x_list)
+                print("Predeccsors Abstraction State(s)")
+                for _s in ts_cube_string:
+                    _name = self.ts_sym_to_curr_state_map.get(_s)
+                    assert _name is not None, "Couldn't convert Cube string to its corresponding State. FIX THIS!!!"
+                    print(_name)
+                
+                ts_cube_string = self._convert_cube_to_func(bdd_func=tmp, curr_state_list=self.ts_x_list)
+                print("Predeccsors Abstraction State(s)")
+                for _s in ts_cube_string:
+                    _name = self.ts_sym_to_curr_state_map.get(_s)
+                    assert _name is not None, "Couldn't convert Cube string to its corresponding State. FIX THIS!!!"
+                    print(_name)
+
+
+            for tr_num, pred in enumerate(preds):
+                if pred & reached_list_composed[layer - 1].existAbstract(dfa_xcube) != self.manager.bddZero():
+                    current = pred & reached_list_composed[layer - 1].existAbstract(dfa_xcube)
+                    plan[layer] = tr_num
+
+        # print(plan)
 
         return plan

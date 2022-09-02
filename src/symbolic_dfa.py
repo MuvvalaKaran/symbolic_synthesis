@@ -93,9 +93,6 @@ class SymbolicDFA(object):
             expression = expression & self.in_order_nnf_tree_traversal(expression, formula.right)
         elif formula.nane == 'OR':
             expression |= self.in_order_nnf_tree_traversal(expression, formula.right)
-        # elif formula.name  == '':
-        #     expression = ~self.in_order_nnf_tree_traversal(expression, formula.right)
-        # expression = self.in_order_nnf_tree_traversal(expression, formula.right)
 
         return expression
 

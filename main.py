@@ -243,7 +243,7 @@ if __name__ == "__main__":
     
     if BUILD_DFA:
         # list of formula
-        formulas = ['F(l2 & (F(l7) & F(l3)))']
+        formulas = ['F(l2 & (F(l7)))']
         # create a list of DFAs
         DFA_list = []
 
@@ -264,7 +264,7 @@ if __name__ == "__main__":
                                                 plot=False,
                                                 valid_dfa_edge_formula_size=len(_dfa.get_symbols()))
     
-    sys.exit()
+    # sys.exit()
     init_state = sym_tr.sym_init_states & dfa_tr.sym_init_state
     print('Inital states: ', init_state)
     print('Goal states: ', dfa_tr.sym_goal_state)
@@ -292,7 +292,7 @@ if __name__ == "__main__":
                                   dfa_sym_to_curr_map=dfa_tr.dfa_predicate_sym_map_curr.inv,
                                   state_obs_bdd=sym_tr.sym_state_labels)
     
-    graph_search.symbolic_bfs_wLTL(verbose=True)
+    action_list = graph_search.symbolic_bfs_wLTL(verbose=True)
     # action_list = graph_search.symbolic_bfs(verbose=False)
     stop = time.time()
     print("Time took for plannig: ", stop - start)
@@ -306,7 +306,10 @@ if __name__ == "__main__":
 
     print("Sequence of actions")
     for _a in reversed(action_list):
-        print(sym_tr.tr_action_idx_map.inv[_a])
+        try:
+            print(sym_tr.tr_action_idx_map.inv[_a])
+        except KeyError:
+            pass
     
     print("Done with the plan")
 
