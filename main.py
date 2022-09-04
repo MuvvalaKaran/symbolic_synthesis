@@ -238,12 +238,16 @@ if __name__ == "__main__":
         sym_tr.create_transition_system(verbose=False, plot=False)
 
         # these spare boolean strs and boolean formulas, of form l0 & l1 & l3.  These will be used for DFA edge assignment if needed
-        sym_tr.create_state_obs_bdd(verbose=True, plot=False)   
+        sym_tr.create_state_obs_bdd(verbose=False, plot=False)   
 
     
     if BUILD_DFA:
         # list of formula
-        formulas = ['F(l2 & (F(l7)))']
+        formulas = [
+            # 'F(l13 & (F(l21) & F(l5)))',
+            # 'F(l13 & (F(l21 & (F(l5)))))',
+            "F(l21 & (F(l5 & (F(l25 & F(l1))))))"   # traversing the gridworld on the corners
+            ]
         # create a list of DFAs
         DFA_list = []
 
@@ -260,7 +264,7 @@ if __name__ == "__main__":
                                  dfa=_dfa,
                                  dfa_name=f'dfa_{_idx}')
 
-            dfa_tr.create_dfa_transition_system(verbose=True,
+            dfa_tr.create_dfa_transition_system(verbose=False,
                                                 plot=False,
                                                 valid_dfa_edge_formula_size=len(_dfa.get_symbols()))
     
@@ -292,9 +296,14 @@ if __name__ == "__main__":
                                   dfa_sym_to_curr_map=dfa_tr.dfa_predicate_sym_map_curr.inv,
                                   state_obs_bdd=sym_tr.sym_state_labels)
     
-    action_list = graph_search.symbolic_bfs_wLTL(verbose=True)
-    # action_list = graph_search.symbolic_bfs(verbose=False)
+    graph_search.updated_symbolic_bfs_wLTL(verbose=False)
     stop = time.time()
+    print("Time took for plannig: ", stop - start)
+    sys.exit()
+    
+    # action_list = graph_search.symbolic_bfs_wLTL(verbose=True)
+    # action_list = graph_search.symbolic_bfs(verbose=False)
+    
     print("Time took for plannig: ", stop - start)
 
 
