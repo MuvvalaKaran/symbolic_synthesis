@@ -22,7 +22,6 @@ from src.symbolic_dfa import SymbolicDFA
 from src.symbolic_abstraction import SymbolicTransitionSystem
 
 import  src.gridworld_visualizer.gridworld_vis.gridworld as gridworld_handle
-# import grid
 # from symbolic_planning.src.graph_search import forward_reachability
 
 from config import *

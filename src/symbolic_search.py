@@ -122,6 +122,25 @@ class SymbolicSearch(object):
             return ImgY.swapVariables(y_list, x_list)
     
 
+    def _append_dict_value(self, dict_obj, key, value):
+        """
+        Check if key exist in dict or not.
+
+        If Key exist in dict:
+           Check if type of value of key is list or not
+           
+           If type is not list then make it list and Append the value in list
+        
+        else: add key-value pair
+        """
+        if key in dict_obj:
+            if not isinstance(dict_obj[key], list):
+                dict_obj[key] = [dict_obj[key]]
+            dict_obj[key].append(value)
+        else:
+            dict_obj[key] = value
+    
+
     def _get_ts_states_to_dfa_evolution(self, ts_states, dfa_to_state, dfa_from_states):
         """
         A helpr function that give a set of Treansition system system, compute their respective observation.
@@ -320,7 +339,7 @@ class SymbolicSearch(object):
 
 
 
-    def updated_symbolic_bfs_wLTL(self, verbose: bool = False):
+    def updated_symbolic_bfs_wLTL(self, max_ts_state: int, verbose: bool = False):
         """
         Implement a symbolic bread first search algorithm for LTL based planning.
 
@@ -337,46 +356,57 @@ class SymbolicSearch(object):
             3.2 Repeat the above process, until we reach the accepting state in the DFA
         4. If a valid path exist, retrieve it.
         """
-        parent_reached_list = {key : {'reached_list' : [],
-                                      'layer': 0,
-                                      'closed': self.manager.bddZero()} for key in self.dfa_sym_to_curr_state_map.inv.keys()}
+        # get the # number of states in the TS 
 
+        parent_reached_list = {key : {'reached_list' : [self.manager.bddZero() for _ in range(4*max_ts_state)],
+                                      'dfa_counter' : 0,
+                                      'closed': self.manager.bddZero()} for key in self.dfa_sym_to_curr_state_map.inv.keys()}
+        # maintain a common layering number
+        parent_layer_counter = 0
         ts_xcube = reduce(lambda x, y: x & y, self.ts_x_list)
 
         # add the initi TS state to the init DFA state
         _explicit_dfa_state: str = self.dfa_sym_to_curr_state_map[self.init_DFA]
-        parent_reached_list[_explicit_dfa_state]['reached_list'].append(self.init_TS)
-        iter_count = 0
+        parent_reached_list[_explicit_dfa_state]['reached_list'][parent_layer_counter] = self.init_TS
 
         
-        while not len(parent_reached_list["accept_all"]['reached_list']) > 0:
+        while parent_reached_list["accept_all"]['reached_list'][parent_layer_counter].isZero():
             for _dfa_curr_state, _dfa_fronteirs in parent_reached_list.items():
-                layer_num = _dfa_fronteirs['layer'] 
-                if len(_dfa_fronteirs['reached_list']) > 0:
-                    reached = _dfa_fronteirs['reached_list'][layer_num]
+                # layer_num = _dfa_fronteirs['layer'] 
+                # if len(_dfa_fronteirs['reached_list']) > 0:
+                if parent_layer_counter > _dfa_fronteirs['dfa_counter']:
+                    _local_layer_counter = _dfa_fronteirs['dfa_counter']
+                    reached = _dfa_fronteirs['reached_list'][_local_layer_counter]
+                elif parent_layer_counter == _dfa_fronteirs['dfa_counter']:
+                    _local_layer_counter = parent_layer_counter
+                    reached = _dfa_fronteirs['reached_list'][parent_layer_counter]
                 else:
-                    reached = []
+                    print("Error with counters in BFS algorithm. FIX THIS!!!")
+                    sys.exit(-1)
+                # else:
+                #     reached = []
                 closed = _dfa_fronteirs['closed']
-                if len(_dfa_fronteirs['reached_list']) > 0 and not reached.isZero():
-                    parent_reached_list[_dfa_curr_state]['reached_list'][layer_num] = \
-                     parent_reached_list[_dfa_curr_state]['reached_list'][layer_num] & ~closed
+                # if len(_dfa_fronteirs['reached_list']) > 0 and not reached.isZero():
+                if not reached.isZero():
+                    parent_reached_list[_dfa_curr_state]['reached_list'][_local_layer_counter] = \
+                     parent_reached_list[_dfa_curr_state]['reached_list'][_local_layer_counter] & ~closed
                     
                     parent_reached_list[_dfa_curr_state]['closed'] |= \
-                                 parent_reached_list[_dfa_curr_state]['reached_list'][layer_num]
+                                 parent_reached_list[_dfa_curr_state]['reached_list'][_local_layer_counter]
                     
-                    if parent_reached_list[_dfa_curr_state]['reached_list'][layer_num].isZero():
+                    if parent_reached_list[_dfa_curr_state]['reached_list'][_local_layer_counter].isZero():
                         print(f"**************Reached a Fixed Point for DFA State {_dfa_curr_state}**************")
 
                     # if there is a state in the TA that reached the DFA accepting state then terminate
-                    if len(parent_reached_list["accept_all"]['reached_list']) > 0:
-                        print("************** Reached an accepting state **************")
+                    if not parent_reached_list["accept_all"]['reached_list'][_local_layer_counter].isZero():
+                        print("************** Reached an accepting state. Now Retrieving a plan **************")
                         break 
 
                     # compute the image of the TS states 
                     ts_image_bdd = self.manager.bddZero()
                     for tr_action in self.ts_transition_fun_list:
                         image_c = self.image_per_action(trans_action=tr_action,
-                                                        From=parent_reached_list[_dfa_curr_state]['reached_list'][layer_num],
+                                                        From=parent_reached_list[_dfa_curr_state]['reached_list'][_local_layer_counter],
                                                         xcube=ts_xcube,
                                                         x_list=self.ts_x_list,
                                                         y_list=self.ts_y_list)
@@ -428,154 +458,24 @@ class SymbolicSearch(object):
                                 # check if the state begin added has a;ready been explored or not for this DFA state
                                 _new_ts_state = _ts_states & ~parent_reached_list[_key]['closed']
                                 if not _new_ts_state.isZero():
-                                    parent_reached_list[_key]['reached_list'].append(_new_ts_state)
-            
+                                    # if you are adding to the current then append, else add to the last layer of the other boxes
+                                    # if _key == _dfa_curr_state:
+                                    parent_reached_list[_key]['reached_list'][parent_layer_counter + 1] = _new_ts_state
+                                    parent_reached_list[_key]['dfa_counter'] = parent_layer_counter + 1
+                   
                     # update the layer after you have looped through all the DFA states
-                    _dfa_fronteirs['layer'] += 1
-                    if len(_dfa_fronteirs['reached_list']) -1 != _dfa_fronteirs['layer']:
-                        _dfa_fronteirs['layer'] -= 1
-            # num of iterations count -needed for retrieving the plan
-            iter_count += 1
+                    parent_layer_counter += 1
+                
         
         # sanity check printing
-        if len(parent_reached_list["accept_all"]['reached_list']) > 0:
-            print("************** Reached an accepting state **************")
-        return self.updated_retrive_bfs_wLTL_actions(reached_list_composed=parent_reached_list,
-                                                     max_layer_num=iter_count,
-                                                     verbose=verbose)
-
-        
-    
-    def symbolic_bfs_wLTL(self, verbose: bool = False):
-        """
-        Implement a symbolic bread first search algorithm for LTL based planning.
-
-        In this search algorithm, we start from the init state in both the TS and DFA.
-        1. Starting from the init state in the abstraction, we take a step
-        2. get the observation for all the states in the image
-        3. Check if Any of the state's observation satisfies the DFA edge label 
-            3.1 If yes, then transit in the DFA as well.
-            3.2 Repeat the above process, until we reach the accepting state in the DFA
-        4. If a valid path exist, retrieve it.
-        """
-        reached_list_composed: list = []
-        closed_composed = self.manager.bddZero()
-
-        reached_list_TS: list = []
-        reached_TS = self.init_TS
-        closed_TS = self.manager.bddZero()
-
-        layer_TS = 0
-        ts_xcube = reduce(lambda x, y: x & y, self.ts_x_list)
-        ts_obs_cube = reduce(lambda x, y: x & y, self.ts_obs_list)
-
-        reached_list_DFA: list = []
-        reached_DFA = self.init_DFA
-        closed_DFA = self.manager.bddZero()
-        layer_DFA = 0
-        
-        dfa_xcube = reduce(lambda x, y: x & y, self.dfa_x_list)
-
-        reached_list_TS.append(reached_TS)
-        reached_list_DFA.append(reached_DFA)
-        reached_list_composed.append(reached_TS & reached_DFA)
-        while not self.target_DFA <= reached_list_DFA[layer_DFA]:
-
-            reached_list_TS[layer_TS] = reached_list_TS[layer_TS] & ~closed_TS
-            reached_list_DFA[layer_DFA] = reached_list_DFA[layer_DFA] & ~closed_DFA
-            reached_list_composed[layer_TS] = reached_list_composed[layer_TS]  & ~closed_composed
-
-            if reached_list_TS[layer_TS] == self.manager.bddZero():
-                print("The specifcation is unrealizable")
-                break
-
-            closed_TS |= reached_list_TS[layer_TS]
-            closed_DFA |= reached_list_DFA[layer_DFA]
-            closed_composed |= reached_list_composed[layer_TS]
-
-            # evolve on the Transition system
-            ts_image_bdd = self.manager.bddZero()
-            for tr_action in self.ts_transition_fun_list:
-                image_c = self.image_per_action(trans_action=tr_action,
-                                                From=reached_list_TS[layer_TS],
-                                                xcube=ts_xcube,
-                                                x_list=self.ts_x_list,
-                                                y_list=self.ts_y_list)
-                ts_image_bdd |= image_c
-
-            # get the observation for all the states in the image
-            obs_bdd = self.obs_bdd.restrict(ts_image_bdd)
-            reached_list_TS.append(ts_image_bdd)
-
-            if verbose:
-                # now extract the set of states that are being expanded during each iteration
-                ts_cube_string = self._convert_cube_to_func(bdd_func=ts_image_bdd, curr_state_list=self.ts_x_list)
-                # ts_cube_string = self._convert_cube_to_func(bdd_func=reached_list[-1], curr_state_list=self.ts_x_list)
-                print("Abstraction State(s) Reached")
-                for _s in ts_cube_string:
-                    _name = self.ts_sym_to_curr_state_map.get(_s)
-                    assert _name is not None, "Couldn't convert Cube string to its corresponding State. FIX THIS!!!"
-                    print(_name)
-                
-                # this is for checking lables associated with state we expanded to
-                ts_S2O_cube_String = self._convert_cube_to_func_S2Obs(bdd_func=obs_bdd)
-                print("Corresponding State Observation")
-                for _s in ts_S2O_cube_String:
-                    _name = self.ts_sym_to_S2obs_map.get(_s)
-                    assert _name is not None, "Couldn't convert Cube string to its corresponding State. FIX THIS!!!"
-                    print(_name)
-
-            # check if any of the DFA edges are satisfied
-            image_DFA = self.dfa_transition_fun.restrict(reached_list_DFA[-1] & obs_bdd)
-
-             # you get a characteristic function which is a combination of ts_obs_labels and dfa_xcube.
-            #  Intuitively, this means, based on which state you are in, your label will differ and accordingly you may or may not evolve on the DFA.
-            # image_DFA = image_DFA.existAbstract(ts_obs_cube)   # we needs to swap vairables
-            image_DFA = image_DFA.swapVariables(self.dfa_y_list, self.dfa_x_list)
-
-            image_DFA_only = image_DFA.existAbstract(ts_obs_cube)
-            reached_list_DFA.append(image_DFA_only)   # using exist abstract removes the dependence on TA curr state related boolean variables 
-            reached_list_composed.append(image_DFA_only & ts_image_bdd)
-
-            if verbose:
-                dfa_cube_string = self._convert_cube_to_func(bdd_func=image_DFA, curr_state_list=self.dfa_x_list)
-                print("DFA State(s) Reached")
-                for _s in dfa_cube_string:
-                    _name = self.dfa_sym_to_curr_state_map.get(_s)
-                    assert _name is not None, "Couldn't convert Cube string to its corresponding State. FIX THIS!!!"
-                    print(_name)
-                    
-
-            layer_TS += 1
-            layer_DFA += 1
-        
-        # get the state that satisfied the accepting labels in the DFA
-        labels_that_satified_the_task = image_DFA.restrict(self.target_DFA)
-        
-        # the actual observation will be at the intersection of last set of observation and possible obs
-        satis_lbl = (labels_that_satified_the_task & obs_bdd).existAbstract(ts_xcube)
-
-        self.accepting_ts_state = self.obs_bdd.restrict(satis_lbl)
-
-        if verbose:
-            ts_S2O_cube_String = self._convert_cube_to_func_S2Obs(bdd_func=satis_lbl)
-            print("State Observation before satisfaction")
-            for _s in ts_S2O_cube_String:
-                _name = self.ts_sym_to_S2obs_map.get(_s)
-                assert _name is not None, "Couldn't convert Cube string to its corresponding State. FIX THIS!!!"
-                print(_name)
-
-            # now extract the set of states that are being expanded during each iteration
-            ts_cube_string = self._convert_cube_to_func(bdd_func=self.accepting_ts_state, curr_state_list=self.ts_x_list)
-            print("Accepting Abstraction State(s) Reached")
-            for _s in ts_cube_string:
-                _name = self.ts_sym_to_curr_state_map.get(_s)
-                assert _name is not None, "Couldn't convert Cube string to its corresponding State. FIX THIS!!!"
-                print(_name)
-
-        reached_list_composed[layer_TS] = reached_list_composed[layer_TS] & self.target_DFA & self.accepting_ts_state
-
-        return self.retrive_bfs_wLTL_actions(reached_list_composed, verbose=False)
+        if not parent_reached_list["accept_all"]['reached_list'][parent_layer_counter].isZero():
+            print("************** Reached an accepting state. Now Retrieving a plan**************")
+            return self.updated_retrive_bfs_wLTL_actions(reached_list_composed=parent_reached_list,
+                                                        max_layer_num=parent_layer_counter,
+                                                        verbose=verbose)
+        else:
+            print("No plan found")
+            sys.exit()
 
 
     def retrieve_bfs(self, reached_list):
@@ -623,31 +523,27 @@ class SymbolicSearch(object):
         Retrieve the plan from symbolic BFS algorithm. The list is sequence of composed states of TS and DFA.
         """
         ts_ycube = reduce(lambda a, b: a & b, self.ts_y_list)
-        accp_layer_num = len(reached_list_composed['accept_all']['reached_list'])
-
-        assert accp_layer_num == 1, "THe accept_all DFA state has more than one layer. This should not happen FIX THIS!!"
-
-        plan = []
-        current_ts = reached_list_composed['accept_all']['reached_list'][0]
+        accepting_dfa_count = reached_list_composed['accept_all']['dfa_counter']
+        current_ts = reached_list_composed['accept_all']['reached_list'][accepting_dfa_count]
         current_dfa = 'accept_all'
         sym_current_dfa = self.dfa_sym_to_curr_state_map.inv[current_dfa]
         dfa_xcube = reduce(lambda x, y: x & y, self.dfa_x_list)
         dfa_ycube = reduce(lambda x, y: x & y, self.dfa_y_list)
         ts_obs_cube = reduce(lambda x, y: x & y, self.ts_obs_list)
-        reverse_count = 1    # counter to keep track of # of backsteps we take. Helps when we are jumming from DFA state to another 
-        layer_num = max_layer_num
+        reverse_count = 1    # counter to keep track of No. of backsteps we take. Helps when we are jumming from DFA state to another 
 
         # loops till you reach the init DFA and TS state
+        parent_plan = {}
+        iter_count = 0
         while not(self.init_TS <= current_ts and sym_current_dfa == self.init_DFA):
-        # for layer in reversed(range(n)):
             # for each action
             preds_ts_list = []
-            for idx, tran_func_action in enumerate(self.ts_transition_fun_list):
-                preds_ts_list.append( self.pre_per_action(trans_action=tran_func_action,
-                                                          From=current_ts,
-                                                          ycube=ts_ycube,
-                                                          x_list=self.ts_x_list,
-                                                          y_list=self.ts_y_list))
+            for tran_func_action in self.ts_transition_fun_list:
+                preds_ts_list.append(self.pre_per_action(trans_action=tran_func_action,
+                                                         From=current_ts,
+                                                         ycube=ts_ycube,
+                                                         x_list=self.ts_x_list,
+                                                         y_list=self.ts_y_list))
                
             # compute the pre on the DFA
             # check any of the above pre intersects with their respective forward set
@@ -667,102 +563,34 @@ class SymbolicSearch(object):
                 if not _v.isZero():
                     # we ignore the very last layer as that is the list where the current ts state came from 
                     # reached_list_composed[_dfa_state]['layer'] = reverse_count
-                    _layer_num = reached_list_composed[_dfa_state]['layer'] - reverse_count
-                    # pred_ts_bdd = reduce(lambda x, y: x | y, preds_ts_list)
-                    _action_num = []
+                    _layer_num = max_layer_num - reverse_count
+                    while reached_list_composed[_dfa_state]['reached_list'][_layer_num].isZero():
+                        reverse_count += 1
+                        _layer_num = max_layer_num - reverse_count
+
                     valid_pred_ts = self.manager.bddZero() 
                     for tr_num, pred_ts_bdd in enumerate(preds_ts_list):
                         _valid_ts = pred_ts_bdd & reached_list_composed[_dfa_state]['reached_list'][_layer_num] 
+                        if verbose:
+                            # print the set of states that are lie at the intersection of Backward Search and Forward Search
+                            ts_cube_string = self._convert_cube_to_func(bdd_func=_valid_ts, curr_state_list=self.ts_x_list)
+                            # print("Abstraction State(s) Reached")
+                            for _s in ts_cube_string:
+                                _name = self.ts_sym_to_curr_state_map.get(_s)
+                                assert _name is not None, "Couldn't convert Cube string to its corresponding State. FIX THIS!!!"
+                                print(f"{_name} lies at the intersection of Forward and Backward Search at Iter {iter_count}")
                         # tr_num corresponds to the TR action
                         if not _valid_ts.isZero():
                             valid_pred_ts |= _valid_ts
-                            _action_num.append(tr_num)
-                    
+                            for _ts_state in self._convert_cube_to_func(bdd_func=_valid_ts, curr_state_list=self.ts_x_list):
+                                self._append_dict_value(dict_obj=parent_plan,
+                                                        key=f'{self.ts_sym_to_curr_state_map[_ts_state]} & {_dfa_state}',
+                                                        value=self.tr_action_idx_map.inv[tr_num])
                     # this is our current_ts now
                     current_ts = valid_pred_ts
                     sym_current_dfa = self.dfa_sym_to_curr_state_map.inv[_dfa_state]
-            
+            # normal counter for iteration count
+            iter_count += 1
             reverse_count += 1
 
-                        
-
-
-            
-
-
-            
-            # tmp = reached_list_composed[layer - 1].existAbstract(dfa_xcube)
-
-            # if verbose:
-            #     # now extract the set of states that are being expanded during each iteration
-            #     ts_cube_string = self._convert_cube_to_func(bdd_func=preds_ts, curr_state_list=self.ts_x_list)
-            #     print("Predeccsors Abstraction State(s)")
-            #     for _s in ts_cube_string:
-            #         _name = self.ts_sym_to_curr_state_map.get(_s)
-            #         assert _name is not None, "Couldn't convert Cube string to its corresponding State. FIX THIS!!!"
-            #         print(_name)
-                
-            #     dfa_cube_string = self._convert_cube_to_func(bdd_func=pred_dfa, curr_state_list=self.dfa_x_list)
-            #     print("Predeccsors Abstraction State(s)")
-            #     for _s in dfa_cube_string:
-            #         _name = self.dfa_sym_to_curr_state_map.get(_s)
-            #         assert _name is not None, "Couldn't convert Cube string to its corresponding State. FIX THIS!!!"
-            #         print(_name)
-
-
-            # for tr_num, pred in enumerate(preds):
-            #     if pred & reached_list_composed[layer - 1].existAbstract(dfa_xcube) != self.manager.bddZero():
-            #         current = pred & reached_list_composed[layer - 1].existAbstract(dfa_xcube)
-            #         plan[layer] = tr_num
-
-        # print(plan)
-
-        return plan
-    
-
-    def retrive_bfs_wLTL_actions(self, reached_list_composed, verbose: bool = False):
-        """
-        Retrieve the plan from symbolic BFS algorithm. The list is sequence of composed states of TS and DFA.
-        """
-        ts_ycube = reduce(lambda a, b: a & b, self.ts_y_list)
-        n = len(reached_list_composed)
-        plan = [None for _ in range(n)]
-        current = reached_list_composed[n - 1]
-        dfa_xcube = reduce(lambda x, y: x & y, self.dfa_x_list)
-
-        for layer in reversed(range(n)):
-            # for each action
-            # pred = self.manager.bddZero()
-            preds: list = []
-            for idx, tran_func_action in enumerate(self.ts_transition_fun_list):
-                preds.append(self.pre_per_action(trans_action=tran_func_action, From=current, ycube=ts_ycube, x_list=self.ts_x_list, y_list=self.ts_y_list).existAbstract(dfa_xcube))
-                # pred = pred | self.pre_per_action(trans_action=tran_func_action, From=current, ycube=ts_ycube, x_list=self.ts_x_list, y_list=self.ts_y_list)
-
-            # pred = pred.existAbstract(dfa_xcube)
-            tmp = reached_list_composed[layer - 1].existAbstract(dfa_xcube)
-
-            if verbose:
-                # now extract the set of states that are being expanded during each iteration
-                ts_cube_string = self._convert_cube_to_func(bdd_func=pred, curr_state_list=self.ts_x_list)
-                print("Predeccsors Abstraction State(s)")
-                for _s in ts_cube_string:
-                    _name = self.ts_sym_to_curr_state_map.get(_s)
-                    assert _name is not None, "Couldn't convert Cube string to its corresponding State. FIX THIS!!!"
-                    print(_name)
-                
-                ts_cube_string = self._convert_cube_to_func(bdd_func=tmp, curr_state_list=self.ts_x_list)
-                print("Predeccsors Abstraction State(s)")
-                for _s in ts_cube_string:
-                    _name = self.ts_sym_to_curr_state_map.get(_s)
-                    assert _name is not None, "Couldn't convert Cube string to its corresponding State. FIX THIS!!!"
-                    print(_name)
-
-
-            for tr_num, pred in enumerate(preds):
-                if pred & reached_list_composed[layer - 1].existAbstract(dfa_xcube) != self.manager.bddZero():
-                    current = pred & reached_list_composed[layer - 1].existAbstract(dfa_xcube)
-                    plan[layer] = tr_num
-
-        # print(plan)
-
-        return plan
+        return parent_plan
