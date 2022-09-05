@@ -11,7 +11,6 @@ from cudd import Cudd, BDD, ADD
 from itertools import product
 
 
-from bidict import bidict
 from src.causal_graph import CausalGraph
 from src.two_player_game import TwoPlayerGame
 from src.transition_system import FiniteTransitionSystem
@@ -22,10 +21,36 @@ from src.two_player_game import TwoPlayerGame
 from src.symbolic_dfa import SymbolicDFA
 from src.symbolic_abstraction import SymbolicTransitionSystem
 
-
+import  src.gridworld_visualizer.gridworld_vis.gridworld as gridworld_handle
+# import grid
 # from symbolic_planning.src.graph_search import forward_reachability
 
 from config import *
+
+
+def create_gridworld(size: int, strategy: list):
+    # print("Hello Grid World")
+
+    def tile2classes(x, y):
+        # if (3 <= x <= 4) and (2 <= y <= 5):
+        #     return "water"
+        # elif (x in (0, 7)) and (y in (0, 7)):
+        #     return "recharge"
+        # elif (2 <= x <= 5) and y in (0, 7):
+        #     return "dry"
+        # elif x in (1, 6) and (y in (4, 5) or y <= 1):
+        #     return "lava"
+        # elif (x in (0, 7)) and (y in (1, 4, 5)):
+        #     return "lava"
+
+        return "normal"
+
+    file_name = PROJECT_ROOT + f'/plots/simulated_strategy.svg'
+
+    # actions = [gridworld_handle.E, gridworld_handle.N, gridworld_handle.N, gridworld_handle.N, gridworld_handle.N, gridworld_handle.W, gridworld_handle.W, gridworld_handle.W]
+
+    svg = gridworld_handle.gridworld(n=size, tile2classes=tile2classes, actions=strategy)
+    svg.saveas(file_name, pretty=True)
 
 
 def create_symbolic_lbl_vars(lbls, manager: Cudd, label_state_var_name: str = 'l', valid_dfa_edge_symbol_size: int = 1):
@@ -196,9 +221,13 @@ if __name__ == "__main__":
     # build_symbolic_model(transition_graph)
 
     DRAW_EXPLICIT_CAUSAL_GRAPH: bool = False
+    SIMULATE_STRATEGY: bool = False
+
+    # create_gridworld()
+    # sys.exit()
 
     domain_file_path = PROJECT_ROOT + "/pddl_files/grid_world/domain.pddl"
-    problem_file_path = PROJECT_ROOT + "/pddl_files/grid_world/problem5_5.pddl"
+    problem_file_path = PROJECT_ROOT + "/pddl_files/grid_world/problem10_10.pddl"
 
     cudd_manager = Cudd()
     
@@ -234,7 +263,7 @@ if __name__ == "__main__":
 
 
         
-
+        ts_total_state = len(task.facts)
         sym_tr.create_transition_system(verbose=False, plot=False)
 
         # these spare boolean strs and boolean formulas, of form l0 & l1 & l3.  These will be used for DFA edge assignment if needed
@@ -244,9 +273,12 @@ if __name__ == "__main__":
     if BUILD_DFA:
         # list of formula
         formulas = [
+            # 'F(l13)',
+            # 'F(l7 & F(l13))',   # simple Formula w 2 states
             # 'F(l13 & (F(l21) & F(l5)))',
             # 'F(l13 & (F(l21 & (F(l5)))))',
-            "F(l21 & (F(l5 & (F(l25 & F(l1))))))"   # traversing the gridworld on the corners
+            # "F(l21 & (F(l5 & (F(l25 & F(l1))))))",   # traversing the gridworld on the corners
+            "F(l91 & (F(l10 & (F(l100 & F(l1))))))"   # traversing the gridworld on the corners for 10 x 10 gridworld
             ]
         # create a list of DFAs
         DFA_list = []
@@ -294,11 +326,28 @@ if __name__ == "__main__":
                                   ts_sym_to_curr_map=sym_tr.predicate_sym_map_curr.inv,
                                   ts_sym_to_S2O_map=sym_tr.predicate_sym_map_lbl.inv,
                                   dfa_sym_to_curr_map=dfa_tr.dfa_predicate_sym_map_curr.inv,
+                                  tr_action_idx_map=sym_tr.tr_action_idx_map,
                                   state_obs_bdd=sym_tr.sym_state_labels)
     
-    graph_search.updated_symbolic_bfs_wLTL(verbose=False)
+    action_list = graph_search.updated_symbolic_bfs_wLTL(max_ts_state=ts_total_state, verbose=False)
     stop = time.time()
     print("Time took for plannig: ", stop - start)
+    # print(action_list)
+    print("Sequence of actions")
+    # simulated_strategy
+    # sort the dictionary according to its keys (alphabetically)
+    for _state, _action in action_list.items():
+        print(f"From State {_state} take Action {_action}")
+        # if isinstance(_a, list):
+        #     print(sym_tr.tr_action_idx_map.inv[_a[0]])
+        # else:
+        #     print(sym_tr.tr_action_idx_map.inv[_a])
+    
+    print("Done with the plan")
+
+    if SIMULATE_STRATEGY:
+        create_gridworld()
+
     sys.exit()
     
     # action_list = graph_search.symbolic_bfs_wLTL(verbose=True)
@@ -313,13 +362,5 @@ if __name__ == "__main__":
     #              x_list=curr_state,
     #              y_list=next_state)
 
-    print("Sequence of actions")
-    for _a in reversed(action_list):
-        try:
-            print(sym_tr.tr_action_idx_map.inv[_a])
-        except KeyError:
-            pass
-    
-    print("Done with the plan")
 
     
