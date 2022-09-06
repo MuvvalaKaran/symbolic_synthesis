@@ -4,3 +4,6 @@
 [submodule "src/gridworld-visualizer"]
 	path = src/gridworld-visualizer
 	url = git@github.com:mvcisback/gridworld-visualizer.git
+[submodule "src/gridworld_visualizer"]
+	path = src/gridworld_visualizer
+	url = git@github.com:MuvvalaKaran/gridworld_visualizer.git
