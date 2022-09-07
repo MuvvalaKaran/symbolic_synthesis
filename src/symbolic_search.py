@@ -250,11 +250,18 @@ class SymbolicSearch(object):
             if len(_amb_var) != 0:
                 cart_prod = list(product(*_amb_var))  # *is to pass list as iterable
                 for _ele in cart_prod:
-                    var_list.append(_ele[0])
+                    var_list.extend(_ele)
                     bddVars.append(reduce(lambda a, b: a & b, var_list))
-                    var_list.pop()
+                    var_list = list(set(var_list) - set(_ele))
             else:
                 bddVars.append(reduce(lambda a, b: a & b, var_list))
+        
+        # make sure that every element in bddVars container all the bdd variables needed to define it completely
+        for ele in bddVars:
+            # conver ele to stirng and the bddVars to str and check if all of them exisit or not!
+            _str_ele = ele.__repr__()
+            for bVar in curr_state_list:
+                assert str(bVar) in _str_ele, "Error! The cube does not contain all the boolean variables in it! FIX THIS!!"
 
         return bddVars
 
@@ -342,7 +349,7 @@ class SymbolicSearch(object):
 
 
 
-    def updated_symbolic_bfs_wLTL(self, max_ts_state: int, verbose: bool = False):
+    def symbolic_bfs_wLTL(self, max_ts_state: int, verbose: bool = False):
         """
         Implement a symbolic bread first search algorithm for LTL based planning.
 
@@ -360,7 +367,6 @@ class SymbolicSearch(object):
         4. If a valid path exist, retrieve it.
         """
         # get the # number of states in the TS 
-
         parent_reached_list = {key : {'reached_list' : [self.manager.bddZero() for _ in range(4*max_ts_state)],
                                       'dfa_counter' : 0,
                                       'closed': self.manager.bddZero()} for key in self.dfa_sym_to_curr_state_map.inv.keys()}
@@ -375,8 +381,6 @@ class SymbolicSearch(object):
         
         while parent_reached_list["accept_all"]['reached_list'][parent_layer_counter].isZero():
             for _dfa_curr_state, _dfa_fronteirs in parent_reached_list.items():
-                # layer_num = _dfa_fronteirs['layer'] 
-                # if len(_dfa_fronteirs['reached_list']) > 0:
                 if parent_layer_counter > _dfa_fronteirs['dfa_counter']:
                     _local_layer_counter = _dfa_fronteirs['dfa_counter']
                     reached = _dfa_fronteirs['reached_list'][_local_layer_counter]
@@ -386,20 +390,18 @@ class SymbolicSearch(object):
                 else:
                     print("Error with counters in BFS algorithm. FIX THIS!!!")
                     sys.exit(-1)
-                # else:
-                #     reached = []
                 closed = _dfa_fronteirs['closed']
-                # if len(_dfa_fronteirs['reached_list']) > 0 and not reached.isZero():
                 if not reached.isZero():
+                    if (parent_reached_list[_dfa_curr_state]['reached_list'][_local_layer_counter] & ~closed ).isZero():
+                        print(f"**************Reached a Fixed Point for DFA State {_dfa_curr_state}**************")
+                        continue
+
                     parent_reached_list[_dfa_curr_state]['reached_list'][_local_layer_counter] = \
                      parent_reached_list[_dfa_curr_state]['reached_list'][_local_layer_counter] & ~closed
                     
                     parent_reached_list[_dfa_curr_state]['closed'] |= \
                                  parent_reached_list[_dfa_curr_state]['reached_list'][_local_layer_counter]
                     
-                    if parent_reached_list[_dfa_curr_state]['reached_list'][_local_layer_counter].isZero():
-                        print(f"**************Reached a Fixed Point for DFA State {_dfa_curr_state}**************")
-
                     # if there is a state in the TA that reached the DFA accepting state then terminate
                     if not parent_reached_list["accept_all"]['reached_list'][_local_layer_counter].isZero():
                         print("************** Reached an accepting state. Now Retrieving a plan **************")
@@ -473,7 +475,7 @@ class SymbolicSearch(object):
         # sanity check printing
         if not parent_reached_list["accept_all"]['reached_list'][parent_layer_counter].isZero():
             print("************** Reached an accepting state. Now Retrieving a plan**************")
-            return self.updated_retrive_bfs_wLTL_actions(reached_list_composed=parent_reached_list,
+            return self.retrive_bfs_wLTL_actions(reached_list_composed=parent_reached_list,
                                                         max_layer_num=parent_layer_counter,
                                                         verbose=verbose)
         else:
@@ -521,7 +523,7 @@ class SymbolicSearch(object):
         return plan
     
 
-    def updated_retrive_bfs_wLTL_actions(self, reached_list_composed, max_layer_num: int, verbose: bool = False):
+    def retrive_bfs_wLTL_actions(self, reached_list_composed, max_layer_num: int, verbose: bool = False):
         """
         Retrieve the plan from symbolic BFS algorithm. The list is sequence of composed states of TS and DFA.
         """
@@ -530,7 +532,6 @@ class SymbolicSearch(object):
         current_ts = reached_list_composed['accept_all']['reached_list'][accepting_dfa_count]
         current_dfa = 'accept_all'
         sym_current_dfa = self.dfa_sym_to_curr_state_map.inv[current_dfa]
-        dfa_xcube = reduce(lambda x, y: x & y, self.dfa_x_list)
         dfa_ycube = reduce(lambda x, y: x & y, self.dfa_y_list)
         ts_obs_cube = reduce(lambda x, y: x & y, self.ts_obs_list)
         reverse_count = 1    # counter to keep track of No. of backsteps we take. Helps when we are jumming from DFA state to another 
@@ -589,9 +590,9 @@ class SymbolicSearch(object):
                                 self._append_dict_value(dict_obj=parent_plan,
                                                         key_dfa=_dfa_state,
                                                         key_ts=self.ts_sym_to_curr_state_map[_ts_state],
-                                                        # key=f'{self.ts_sym_to_curr_state_map[_ts_state]} & {_dfa_state}',
                                                         value=self.tr_action_idx_map.inv[tr_num])
                     # this is our current_ts now
+                    assert not valid_pred_ts.isZero(), "Error retireving a plan. The intersection of Forward anc Backwards Reachable sets should NEVER be empty. FIX THIS!!!"
                     current_ts = valid_pred_ts
                     sym_current_dfa = self.dfa_sym_to_curr_state_map.inv[_dfa_state]
             # normal counter for iteration count
