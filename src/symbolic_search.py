@@ -122,7 +122,7 @@ class SymbolicSearch(object):
             return ImgY.swapVariables(y_list, x_list)
     
 
-    def _append_dict_value(self, dict_obj, key, value):
+    def _append_dict_value(self, dict_obj, key_ts, key_dfa, value):
         """
         Check if key exist in dict or not.
 
@@ -133,12 +133,15 @@ class SymbolicSearch(object):
         
         else: add key-value pair
         """
-        if key in dict_obj:
-            if not isinstance(dict_obj[key], list):
-                dict_obj[key] = [dict_obj[key]]
-            dict_obj[key].append(value)
+        if key_dfa in dict_obj:
+            if key_ts in dict_obj[key_dfa]:
+                if not isinstance(dict_obj[key_dfa][key_ts], list):
+                    dict_obj[key_dfa][key_ts] = [dict_obj[key_dfa][key_ts]]
+                dict_obj[key_dfa][key_ts].append(value)
+            else:
+                dict_obj[key_dfa][key_ts] = value
         else:
-            dict_obj[key] = value
+            dict_obj[key_dfa] = {key_ts: value}
     
 
     def _get_ts_states_to_dfa_evolution(self, ts_states, dfa_to_state, dfa_from_states):
@@ -584,7 +587,9 @@ class SymbolicSearch(object):
                             valid_pred_ts |= _valid_ts
                             for _ts_state in self._convert_cube_to_func(bdd_func=_valid_ts, curr_state_list=self.ts_x_list):
                                 self._append_dict_value(dict_obj=parent_plan,
-                                                        key=f'{self.ts_sym_to_curr_state_map[_ts_state]} & {_dfa_state}',
+                                                        key_dfa=_dfa_state,
+                                                        key_ts=self.ts_sym_to_curr_state_map[_ts_state],
+                                                        # key=f'{self.ts_sym_to_curr_state_map[_ts_state]} & {_dfa_state}',
                                                         value=self.tr_action_idx_map.inv[tr_num])
                     # this is our current_ts now
                     current_ts = valid_pred_ts
