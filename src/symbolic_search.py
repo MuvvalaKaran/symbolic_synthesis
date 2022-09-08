@@ -19,24 +19,24 @@ class SymbolicSearch(object):
 
     def __init__(self,
                  init,
-                 init_TS,
-                 target_DFA,
-                 init_DFA,
-                 target,
-                 manager,
+                 init_TS: BDD,
+                 target_DFA: BDD,
+                 init_DFA: BDD,
+                 target: BDD,
+                 manager: Cudd,
                  ts_curr_vars: list,
                  ts_next_vars: list,
                  ts_obs_vars: list,
                  dfa_curr_vars: list,
                  dfa_next_vars: list,
-                 ts_transition_func,
-                 ts_trans_func_list,
-                 dfa_transition_func,
+                 ts_transition_func: BDD,
+                 ts_trans_func_list: BDD,
+                 dfa_transition_func: BDD,
                  ts_sym_to_curr_map: dict,
                  ts_sym_to_S2O_map: dict,
                  dfa_sym_to_curr_map: dict,
                  tr_action_idx_map: dict, 
-                 state_obs_bdd):
+                 state_obs_bdd: BDD):
 
         self.init = init
         self.init_TS = init_TS
@@ -57,12 +57,9 @@ class SymbolicSearch(object):
         self.dfa_sym_to_curr_state_map: dict = dfa_sym_to_curr_map
         self.obs_bdd = state_obs_bdd
         self.tr_action_idx_map = tr_action_idx_map
-        # self.transition_fun = self._build_transition_function_w_action_costs()
-        # self.estimate_fun = self._build_estimate_function()
-        # self.reached = []
-        # self.que = []
+
     
-    def pre(self, From, ycube, x_list, y_list, transition_fun):
+    def pre(self, From, ycube, x_list: list, y_list: list, transition_fun):
         """
         Compute the predecessors of 'From'.
         
@@ -71,7 +68,7 @@ class SymbolicSearch(object):
         fromY = From.swapVariables(x_list, y_list)
         return transition_fun.andAbstract(fromY, ycube)
     
-    def pre_per_action(self, trans_action, From, ycube, x_list, y_list):
+    def pre_per_action(self, trans_action, From, ycube, x_list: list, y_list: list):
         """
          Compute the predecessors of 'From' under action specific transition function.
 
@@ -392,8 +389,8 @@ class SymbolicSearch(object):
                     sys.exit(-1)
                 closed = _dfa_fronteirs['closed']
                 if not reached.isZero():
-                    if (parent_reached_list[_dfa_curr_state]['reached_list'][_local_layer_counter] & ~closed ).isZero():
-                        print(f"**************Reached a Fixed Point for DFA State {_dfa_curr_state}**************")
+                    if not closed.isZero() and (parent_reached_list[_dfa_curr_state]['reached_list'][_local_layer_counter] & ~closed ).isZero():
+                        # print(f"**************Reached a Fixed Point for DFA State {_dfa_curr_state}**************")
                         continue
 
                     parent_reached_list[_dfa_curr_state]['reached_list'][_local_layer_counter] = \
@@ -566,7 +563,6 @@ class SymbolicSearch(object):
             for _dfa_state, _v in valid_pre_dfa_state.items():
                 if not _v.isZero():
                     # we ignore the very last layer as that is the list where the current ts state came from 
-                    # reached_list_composed[_dfa_state]['layer'] = reverse_count
                     _layer_num = max_layer_num - reverse_count
                     while reached_list_composed[_dfa_state]['reached_list'][_layer_num].isZero():
                         reverse_count += 1
@@ -576,7 +572,7 @@ class SymbolicSearch(object):
                     for tr_num, pred_ts_bdd in enumerate(preds_ts_list):
                         _valid_ts = pred_ts_bdd & reached_list_composed[_dfa_state]['reached_list'][_layer_num] 
                         if verbose:
-                            # print the set of states that are lie at the intersection of Backward Search and Forward Search
+                            # print the set of states that lie at the intersection of Backward Search and Forward Search
                             ts_cube_string = self._convert_cube_to_func(bdd_func=_valid_ts, curr_state_list=self.ts_x_list)
                             # print("Abstraction State(s) Reached")
                             for _s in ts_cube_string:
@@ -592,7 +588,7 @@ class SymbolicSearch(object):
                                                         key_ts=self.ts_sym_to_curr_state_map[_ts_state],
                                                         value=self.tr_action_idx_map.inv[tr_num])
                     # this is our current_ts now
-                    assert not valid_pred_ts.isZero(), "Error retireving a plan. The intersection of Forward anc Backwards Reachable sets should NEVER be empty. FIX THIS!!!"
+                    assert not valid_pred_ts.isZero(), "Error retireving a plan. The intersection of Forward and Backwards Reachable sets should NEVER be empty. FIX THIS!!!"
                     current_ts = valid_pred_ts
                     sym_current_dfa = self.dfa_sym_to_curr_state_map.inv[_dfa_state]
             # normal counter for iteration count
