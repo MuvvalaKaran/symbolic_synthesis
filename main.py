@@ -37,7 +37,7 @@ CREATE_VAR_LBLS: bool = True   # set this to true if you want to create Observat
 # build_symbolic_model(transition_graph)
 
 DRAW_EXPLICIT_CAUSAL_GRAPH: bool = False
-SIMULATE_STRATEGY: bool = False
+SIMULATE_STRATEGY: bool = True
 GRID_WORLD_SIZE: int = 5
 OBSTACLE: bool = False  # galf to load the onbstacle gridworl and color the gridworld accordingly
 
@@ -256,7 +256,7 @@ def convert_action_dict_to_gridworld_strategy(action_map: dict,
                                               init_state_ts,
                                               init_state_dfa,
                                               target_DFA,
-                                              state_obs_bdd,
+                                              state_obs_dd,
                                               ts_curr_vars: list,
                                               ts_next_vars: list,
                                               dfa_curr_vars: list,
@@ -302,7 +302,7 @@ def convert_action_dict_to_gridworld_strategy(action_map: dict,
         _nxt_ts_state = _nxt_ts_state.swapVariables(ts_curr_vars, ts_next_vars)
         
         # get the observation of this ts state
-        _sym_obs = state_obs_bdd.restrict(_nxt_ts_state)
+        _sym_obs = state_obs_dd.restrict(_nxt_ts_state)
 
         # get the next DFA state
         _nxt_dfa = dfa_tr.restrict(curr_dfa_state & _sym_obs)
@@ -342,8 +342,8 @@ def build_add_symbolic_dfa(formulas: List[str],
                                 dfa=_dfa,
                                 dfa_name=f'dfa_{_idx}')
 
-        dfa_tr.create_dfa_transition_system(verbose=True,
-                                            plot=True,
+        dfa_tr.create_dfa_transition_system(verbose=False,
+                                            plot=False,
                                             valid_dfa_edge_formula_size=len(_dfa.get_symbols()))
     
     return dfa_tr, add_dfa_curr_state, add_dfa_next_state
@@ -454,9 +454,9 @@ def build_weighted_add_abstraction(cudd_manager, problem_file_path, domain_file_
 
     ts_total_state = len(task.facts)
     # All action are have equal weight of 1 unit 
-    sym_tr.create_weighted_transition_system(verbose=True, plot=True, weight_list=[c_a, c_a, c_a, c_a])
+    sym_tr.create_weighted_transition_system(verbose=False, plot=False, weight_list=[c_a, c_a, c_a, c_a])
 
-    sym_tr.create_state_obs_add(verbose=True, plot=True)
+    sym_tr.create_state_obs_add(verbose=False, plot=False)
 
     return  sym_tr, add_ts_curr_state, add_ts_next_state, add_ts_lbl_states, ts_total_state 
 
@@ -474,15 +474,19 @@ if __name__ == "__main__":
 
     # list of formula
     formulas = [
-        'F(l13)',
+        # 'F(l13)',
         # 'F(l7 & F(l13))',   # simple Formula w 2 states
-        # 'F(l13 & (F(l21) & F(l5)))',
+        'F(l13 & (F(l21) & F(l5)))',
         # 'F(l6) & F(l2)', 
         # 'F(l13 & (F(l21 & (F(l5)))))',
         # "F(l21 & (F(l5 & (F(l25 & F(l1))))))",   # traversing the gridworld on the corners
         # "F(l91 & (F(l10 & (F(l100 & F(l1))))))"   # traversing the gridworld on the corners for 10 x 10 gridworld
-        # "F(l400)", 
-        # "F(l381 & (F(l20 & (F(l400 & F(l1))))))"   # traversing the gridworld on the corners for 20 x 20 gridworld
+        # "F(l400)",
+        # "F(l100 & F(l1))",
+        # "F(l100 & F(l1 & F(l91)))"
+        # "F(l381 & (F(l20 & (F(l400 & F(l1))))))",   # traversing the gridworld on the corners for 20 x 20 gridworld
+        # "F(l381 & (F(l20 & (F(l400)))))",
+        # "F(l381 & (F(l20)))",
         ]
     
     # Build Transition with costs
@@ -510,7 +514,7 @@ if __name__ == "__main__":
                                                                         sym_tr_handle=sym_tr,
                                                                         manager=cudd_manager)
     
-    sys.exit()
+    # sys.exit()
     # init_state = sym_tr.sym_init_states & dfa_tr.sym_init_state
     # print('Inital states: ', init_state)
     # print('Goal states: ', dfa_tr.sym_goal_state)
@@ -526,21 +530,23 @@ if __name__ == "__main__":
                                             init_DFA=dfa_tr.sym_init_state,
                                             ts_curr_vars=ts_curr_state,
                                             ts_next_vars=ts_next_state,
-                                            dfa_curr_vars=ts_lbl_states,
-                                            dfa_next_vars=dfa_curr_state,
+                                            dfa_curr_vars=dfa_curr_state,
+                                            dfa_next_vars=dfa_next_state,
                                             ts_obs_vars=ts_lbl_states,
                                             ts_transition_func=giant_tr,
                                             ts_trans_func_list=sym_tr.sym_tr_actions,
                                             dfa_transition_func=dfa_tr.dfa_bdd_tr,
                                             ts_add_sym_to_curr_map=sym_tr.predicate_add_sym_map_curr.inv,
                                             ts_bdd_sym_to_curr_map=sym_tr.predicate_sym_map_curr.inv,
-                                            ts_sym_to_S2O_map=sym_tr.predicate_sym_map_lbl.inv,
-                                            dfa_sym_to_curr_map=dfa_tr.dfa_predicate_sym_map_curr.inv,
-                                            tr_action_idx_map=sym_tr.tr_action_idx_map, 
-                                            state_obs_bdd=sym_tr.sym_state_labels,
+                                            ts_bdd_sym_to_S2O_map=sym_tr.predicate_sym_map_lbl.inv,
+                                            ts_add_sym_to_S2O_map=sym_tr.predicate_add_sym_map_lbl.inv,
+                                            dfa_bdd_sym_to_curr_map=dfa_tr.dfa_predicate_sym_map_curr.inv,
+                                            dfa_add_sym_to_curr_map=dfa_tr.dfa_predicate_add_sym_map_curr.inv,
+                                            state_obs_add=sym_tr.sym_add_state_labels,
+                                            tr_action_idx_map=sym_tr.tr_action_idx_map,
                                             cudd_manager=cudd_manager)
         
-        graph_search.symbolic_dijkstra(verbose=True)
+        action_dict = graph_search.symbolic_dijkstra(verbose=False)
     else:
 
         graph_search = SymbolicSearch(init=sym_tr.sym_init_states,
@@ -572,16 +578,33 @@ if __name__ == "__main__":
 
     stop: float = time.time()
     print("Time took for plannig: ", stop - start)
-    print("Sequence of actions")
+    # print("Sequence of actions")
     
-    for _dfa_state, _ts_dict in action_dict.items():
-        print(f"******************Currently in DFA state {_dfa_state}******************")
-        for _ts_state, _action in _ts_dict.items(): 
-            print(f"From State {_ts_state} take Action {_action}")
+    # for _dfa_state, _ts_dict in action_dict.items():
+    #     print(f"******************Currently in DFA state {_dfa_state}******************")
+    #     for _ts_state, _action in _ts_dict.items(): 
+    #         print(f"From State {_ts_state} take Action {_action}")
 
-    print("Done with the plan")
+    # print("Done with the plan")
 
-    if SIMULATE_STRATEGY:
+    if SIMULATE_STRATEGY and QUANTITATIVE_SEARCH:
+        gridworld_strategy = convert_action_dict_to_gridworld_strategy(action_map=action_dict,
+                                                                       transition_sys_tr=sym_tr.sym_tr_actions,
+                                                                       dfa_tr=dfa_tr.dfa_bdd_tr,
+                                                                       init_state_ts=sym_tr.sym_add_init_states,
+                                                                       init_state_dfa=dfa_tr.sym_init_state,
+                                                                       target_DFA=dfa_tr.sym_goal_state,
+                                                                       tr_action_idx_map=sym_tr.tr_action_idx_map,
+                                                                       state_obs_dd=sym_tr.sym_add_state_labels,
+                                                                       ts_curr_vars=ts_curr_state,
+                                                                       ts_next_vars=ts_next_state,
+                                                                       dfa_curr_vars=dfa_curr_state,
+                                                                       dfa_next_vars=dfa_next_state,
+                                                                       ts_sym_to_curr_map=sym_tr.predicate_add_sym_map_curr.inv,
+                                                                       dfa_sym_to_curr_map=dfa_tr.dfa_predicate_add_sym_map_curr.inv)
+        create_gridworld(size=GRID_WORLD_SIZE, strategy=gridworld_strategy, init_pos=(0, 0))
+
+    elif SIMULATE_STRATEGY:
         gridworld_strategy = convert_action_dict_to_gridworld_strategy(action_map=action_dict,
                                                                        transition_sys_tr=sym_tr.sym_tr_actions,
                                                                        dfa_tr=dfa_tr.dfa_bdd_tr,
@@ -589,7 +612,7 @@ if __name__ == "__main__":
                                                                        init_state_dfa=dfa_tr.sym_init_state,
                                                                        target_DFA=dfa_tr.sym_goal_state,
                                                                        tr_action_idx_map=sym_tr.tr_action_idx_map,
-                                                                       state_obs_bdd=sym_tr.sym_state_labels,
+                                                                       state_obs_dd=sym_tr.sym_state_labels,
                                                                        ts_curr_vars=ts_curr_state,
                                                                        ts_next_vars=ts_next_state,
                                                                        dfa_curr_vars=dfa_curr_state,
@@ -597,10 +620,6 @@ if __name__ == "__main__":
                                                                        ts_sym_to_curr_map=sym_tr.predicate_sym_map_curr.inv,
                                                                        dfa_sym_to_curr_map=dfa_tr.dfa_predicate_sym_map_curr.inv)
         create_gridworld(size=GRID_WORLD_SIZE, strategy=gridworld_strategy, init_pos=(0, 0))
-
-    sys.exit()
-    
-    print("Time took for plannig: ", stop - start)
 
 
     # graph_search(init=sym_tr.sym_init_states,

@@ -255,8 +255,8 @@ class SymbolicAddDFA(object):
         self.dfa_predicate_add_sym_map_curr = _node_int_map_curr
         self.dfa_predicate_add_sym_map_nxt = _node_int_map_next
 
-        self.predicate_sym_map_curr = _node_bdd_int_map_curr
-        self.predicate_sym_map_nxt = _node_bdd_int_map_next
+        self.dfa_predicate_sym_map_curr = _node_bdd_int_map_curr
+        self.dfa_predicate_sym_map_nxt = _node_bdd_int_map_next
     
     def in_order_nnf_tree_traversal(self, expression, formula):
         
