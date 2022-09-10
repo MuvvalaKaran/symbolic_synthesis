@@ -1,4 +1,3 @@
-from curses.has_key import has_key
 import re 
 import sys
 
@@ -362,8 +361,10 @@ class SymbolicDijkstraSearch(BaseSymbolicSearch):
         """
         A helper function to check if the reached associated with all the dfa states is empty or not
         """
-        for _dfa in bucket.keys():
-            if self.init_TS <= bucket[_dfa]:
+        _dfa_init_state = self.dfa_add_sym_to_curr_state_map[self.init_DFA]
+        # for _dfa in bucket.keys():
+        if _dfa_init_state in bucket:
+            if self.init_TS <= bucket[_dfa_init_state]:
                 return True
         
         return False
@@ -461,7 +462,7 @@ class SymbolicDijkstraSearch(BaseSymbolicSearch):
         _reached_accp_state : bool = False
         # compute the image of the TS states 
         # dfa_curr_state = self.dfa_add_sym_to_curr_state_map[dfa_sym_curr_state]
-        dfa_final_state = self.dfa_add_sym_to_curr_state_map[self.target_DFA]
+        
         for tr_action in self.ts_transition_fun_list:
             ts_image_add = self.manager.addZero()
             if _reached_accp_state:
@@ -617,6 +618,8 @@ class SymbolicDijkstraSearch(BaseSymbolicSearch):
                                                    ycube=ts_ycube,
                                                    x_list=self.ts_x_list,
                                                    y_list=self.ts_y_list)
+                    if preds_ts.isZero():
+                        continue
                     if verbose:
                         self.get_states_from_dd(dd_func=preds_ts, curr_state_list=self.ts_x_list, sym_map=self.ts_bdd_sym_to_curr_state_map)
 

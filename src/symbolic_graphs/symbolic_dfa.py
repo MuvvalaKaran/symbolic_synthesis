@@ -2,7 +2,7 @@ import copy
 import re
 import graphviz as gv
 
-from typing import List, Tuple, Union
+from typing import List
 from bidict import bidict
 from functools import reduce
 from itertools import product

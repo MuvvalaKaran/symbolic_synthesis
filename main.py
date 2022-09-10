@@ -11,16 +11,15 @@ from cudd import Cudd, BDD, ADD
 from itertools import product
 
 
-from src.causal_graph import CausalGraph
-from src.two_player_game import TwoPlayerGame
-from src.transition_system import FiniteTransitionSystem
-from graph_search import graph_search
+from src.explicit_graphs import CausalGraph
+from src.explicit_graphs import TwoPlayerGame
+from src.explicit_graphs import FiniteTransitionSystem
 
-from src.symbolic_search import SymbolicSearch
-from src.two_player_game import TwoPlayerGame
-from src.symbolic_dfa import SymbolicDFA, SymbolicAddDFA
-from src.symbolic_abstraction import SymbolicTransitionSystem, SymbolicWeightedTransitionSystem
-from src.symbolic_quantitative_search import SymbolicDijkstraSearch
+from src.symbolic_graphs import SymbolicDFA, SymbolicAddDFA
+from src.symbolic_graphs import SymbolicTransitionSystem, SymbolicWeightedTransitionSystem
+
+from src.algorithms.blind_search import SymbolicSearch
+from src.algorithms.weighted_search import SymbolicDijkstraSearch
 
 import  src.gridworld_visualizer.gridworld_vis.gridworld as gridworld_handle
 
@@ -32,18 +31,15 @@ QUANTITATIVE_SEARCH: bool = True  # set this flag to true whe you have edge cost
 BUILD_DFA: bool = True
 BUILD_ABSTRACTION: bool = True
 CREATE_VAR_LBLS: bool = True   # set this to true if you want to create Observation BDDs
-# construct a sample rwo player game and wrap it to construct its symbolic version
-# transition_graph = get_graph(print_flag=True)
-# build_symbolic_model(transition_graph)
 
 DRAW_EXPLICIT_CAUSAL_GRAPH: bool = False
 SIMULATE_STRATEGY: bool = True
-GRID_WORLD_SIZE: int = 5
+GRID_WORLD_SIZE: int = 20
 OBSTACLE: bool = False  # galf to load the onbstacle gridworl and color the gridworld accordingly
 
 
 def create_gridworld(size: int, strategy: list, init_pos: tuple = (1, 1)):
-    def tile2classes(x, y):
+    def tile2classes_obstacle(x, y):
         # draw horizontal block
         if (5 <= x <= 16) and (16 <= y <= 18):
             return "lava"
@@ -52,14 +48,9 @@ def create_gridworld(size: int, strategy: list, init_pos: tuple = (1, 1)):
         if (16 <= x <= 18) and (11 <= y <= 18):
             return "lava"
 
-        # elif (x in (0, 7)) and (y in (0, 7)):
-        #     return "recharge"
-        # elif (2 <= x <= 5) and y in (0, 7):
-        #     return "dry"
-        # elif x in (1, 6) and (y in (4, 5) or y <= 1):
-        #     return "lava"
-        # elif (x in (0, 7)) and (y in (1, 4, 5)):
-        #     return "lava"
+        return "normal"
+    
+    def tile2classes(x, y):
 
         return "normal"
 
@@ -69,8 +60,10 @@ def create_gridworld(size: int, strategy: list, init_pos: tuple = (1, 1)):
         strategy = [gridworld_handle.E, gridworld_handle.N, gridworld_handle.N,
                     gridworld_handle.N, gridworld_handle.N, gridworld_handle.W, 
                     gridworld_handle.W, gridworld_handle.W]
-
-    svg = gridworld_handle.gridworld(n=size, tile2classes=tile2classes, actions=strategy, init_pos=init_pos)
+    if OBSTACLE:
+        svg = gridworld_handle.gridworld(n=size, tile2classes=tile2classes_obstacle, actions=strategy, init_pos=init_pos)
+    else:
+        svg = gridworld_handle.gridworld(n=size, tile2classes=tile2classes, actions=strategy, init_pos=init_pos)
     svg.saveas(file_name, pretty=True)
 
 
@@ -476,7 +469,7 @@ if __name__ == "__main__":
     formulas = [
         # 'F(l13)',
         # 'F(l7 & F(l13))',   # simple Formula w 2 states
-        'F(l13 & (F(l21) & F(l5)))',
+        # 'F(l13 & (F(l21) & F(l5)))',
         # 'F(l6) & F(l2)', 
         # 'F(l13 & (F(l21 & (F(l5)))))',
         # "F(l21 & (F(l5 & (F(l25 & F(l1))))))",   # traversing the gridworld on the corners
@@ -484,7 +477,7 @@ if __name__ == "__main__":
         # "F(l400)",
         # "F(l100 & F(l1))",
         # "F(l100 & F(l1 & F(l91)))"
-        # "F(l381 & (F(l20 & (F(l400 & F(l1))))))",   # traversing the gridworld on the corners for 20 x 20 gridworld
+        "F(l381 & (F(l20 & (F(l400 & F(l1))))))",   # traversing the gridworld on the corners for 20 x 20 gridworld
         # "F(l381 & (F(l20 & (F(l400)))))",
         # "F(l381 & (F(l20)))",
         ]
