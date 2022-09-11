@@ -825,16 +825,16 @@ class TwoPlayerGame:
 
         return _ltl_automaton
 
-    def build_product(self, dfa, trans_sys, plot: bool = False):
+    def build_product(self, dfa, trans_sys, plot: bool = False, absorbing: bool = True):
         _product_automaton = graph_factory.get("ProductGraph",
                                                graph_name="pddl_product_graph",
                                                config_yaml="/config/pddl_product_graph",
                                                trans_sys=trans_sys,
-                                               dfa=dfa,
+                                               automaton=dfa,
                                                save_flag=True,
                                                prune=False,
                                                debug=False,
-                                               absorbing=True,
+                                               absorbing=absorbing,
                                                finite=False,
                                                plot=plot)
 

@@ -1,5 +1,7 @@
-import copy
 import re
+import sys
+import copy
+import warnings
 import graphviz as gv
 
 from typing import List
@@ -94,7 +96,7 @@ class SymbolicDFA(object):
         expression = self.in_order_nnf_tree_traversal(expression, formula.left)
         if formula.name == 'AND':
             expression = expression & self.in_order_nnf_tree_traversal(expression, formula.right)
-        elif formula.nane == 'OR':
+        elif formula.name == 'OR':
             expression |= self.in_order_nnf_tree_traversal(expression, formula.right)
 
         return expression
@@ -124,7 +126,7 @@ class SymbolicDFA(object):
         symbls =  self.find_symbols(_guard_formula)
 
         # if symbls is empty then create True edge
-        if not symbls:
+        if not symbls or 'true' in symbls:
             return self.manager.bddOne()
         else:
             if len(symbls) > valid_dfa_edge_formula_size:
@@ -150,6 +152,11 @@ class SymbolicDFA(object):
             _edge_sym = self.get_edge_boolean_formula(curr_state=_curr,
                                                        nxt_state=_nxt,
                                                        valid_dfa_edge_formula_size=valid_dfa_edge_formula_size)
+            
+            if not isinstance(_edge_sym, BDD):
+                _edge = self.dfa._graph[_curr][_nxt][0]['guard_formula']
+                warnings.warn(f"Error while parsing the LTL Formula. Could not parse edge {_edge}")
+                sys.exit(-1)
             
             self.dfa_bdd_tr |= _curr_sym & _nxt_sym & _edge_sym
     
@@ -270,7 +277,7 @@ class SymbolicAddDFA(object):
         expression = self.in_order_nnf_tree_traversal(expression, formula.left)
         if formula.name == 'AND':
             expression = expression & self.in_order_nnf_tree_traversal(expression, formula.right)
-        elif formula.nane == 'OR':
+        elif formula.name == 'OR':
             expression |= self.in_order_nnf_tree_traversal(expression, formula.right)
 
         return expression
@@ -300,8 +307,10 @@ class SymbolicAddDFA(object):
         symbls =  self.find_symbols(_guard_formula)
 
         # if symbls is empty then create True edge
-        if not symbls:
-            return self.manager.addOne()
+        if not symbls or 'true' in symbls:
+            # return self.manager.addOne()
+            # testing this feature - do not add edges associated with accepting or sink states as they cause problem during search
+            return self.manager.addZero()
         else:
             if len(symbls) > valid_dfa_edge_formula_size:
                 return self.manager.addZero()

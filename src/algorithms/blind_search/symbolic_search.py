@@ -18,18 +18,15 @@ class SymbolicSearch(object):
     """
 
     def __init__(self,
-                 init,
                  init_TS: BDD,
                  target_DFA: BDD,
                  init_DFA: BDD,
-                 target: BDD,
                  manager: Cudd,
                  ts_curr_vars: list,
                  ts_next_vars: list,
                  ts_obs_vars: list,
                  dfa_curr_vars: list,
                  dfa_next_vars: list,
-                 ts_transition_func: BDD,
                  ts_trans_func_list: BDD,
                  dfa_transition_func: BDD,
                  ts_sym_to_curr_map: dict,
@@ -38,18 +35,15 @@ class SymbolicSearch(object):
                  tr_action_idx_map: dict, 
                  state_obs_bdd: BDD):
 
-        self.init = init
         self.init_TS = init_TS
         self.target_DFA = target_DFA
         self.init_DFA = init_DFA
-        self.target = target
         self.manager = manager
         self.ts_x_list = ts_curr_vars
         self.ts_y_list = ts_next_vars
         self.dfa_x_list = dfa_curr_vars
         self.dfa_y_list = dfa_next_vars
         self.ts_obs_list = ts_obs_vars
-        self.ts_transition_fun = ts_transition_func
         self.ts_transition_fun_list = ts_trans_func_list
         self.dfa_transition_fun = dfa_transition_func
         self.ts_sym_to_curr_state_map: dict = ts_sym_to_curr_map
@@ -261,78 +255,6 @@ class SymbolicSearch(object):
                 assert str(bVar) in _str_ele, "Error! The cube does not contain all the boolean variables in it! FIX THIS!!"
 
         return bddVars
-
-
-    def symbolic_bfs(self, verbose: bool = False):
-        """
-        Implement a symbolic bread first search algorithm.
-        """
-        reached_list = []
-        reached = self.init
-        closed = self.manager.bddZero()
-        layer = 0
-        xcube = reduce(lambda x, y: x & y, self.x_list)
-
-        reached_list.append(reached)
-        while not self.target <= reached_list[layer]:
-
-            reached_list[layer] = reached_list[layer] & ~closed
-
-            if reached_list[layer] == self.manager.bddZero():
-                print("No plan found")
-                break
-
-            closed |= reached_list[layer]
-            
-            # for franka world - if reached set consists only of the init set then next set of states is the
-            # INTERSECTION of the image of each init state
-
-            # if reached_list[layer].compare(self.init, 2):
-            #     # first compute the individual initial states 
-            #     init_states = self._convert_cube_to_func(bdd_func=reached_list[layer])
-            #     # take the intersection of the states 
-            #     next_state = self.manager.bddOne()
-            #     for _s in init_states:
-            #         print(self.ts_sym_to_state_curr_map.get(_s))
-            #         test = self._convert_cube_to_func(self.image(From=_s, xcube=xcube))
-            #         next_state = next_state & self.image(From=_s, xcube=xcube)
-            #         for t in test:
-            #             print(self.ts_sym_to_state_curr_map.get(t))
-
-            #     reached_list.append(next_state)
-            
-            # else:
-            # reached_list.append(self.image(From=reached_list[layer], xcube=xcube))
-
-            image_bdd = self.manager.bddZero()
-            for tr_action in self.transition_fun_list:
-                image_c = self.image_per_action(trans_action=tr_action,
-                                                From=reached_list[layer],
-                                                xcube=xcube,
-                                                x_list=self.ts_x_list,
-                                                y_list=self.ts_y_list)
-                image_bdd |= image_c
-
-            reached_list.append(image_bdd)
-
-            
-            if verbose:
-                # now extract the set of states that are being expanded during each iteration
-                test = self._convert_cube_to_func(bdd_func=reached_list[layer])
-                for _s in test:
-                    _name = self.ts_sym_to_state_curr_map.get(_s)
-                    if _name is None:
-                        print('Hi!')
-                        sys.exit(-1)
-                    print(self.ts_sym_to_state_curr_map.get(_s))
-                    
-
-            layer += 1
-
-        reached_list[layer] = reached_list[layer] & self.target
-
-        # return self.retrieve_bfs(reached_list)
-        return self.retrive_bfs_action(reached_list)
     
 
     def _check_target_dfa_in_closed_list(self, reached_list) -> bool:
@@ -343,7 +265,30 @@ class SymbolicSearch(object):
             if len(sub_reached_list['reached_list']) > 0 and self.target_DFA <= sub_reached_list['reached_list'][-1]:
                 return True
         return False
+    
 
+    def add_init_state_to_reached_list(self, reached_list: dict) -> str:
+        """
+        A function that checks if the initial TS state enables any transition on the DFA. If yes, then update that specific DFA state list
+        Else, add the initial TS state to the initial DFA state (usually T0_Init). 
+        """
+        # get the observation of the initial state
+        obs_bdd = self.obs_bdd.restrict(self.init_TS)
+
+        # check if any of the DFA edges are satisfied
+        image_DFA = self.dfa_transition_fun.restrict(self.init_DFA & obs_bdd)
+        image_DFA = image_DFA.swapVariables(self.dfa_y_list, self.dfa_x_list)
+        _explicit_dfa_state: str = self.dfa_sym_to_curr_state_map[image_DFA] 
+        _init_state = self.dfa_sym_to_curr_state_map[self.init_DFA] 
+
+        # assert _explicit_dfa_state == _init_state, "The initial TS state enable a transition on the DFA. This is not supported by my algorithm yet!"
+
+        reached_list[_explicit_dfa_state]['reached_list'][0] = self.init_TS
+
+        if _explicit_dfa_state == _init_state:
+            return self.manager.bddZero()
+        else:
+            return image_DFA
 
 
     def symbolic_bfs_wLTL(self, max_ts_state: int, verbose: bool = False):
@@ -371,9 +316,8 @@ class SymbolicSearch(object):
         parent_layer_counter = 0
         ts_xcube = reduce(lambda x, y: x & y, self.ts_x_list)
 
-        # add the initi TS state to the init DFA state
-        _explicit_dfa_state: str = self.dfa_sym_to_curr_state_map[self.init_DFA]
-        parent_reached_list[_explicit_dfa_state]['reached_list'][parent_layer_counter] = self.init_TS
+        # add the init state to ite respective DFA state. Note, we start in some other state 
+        init_dfa =  self.add_init_state_to_reached_list(parent_reached_list)
 
         
         while parent_reached_list["accept_all"]['reached_list'][parent_layer_counter].isZero():
@@ -474,55 +418,19 @@ class SymbolicSearch(object):
             print("************** Reached an accepting state. Now Retrieving a plan**************")
             return self.retrive_bfs_wLTL_actions(reached_list_composed=parent_reached_list,
                                                         max_layer_num=parent_layer_counter,
+                                                        init_dfa=init_dfa,
                                                         verbose=verbose)
         else:
             print("No plan found")
             sys.exit()
-
-
-    def retrieve_bfs(self, reached_list):
-        """
-        Retrieve the plan from symbolic BFS algorithm
-        """
-        ycube = reduce(lambda a, b: a & b, self.y_list)
-        plan = []
-        n = len(reached_list)
-        current = reached_list[n-1]
-        plan.append(current)
-
-        for layer in reversed(range(n)):
-            pred = self.pre(From=current, ycube=ycube)
-            if pred & reached_list[layer - 1] != self.manager.bddZero():
-                current = pred & reached_list[layer - 1]
-                plan.append(current)
-
-        print(plan)
-    
-    def retrive_bfs_action(self, reached_list):
-        """
-        Retrieve the plan from symbolic BFS algorithm
-        """
-        ycube = reduce(lambda a, b: a & b, self.y_list)
-        plan = []
-        n = len(reached_list)
-        current = reached_list[n - 1]
-
-        for layer in reversed(range(n)):
-            # for each action
-            for idx, tran_func_action in enumerate(self.transition_fun_list):
-                pred = self.pre_per_action(trans_action=tran_func_action, From=current, ycube=ycube)
-                if pred & reached_list[layer - 1] != self.manager.bddZero():
-                    current = pred & reached_list[layer - 1]
-                    plan.append(idx)
-
-        print(plan)
-
-        return plan
     
 
-    def retrive_bfs_wLTL_actions(self, reached_list_composed, max_layer_num: int, verbose: bool = False):
+    def retrive_bfs_wLTL_actions(self, reached_list_composed, max_layer_num: int, init_dfa: str = '', verbose: bool = False):
         """
         Retrieve the plan from symbolic BFS algorithm. The list is sequence of composed states of TS and DFA.
+
+        Note: Currently our approach can not handle formula where a state multilple predeccsors in the DFA and one of the intermediate edges are triggered.
+        I will fix this in future commits. 
         """
         ts_ycube = reduce(lambda a, b: a & b, self.ts_y_list)
         accepting_dfa_count = reached_list_composed['accept_all']['dfa_counter']
@@ -536,7 +444,11 @@ class SymbolicSearch(object):
         # loops till you reach the init DFA and TS state
         parent_plan = {}
         iter_count = 0
-        while not(self.init_TS <= current_ts and sym_current_dfa == self.init_DFA):
+
+        if init_dfa.isZero():
+            init_dfa = self.init_DFA
+
+        while not(self.init_TS <= current_ts and sym_current_dfa == init_dfa):
             # for each action
             preds_ts_list = []
             for tran_func_action in self.ts_transition_fun_list:
@@ -564,9 +476,11 @@ class SymbolicSearch(object):
                 if not _v.isZero():
                     # we ignore the very last layer as that is the list where the current ts state came from 
                     _layer_num = max_layer_num - reverse_count
+                    assert _layer_num >= 0, "Trying to access a nonexistent layer. FIX THIS!! "
                     while reached_list_composed[_dfa_state]['reached_list'][_layer_num].isZero():
                         reverse_count += 1
                         _layer_num = max_layer_num - reverse_count
+                        assert _layer_num >= 0, "Trying to access a nonexistent layer. FIX THIS!! "
 
                     valid_pred_ts = self.manager.bddZero() 
                     for tr_num, pred_ts_bdd in enumerate(preds_ts_list):

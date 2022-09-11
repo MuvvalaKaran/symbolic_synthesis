@@ -1,1 +1,1 @@
-__all__ = ["blind_search", "weighted_search"]
+__all__ = ["blind_search", "weighted_search", "base"]
