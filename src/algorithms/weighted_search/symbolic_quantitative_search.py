@@ -32,7 +32,14 @@ class SymbolicDijkstraSearch(BaseSymbolicSearch):
                  tr_action_idx_map: dict, 
                  state_obs_add: ADD,
                  cudd_manager: Cudd):
-        super().__init__(init_TS, target_DFA, init_DFA, ts_curr_vars, ts_next_vars, dfa_curr_vars, dfa_next_vars, ts_obs_vars, cudd_manager)
+        super().__init__(ts_obs_vars, cudd_manager)
+        self.init_TS = init_TS
+        self.target_DFA = target_DFA
+        self.init_DFA = init_DFA
+        self.ts_x_list = ts_curr_vars
+        self.ts_y_list = ts_next_vars
+        self.dfa_x_list = dfa_curr_vars
+        self.dfa_y_list = dfa_next_vars
         self.ts_transition_fun = ts_transition_func
         self.ts_transition_fun_list = ts_trans_func_list
         self.dfa_transition_fun = dfa_transition_func
@@ -119,7 +126,7 @@ class SymbolicDijkstraSearch(BaseSymbolicSearch):
             ts_cube_string = self.convert_cube_to_func(dd_func=tmp_dd_func, curr_state_list=tmp_state_list)
         
         else:
-            ts_cube_string = self.convert_cube_to_func(dd_func=tmp_dd_func, curr_state_list=curr_state_list)
+            ts_cube_string = self.convert_cube_to_func(dd_func=dd_func, curr_state_list=curr_state_list)
         
         print("Abstraction State(s) Reached")
         for _s in ts_cube_string:
@@ -157,7 +164,7 @@ class SymbolicDijkstraSearch(BaseSymbolicSearch):
             assert dfa_to_state.support() >= dfa_ycube, "Error while computing TS states for 'to-dfa-state-evolution'. \
             Make sure your 'to-dfa-states' are in terms of next dfa variables "
         
-        if isinstance(dfa_to_state, ADD):
+        if isinstance(dfa_from_states, ADD):
             dfa_from_states.bddPattern().support() >= dfa_xcube.bddPattern()
         else:
             assert dfa_from_states.support() >= dfa_xcube, "Error while computing TS states for 'to-dfa-state-evolution'. \

@@ -8,25 +8,11 @@ from itertools import product
 class BaseSymbolicSearch(object):
 
     def __init__(self,
-                 init_TS: BDD,
-                 target_DFA: BDD,
-                 init_DFA: BDD,
-                 ts_curr_vars: list,
-                 ts_next_vars: list,
-                 dfa_curr_vars: list,
-                 dfa_next_vars: list,
                  ts_obs_vars: list,
                  cudd_manager: Cudd):
-        super().__init__()
-        self.init_TS = init_TS
-        self.target_DFA = target_DFA
-        self.init_DFA = init_DFA
-        self.manager = cudd_manager
-        self.ts_x_list = ts_curr_vars
-        self.ts_y_list = ts_next_vars
-        self.dfa_x_list = dfa_curr_vars
-        self.dfa_y_list = dfa_next_vars
         self.ts_obs_list = ts_obs_vars
+        self.manager = cudd_manager
+        
     
 
     def pre(self, From, ycube, x_list: list, y_list: list, transition_fun) -> BDD:
@@ -93,11 +79,6 @@ class BaseSymbolicSearch(object):
         """
         A helper function that convert a string of a path to its corresponding boolean form for a Given transition system
         """
-        
-        # if isinstance(dd_func, ADD):
-        #     tmp_dd_func: BDD = dd_func.bddPattern()
-        #     tmp_state_list: List[BDD] = [_avar.bddPattern() for _avar in curr_state_list]
-        
         tmp_dd_func = dd_func
         tmp_state_list = curr_state_list
 

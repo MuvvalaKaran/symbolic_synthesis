@@ -15,11 +15,13 @@ from src.explicit_graphs import CausalGraph
 from src.explicit_graphs import TwoPlayerGame
 from src.explicit_graphs import FiniteTransitionSystem
 
-from src.symbolic_graphs import SymbolicDFA, SymbolicAddDFA
+from src.symbolic_graphs import SymbolicDFA, SymbolicAddDFA, SymbolicMultipleDFA
 from src.symbolic_graphs import SymbolicTransitionSystem, SymbolicWeightedTransitionSystem
 
-from src.algorithms.blind_search import SymbolicSearch
+from src.algorithms.blind_search import SymbolicSearch, MultipleFormulaBFS
 from src.algorithms.weighted_search import SymbolicDijkstraSearch
+
+from utls import get_graph
 
 import  src.gridworld_visualizer.gridworld_vis.gridworld as gridworld_handle
 
@@ -28,14 +30,14 @@ from config import *
 
 EXPLICIT_GRAPH: bool = False  # set this flag to true when you want to construct Explicit graph
 
-QUANTITATIVE_SEARCH: bool = True  # set this flag to true whe you have edge costs
+QUANTITATIVE_SEARCH: bool = False  # set this flag to true whe you have edge costs
 
 BUILD_DFA: bool = True
 BUILD_ABSTRACTION: bool = True
 CREATE_VAR_LBLS: bool = True   # set this to true if you want to create Observation BDDs
 
 DRAW_EXPLICIT_CAUSAL_GRAPH: bool = False
-SIMULATE_STRATEGY: bool = True
+SIMULATE_STRATEGY: bool = False
 GRID_WORLD_SIZE: int = 5
 OBSTACLE: bool = False  # galf to load the onbstacle gridworl and color the gridworld accordingly
 
@@ -147,7 +149,7 @@ def create_symbolic_vars(num_of_facts: int,
     nxt_state = next_state_var_name
 
     # get the number of variables in the manager. We will assign the next idex to the next lbl variables
-    _num_of_sym_vars = cudd_manager.size()
+    _num_of_sym_vars = manager.size()
 
     for num_var in range(math.ceil(math.log2(num_of_facts))):
             if add_flag:
@@ -160,7 +162,10 @@ def create_symbolic_vars(num_of_facts: int,
     return (curr_state_vars, next_state_vars)
 
 
-def create_symbolic_dfa_graph(cudd_manager, formula: str, dfa_num: int, add_flag: bool = False):
+def create_symbolic_dfa_graph(cudd_manager,
+                              formula: str,
+                              dfa_num: int,
+                              add_flag: bool = False):
     _two_player_instance = TwoPlayerGame(None, None)
     _dfa = _two_player_instance.build_LTL_automaton(formula=formula, plot=False)
     _state = _dfa.get_states()
@@ -212,82 +217,6 @@ def create_symbolic_causal_graph(cudd_manager,
          curr_state, next_state, lbl_state
 
     return _causal_graph_instance.task, _causal_graph_instance.problem.domain, curr_state, next_state
-
-
-def get_graph(domain_file: str,
-              problem_file: str,
-              formulas: List[str] = '',
-              print_flag: bool = False,
-              plot_ts: bool =False,
-              plot_dfa: bool = False,
-              plot_product: bool = False) -> None:
-    """
-    A helepr function to plaot the causal graphs and the DFAs. The product graph is a work under construction
-
-    Note on Causal Graph: For Gridworld, the # of states is directly proportionaly to the # of grid cells.
-     So, a m by m gridworld will have exaclt m^2 states. Now if oyu have DFA with n states, then the product graph will have
-     m*m*n states. For k DFAs each with n states, we will have in total = k*m*m*n states in the product graph.
-    
-    Unlike the manipulation domain, the # of states in the product graph does not explode exponentially.
-    
-    For e.g. for 20 by 20 gridworld, 5 DFAs each with 5 states, we have 10,000 States in our Product graph.
-    
-    """
-
-    _causal_graph_instance = CausalGraph(problem_file=problem_file,
-                                         domain_file=domain_file,
-                                         draw=plot_ts)
-
-    _causal_graph_instance.build_causal_graph(add_cooccuring_edges=False, relabel=False)
-
-    if print_flag:
-        print(
-            f"No. of nodes in the Causal Graph is :{len(_causal_graph_instance._causal_graph._graph.nodes())}")
-        print(
-            f"No. of edges in the Causal Graph is :{len(_causal_graph_instance._causal_graph._graph.edges())}")
-    
-    _two_player_instance = TwoPlayerGame(_causal_graph_instance._causal_graph, None)
-
-    # # Build the automaton
-    # if formulas == '':
-    #     _dfa = _two_player_instance.build_LTL_automaton(formula="F((l8 & l9 & l0) || (l3 & l2 & l1))", plot=plot_dfa)
-    #     _product_graph = _two_player_instance.build_product(dfa=_dfa,
-    #                                                         trans_sys=_causal_graph_instance._causal_graph,
-    #                                                         absorbing=True,
-    #                                                         plot=plot_product)
-    
-    # # now lets plot a product of two DFAs
-    # if len(formulas) > 1:
-    #     formula_list_len = len(formulas) - 1
-    #     for idx, ltl in enumerate(formulas):
-    #         _dfa = _two_player_instance.build_LTL_automaton(formula=ltl, plot=plot_dfa)
-    #         if idx == 0:
-    #             _product_graph = _two_player_instance.build_product(dfa=_dfa,
-    #                                             trans_sys=_causal_graph_instance._causal_graph,
-    #                                             absorbing=True,
-    #                                             plot=False)
-    #         elif idx == formula_list_len:
-    #             _product_graph = _two_player_instance.build_product(dfa=_dfa,
-    #                                             trans_sys=_product_graph,
-    #                                             absorbing=True,
-    #                                             plot=plot_product)
-    #         else:
-    #             _product_graph = _two_player_instance.build_product(dfa=_dfa,
-    #                                             trans_sys=_product_graph,
-    #                                             absorbing=True,
-    #                                             plot=False)
-    # else:
-    #     _dfa = _two_player_instance.build_LTL_automaton(formula=formulas[0], plot=plot_dfa)
-    #     _product_graph = _two_player_instance.build_product(dfa=_dfa,
-    #                                                         trans_sys=_causal_graph_instance._causal_graph,
-    #                                                         absorbing=True,
-    #                                                         plot=plot_product)
-    
-    # if print_flag:
-    #     print(f"No. of nodes in the product graph is :{len(_product_graph._graph.nodes())}")
-    #     print(f"No. of edges in the product graph is :{len(_product_graph._graph.edges())}")
-
-    # print("Done building the Product Automaton")
 
 
 def convert_action_dict_to_gridworld_strategy(action_map: dict,
@@ -364,6 +293,51 @@ def convert_action_dict_to_gridworld_strategy(action_map: dict,
     return _strategy
 
 
+def build_multiple_bdd_symbolic_dfas(formulas: List[str],
+                                     ts_lbl_states: List[BDD],
+                                     sym_tr_handle: SymbolicWeightedTransitionSystem,
+                                     manager: Cudd,
+                                     verbose: bool = False,
+                                     plot: bool = False):
+    """
+    A function that firest consteucts all the dfa, counts the # of states, creates required number of bdd Variables. 
+    Then, we iterate through each DFA and contruct the Transition Relation for each DFA and store it in a list. 
+    """
+    # create a list of DFAs
+    DFA_list = []
+    _dfa_idx_map: dict = {}
+    num_of_states: int = 0
+
+    for _idx, formula in enumerate(formulas):
+        _two_player_instance = TwoPlayerGame(None, None)
+        _dfa = _two_player_instance.build_LTL_automaton(formula=formula, plot=False)
+        DFA_list.append(_dfa)
+        _dfa_idx_map[_idx] = (formula, _dfa)
+        num_of_states += len(_dfa.get_states())
+    
+    # after your have created all the dfas, create the required number of boolean variables
+    # the number of boolean variables (|a|) = log⌈Σ |DFA_i states|⌉
+    dfa_curr_state, dfa_next_state = create_symbolic_vars(num_of_facts=num_of_states,
+                                                          manager=cudd_manager,
+                                                          curr_state_var_name='a',
+                                                          next_state_var_name='b',
+                                                          add_flag=False)
+    
+    # create TR corresponding to each DFA - dfa name is only used dumping graph 
+    dfa_tr = SymbolicMultipleDFA(curr_states=dfa_curr_state,
+                                 next_states=dfa_next_state,
+                                 ts_lbls=ts_lbl_states,
+                                 predicate_sym_map_lbl=sym_tr_handle.predicate_sym_map_lbl,
+                                 manager=manager,
+                                 dfa_list=DFA_list)
+
+    dfa_tr.create_multiple_dfa_transition_system(verbose=verbose,
+                                                 plot=plot)
+    
+    return dfa_tr, dfa_curr_state, dfa_next_state
+
+
+
 def build_add_symbolic_dfa(formulas: List[str],
                            add_ts_lbl_states: List[ADD],
                            sym_tr_handle: SymbolicWeightedTransitionSystem,
@@ -377,7 +351,7 @@ def build_add_symbolic_dfa(formulas: List[str],
     # create a list of DFAs
     DFA_list = []
 
-    # for now dfa_num is zero. If oyu rhave multiple DFAs then loop over them and update DFA_num
+    # for now dfa_num is zero. If you have multiple DFAs then loop over them and update DFA_num
     for _idx, fmla in enumerate(formulas):
         # create boolean ADD variables
         add_dfa_curr_state, add_dfa_next_state, _dfa = create_symbolic_dfa_graph(cudd_manager=cudd_manager,
@@ -511,7 +485,7 @@ def build_weighted_add_abstraction(cudd_manager, problem_file_path, domain_file_
 
     ts_total_state = len(task.facts)
     # All action are have equal weight of 1 unit 
-    sym_tr.create_weighted_transition_system(verbose=True, plot=False, weight_list=[c_a, c_a, c_a, c_a])
+    sym_tr.create_weighted_transition_system(verbose=False, plot=False, weight_list=[c_a, c_a, c_a, c_a])
 
     sym_tr.create_state_obs_add(verbose=False, plot=False)
 
@@ -536,13 +510,27 @@ if __name__ == "__main__":
         sys.exit(-1)
 
     cudd_manager = Cudd()
+    
+    # 5 by 5 formulas
+    # formulas = ["F(l21) & F(l5) & F(l25) & F(l1)",
+    #             "F(l19) & F(l7) & F(l9) & F(l17)",
+    #             "F(l23) & F(l3) & F(l11) & F(l15)",
+    #             "F(l16) & F(l24) & F(l2) & F(l10) "
+    #             ]
+    
+    # for 10 by 10 grid world
+    # formulas = ["F(l91 & F(l10) & F(l100))",
+    #             "F(l89 & F(l12) & F(l19))",
+    #             "F(l23 & F(l3) & F(l11))",
+    #             "F(l16 & F(l24) & F(l2))"
+    #             ]
 
     # list of formula
     formulas = [
-        # 'F(l13)',
+        'F(l25)',
         # '!l2 & !l7 U l13',
-        'F(l1) & F(l13)',
-        # 'F(l7 & F(l13))',   # simple Formula w 2 states
+        # 'F(l25) & F(l14)',
+        'F(l19 & F(l13))',   # simple Formula w 2 states
         # 'F(l13 & (F(l21) & F(l5)))',
         # 'F(l6) & F(l2)', 
         # 'F(l13 & (F(l21 & (F(l5)))))',
@@ -562,94 +550,129 @@ if __name__ == "__main__":
         # As Each state has an associated label with (ADD State2OBs), we need to create Label Vars out ADD VAriables too. 
         # As each each edge in DFA is dictated by a symbol (State label), the DFA states are also built out of ADD Variables. 
         sym_tr, ts_curr_state, ts_next_state, ts_lbl_states, ts_total_state = build_weighted_add_abstraction(cudd_manager=cudd_manager,
-                                                                                                            problem_file_path=problem_file_path,
-                                                                                                            domain_file_path=domain_file_path,
-                                                                                                            weight_list=[1, 1, 1, 1])
-        dfa_tr, dfa_curr_state, dfa_next_state = build_add_symbolic_dfa(formulas=formulas,
-                                                                        add_ts_lbl_states=ts_next_state,
-                                                                        sym_tr_handle=sym_tr,
-                                                                        manager=cudd_manager,
-                                                                        verbose=False, plot=False)
+                                                                                                                problem_file_path=problem_file_path,
+                                                                                                                domain_file_path=domain_file_path,
+                                                                                                                weight_list=[1, 1, 1, 1])
+
+        if len(formulas) == 1:
+            dfa_tr, dfa_curr_state, dfa_next_state = build_add_symbolic_dfa(formulas=formulas,
+                                                                            add_ts_lbl_states=ts_next_state,
+                                                                            sym_tr_handle=sym_tr,
+                                                                            manager=cudd_manager,
+                                                                            verbose=False,
+                                                                            plot=False)
+        else:
+            raise NotImplementedError()
         
     else:
         # Build Transition with no costs
         sym_tr, ts_curr_state, ts_next_state, ts_lbl_states, ts_total_state = build_bdd_abstraction(cudd_manager=cudd_manager,
                                                                                                     problem_file_path=problem_file_path,
                                                                                                     domain_file_path=domain_file_path)
-        
-        dfa_tr, dfa_curr_state, dfa_next_state = build_bdd_symbolic_dfa(formulas=formulas,
-                                                                        ts_lbl_states=ts_next_state,
-                                                                        sym_tr_handle=sym_tr,
-                                                                        manager=cudd_manager,
-                                                                        verbose=False, plot=False)
-    
+
+        if len(formulas) == 1:
+            dfa_tr, dfa_curr_state, dfa_next_state = build_bdd_symbolic_dfa(formulas=formulas,
+                                                                            ts_lbl_states=ts_next_state,
+                                                                            sym_tr_handle=sym_tr,
+                                                                            manager=cudd_manager,
+                                                                            verbose=False,
+                                                                            plot=False)
+        else:
+            dfa_tr, dfa_curr_state, dfa_next_state = build_multiple_bdd_symbolic_dfas(formulas=formulas,
+                                                                                      ts_lbl_states=ts_next_state,
+                                                                                      sym_tr_handle=sym_tr,
+                                                                                      manager=cudd_manager,
+                                                                                      verbose=False,
+                                                                                      plot=False)
     # sys.exit()
-    # init_state = sym_tr.sym_init_states & dfa_tr.sym_init_state
-    # print('Inital states: ', init_state)
-    # print('Goal states: ', dfa_tr.sym_goal_state)
 
-    # let do graph search from init state to a goal state
-    start: float = time.time()
-    if QUANTITATIVE_SEARCH:
-         # shortest path graph search with Dijkstras
-        graph_search =  SymbolicDijkstraSearch(init_TS=sym_tr.sym_add_init_states,
-                                               target_DFA=dfa_tr.sym_goal_state,
-                                               init_DFA=dfa_tr.sym_init_state,
-                                               ts_curr_vars=ts_curr_state,
-                                               ts_next_vars=ts_next_state,
-                                               dfa_curr_vars=dfa_curr_state,
-                                               dfa_next_vars=dfa_next_state,
-                                               ts_obs_vars=ts_lbl_states,
-                                               ts_transition_func=None,
-                                               ts_trans_func_list=sym_tr.sym_tr_actions,
-                                               dfa_transition_func=dfa_tr.dfa_bdd_tr,
-                                               ts_add_sym_to_curr_map=sym_tr.predicate_add_sym_map_curr.inv,
-                                               ts_bdd_sym_to_curr_map=sym_tr.predicate_sym_map_curr.inv,
-                                               ts_bdd_sym_to_S2O_map=sym_tr.predicate_sym_map_lbl.inv,
-                                               ts_add_sym_to_S2O_map=sym_tr.predicate_add_sym_map_lbl.inv,
-                                               dfa_bdd_sym_to_curr_map=dfa_tr.dfa_predicate_sym_map_curr.inv,
-                                               dfa_add_sym_to_curr_map=dfa_tr.dfa_predicate_add_sym_map_curr.inv,
-                                               state_obs_add=sym_tr.sym_add_state_labels,
-                                               tr_action_idx_map=sym_tr.tr_action_idx_map,
-                                               cudd_manager=cudd_manager)
-        
-        action_dict = graph_search.symbolic_dijkstra(verbose=False)
+    if len(formulas) > 1:
+        start: float = time.time()
+        graph_Search = MultipleFormulaBFS(init_TS=sym_tr.sym_init_states,
+                                          dfa_handle=dfa_tr,
+                                          ts_curr_vars=ts_curr_state,
+                                          ts_next_vars=ts_next_state,
+                                          dfa_curr_vars=dfa_curr_state,
+                                          dfa_next_vars=dfa_next_state,
+                                          ts_obs_vars=ts_lbl_states,
+                                          ts_trans_func_list=sym_tr.sym_tr_actions, 
+                                          ts_sym_to_curr_map=sym_tr.predicate_sym_map_curr.inv,
+                                          ts_sym_to_S2O_map=sym_tr.predicate_sym_map_lbl.inv,
+                                          tr_action_idx_map=sym_tr.tr_action_idx_map, 
+                                          state_obs_bdd=sym_tr.sym_state_labels,
+                                          cudd_manager=cudd_manager)
+
+        graph_Search.symbolic_bfs_nLTL(verbose=True)
+        stop: float = time.time()
+        print("Time took for plannig: ", stop - start)
+
     else:
+        # init_state = sym_tr.sym_init_states & dfa_tr.sym_init_state
+        # print('Inital states: ', init_state)
+        # print('Goal states: ', dfa_tr.sym_goal_state)
 
-        graph_search = SymbolicSearch(init_TS=sym_tr.sym_init_states,
-                                      target_DFA=dfa_tr.sym_goal_state,
-                                      init_DFA=dfa_tr.sym_init_state,
-                                      manager=cudd_manager,
-                                      ts_curr_vars=ts_curr_state,
-                                      ts_next_vars=ts_next_state,
-                                      ts_obs_vars=ts_lbl_states,
-                                      dfa_curr_vars=dfa_curr_state,
-                                      dfa_next_vars=dfa_next_state,
-                                      ts_trans_func_list=sym_tr.sym_tr_actions,
-                                      dfa_transition_func=dfa_tr.dfa_bdd_tr,
-                                      ts_sym_to_curr_map=sym_tr.predicate_sym_map_curr.inv,
-                                      ts_sym_to_S2O_map=sym_tr.predicate_sym_map_lbl.inv,
-                                      dfa_sym_to_curr_map=dfa_tr.dfa_predicate_sym_map_curr.inv,
-                                      tr_action_idx_map=sym_tr.tr_action_idx_map,
-                                      state_obs_bdd=sym_tr.sym_state_labels)
+        # let do graph search from init state to a goal state
+        start: float = time.time()
+        if QUANTITATIVE_SEARCH:
+            # shortest path graph search with Dijkstras
+            graph_search =  SymbolicDijkstraSearch(init_TS=sym_tr.sym_add_init_states,
+                                                target_DFA=dfa_tr.sym_goal_state,
+                                                init_DFA=dfa_tr.sym_init_state,
+                                                ts_curr_vars=ts_curr_state,
+                                                ts_next_vars=ts_next_state,
+                                                dfa_curr_vars=dfa_curr_state,
+                                                dfa_next_vars=dfa_next_state,
+                                                ts_obs_vars=ts_lbl_states,
+                                                ts_transition_func=None,
+                                                ts_trans_func_list=sym_tr.sym_tr_actions,
+                                                dfa_transition_func=dfa_tr.dfa_bdd_tr,
+                                                ts_add_sym_to_curr_map=sym_tr.predicate_add_sym_map_curr.inv,
+                                                ts_bdd_sym_to_curr_map=sym_tr.predicate_sym_map_curr.inv,
+                                                ts_bdd_sym_to_S2O_map=sym_tr.predicate_sym_map_lbl.inv,
+                                                ts_add_sym_to_S2O_map=sym_tr.predicate_add_sym_map_lbl.inv,
+                                                dfa_bdd_sym_to_curr_map=dfa_tr.dfa_predicate_sym_map_curr.inv,
+                                                dfa_add_sym_to_curr_map=dfa_tr.dfa_predicate_add_sym_map_curr.inv,
+                                                state_obs_add=sym_tr.sym_add_state_labels,
+                                                tr_action_idx_map=sym_tr.tr_action_idx_map,
+                                                cudd_manager=cudd_manager)
+            
+            action_dict = graph_search.symbolic_dijkstra(verbose=False)
+        else:
 
-        # TODO: In future store startegy as Mealey machine (Finite State Machine)
-        # The Mealey machine is a characteristic Function that represents a mapping from
-        # current TS state x Obs associated with this state x State of the Automation to Next State in TS and next state in the DFA Automaton
-        # TR : S_ts x Obs_bdd x S_dfa x S'_ts x S'_dfa
-        action_dict = graph_search.symbolic_bfs_wLTL(max_ts_state=ts_total_state, verbose=False)
+            graph_search = SymbolicSearch(init_TS=sym_tr.sym_init_states,
+                                        target_DFA=dfa_tr.sym_goal_state,
+                                        init_DFA=dfa_tr.sym_init_state,
+                                        manager=cudd_manager,
+                                        ts_curr_vars=ts_curr_state,
+                                        ts_next_vars=ts_next_state,
+                                        ts_obs_vars=ts_lbl_states,
+                                        dfa_curr_vars=dfa_curr_state,
+                                        dfa_next_vars=dfa_next_state,
+                                        ts_trans_func_list=sym_tr.sym_tr_actions,
+                                        dfa_transition_func=dfa_tr.dfa_bdd_tr,
+                                        ts_sym_to_curr_map=sym_tr.predicate_sym_map_curr.inv,
+                                        ts_sym_to_S2O_map=sym_tr.predicate_sym_map_lbl.inv,
+                                        dfa_sym_to_curr_map=dfa_tr.dfa_predicate_sym_map_curr.inv,
+                                        tr_action_idx_map=sym_tr.tr_action_idx_map,
+                                        state_obs_bdd=sym_tr.sym_state_labels)
+
+            # TODO: In future store startegy as Mealey machine (Finite State Machine)
+            # The Mealey machine is a characteristic Function that represents a mapping from
+            # current TS state x Obs associated with this state x State of the Automation to Next State in TS and next state in the DFA Automaton
+            # TR : S_ts x Obs_bdd x S_dfa x S'_ts x S'_dfa
+            action_dict = graph_search.symbolic_bfs_wLTL(max_ts_state=ts_total_state, verbose=False)
 
 
-    stop: float = time.time()
-    print("Time took for plannig: ", stop - start)
-    # print("Sequence of actions")
-    
-    # for _dfa_state, _ts_dict in action_dict.items():
-    #     print(f"******************Currently in DFA state {_dfa_state}******************")
-    #     for _ts_state, _action in _ts_dict.items(): 
-    #         print(f"From State {_ts_state} take Action {_action}")
+        stop: float = time.time()
+        print("Time took for plannig: ", stop - start)
+        # print("Sequence of actions")
+        
+        # for _dfa_state, _ts_dict in action_dict.items():
+        #     print(f"******************Currently in DFA state {_dfa_state}******************")
+        #     for _ts_state, _action in _ts_dict.items(): 
+        #         print(f"From State {_ts_state} take Action {_action}")
 
-    # print("Done with the plan")
+        # print("Done with the plan")
 
     if SIMULATE_STRATEGY and QUANTITATIVE_SEARCH:
         gridworld_strategy = convert_action_dict_to_gridworld_strategy(action_map=action_dict,

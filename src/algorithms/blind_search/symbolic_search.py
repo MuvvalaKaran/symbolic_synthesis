@@ -316,7 +316,7 @@ class SymbolicSearch(object):
         parent_layer_counter = 0
         ts_xcube = reduce(lambda x, y: x & y, self.ts_x_list)
 
-        # add the init state to ite respective DFA state. Note, we start in some other state 
+        # add the init state to ite respective DFA state. Note, we could start in some other state than the usual T0_init
         init_dfa =  self.add_init_state_to_reached_list(parent_reached_list)
 
         
