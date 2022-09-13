@@ -73,6 +73,28 @@ class BaseSymbolicSearch(object):
             ImgY = trans_action.andAbstract(From, xcube)
 
             return ImgY.swapVariables(y_list, x_list)
+    
+
+    def _append_dict_value(self, dict_obj, key_ts, key_dfa, value):
+        """
+        Check if key exist in dict or not.
+
+        If Key exist in dict:
+           Check if type of value of key is list or not
+           
+           If type is not list then make it list and Append the value in list
+        
+        else: add key-value pair
+        """
+        if key_dfa in dict_obj:
+            if key_ts in dict_obj[key_dfa]:
+                if not isinstance(dict_obj[key_dfa][key_ts], list):
+                    dict_obj[key_dfa][key_ts] = [dict_obj[key_dfa][key_ts]]
+                dict_obj[key_dfa][key_ts].append(value)
+            else:
+                dict_obj[key_dfa][key_ts] = value
+        else:
+            dict_obj[key_dfa] = {key_ts: value}
 
 
     def convert_add_cube_to_func(self, dd_func: ADD, curr_state_list: List[ADD]) -> List[BDD]:
