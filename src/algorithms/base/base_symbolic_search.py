@@ -5,6 +5,7 @@ from typing import Union, List
 from cudd import Cudd, BDD, ADD
 from itertools import product
 
+
 class BaseSymbolicSearch(object):
 
     def __init__(self,

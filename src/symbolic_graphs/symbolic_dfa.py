@@ -395,11 +395,40 @@ class SymbolicMultipleDFA(object):
         """
         A function that create a integer mapping from each dfa state to a integer. This map is used as a look up key in the Search algorithms.
 
-        e.g T0_init = 1 accept_all 2; For 2 DFAs both 2 states we will then have (1, 1); (1, 2); (2, 1) and (2, 2) possible keys 
+        e.g T0_init = 1 accept_all 2; For 2 DFAs both 2 states we will then have (1, 1); (1, 2); (2, 1) and (2, 2) possible keys
+        Networkx inherently randomizes thwe order in which we get the nodes. To fix the order, I will create my own ordering schene.
+        
+        To_init = 0
+        accept_all = n (Max # of states in the DFA)
+        TO_Si = i - SPOT always follows this naming convention
+
+        For more info about SPOT's NeverClaim format - https://spot.lrde.epita.fr/oaut.html
         """
+        
         self.node_int_map_dfas = {}
         for dfa_idx, dfa in enumerate(self.dfa_list):
-            self.node_int_map_dfas[dfa_idx] = bidict({state: index for index, state in enumerate(list(dfa._graph.nodes()))})
+            _dfa_map = bidict()
+            _max_dfa_states = len(list(dfa._graph.nodes()))
+            for count, _acc in  enumerate(dfa.get_accepting_states()):
+                # for the type of formula we are concerned with, there should only be one Acc state and hence count will be max zero
+                # _dfa_map[_max_dfa_states - count] = _acc
+                _dfa_map[_acc] = _max_dfa_states - count
+            
+            for count, _init in enumerate(dfa.get_initial_states()):
+                 # there should only be one Init state and hence count will be max zero
+                # _dfa_map[count] = _init[0]
+                assert isinstance(_init[0], str), "Error creating DFA state int mapping. FIX THIS!!!"
+                _dfa_map[_init[0]] = count
+            
+            for dstate in list(dfa._graph.nodes()):
+                if not dstate in _dfa_map.keys():
+                    # every state has a number associated with it, T0_S1, extract 1 ad store that has the key
+                    _state_num = int(re.split("_\w", dstate)[-1])
+                    assert _state_num not in _dfa_map.keys(), "Error creating DFA state int mapping. FIX THIS!!!"
+                    _dfa_map[dstate] = _state_num
+            
+            # self.node_int_map_dfas[dfa_idx] = bidict({state: index for index, state in enumerate(list(dfa._graph.nodes()))})
+            self.node_int_map_dfas[dfa_idx] = _dfa_map
 
 
     def _create_sym_var_map_dfas(self):

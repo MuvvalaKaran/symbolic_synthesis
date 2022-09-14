@@ -153,9 +153,6 @@ class MultipleFormulaBFS(BaseSymbolicSearch):
         for dfa_idx, _state_num in enumerate(dfa_tuple):
             _state_name = self.dfa_state_int_map[dfa_idx].inv[_state_num]
             _dfa_states.append(self.dfa_sym_to_curr_state_map.inv[f'{_state_name}_{dfa_idx}'])
-            
-            # dfa_state = re.split('_\d', _sym_s)[0]
-            # return self.dfa_state_int_map[dfa_idx][dfa_state]
         return _dfa_states
 
     
@@ -363,7 +360,7 @@ class MultipleFormulaBFS(BaseSymbolicSearch):
         return _prod_dfa_state_ts_map
     
 
-    def updated_closed_list(self, closed: dict, bucket: BDD) -> dict:
+    def updated_closed_list(self, closed: dict, bucket: BDD, verbose: bool = False) -> dict:
         """
         Update the closed set by iterating over the entire bucket (all DFA states) reached list,
          and adding them to the expanded set (closed set)
@@ -374,7 +371,11 @@ class MultipleFormulaBFS(BaseSymbolicSearch):
                 closed[_prod_dfa_state] |= _ts_states
             else:
                 closed[_prod_dfa_state] = _ts_states
-        
+            if verbose:
+                    print(f"Updated closed list of {_prod_dfa_state} with following states:")
+                    self.get_states_from_dd(dd_func=_ts_states,
+                                            curr_state_list=self.ts_x_list,
+                                            sym_map=self.ts_sym_to_curr_state_map)
         return closed
     
 
@@ -402,7 +403,7 @@ class MultipleFormulaBFS(BaseSymbolicSearch):
             # If unexpanded states exist ... 
             if not self.check_open_list_is_empty(layer_num=g_layer, open_list=open_list):
                 # Add states to be expanded next to already expanded states
-                closed = self.updated_closed_list(closed, open_list[g_layer])
+                closed = self.updated_closed_list(closed, open_list[g_layer], verbose=False)
                 
                 # compute the image of the TS states 
                 for prod_dfa_tuple, ts_states in open_list[g_layer].items():
@@ -483,13 +484,9 @@ class MultipleFormulaBFS(BaseSymbolicSearch):
                                                                      dfa_xcube=dfa_xcube,
                                                                      dfa_ycube=dfa_ycube,
                                                                      verify=False)
-
-                # valid_pre_dfa_state = self._get_ts_states_to_dfa_evolution(ts_states=current_ts,
-                #                                                            dfa_to_state=[_to_dfa_state.swapVariables(self.dfa_x_list, self.dfa_y_list) for _to_dfa_state in sym_current_dfa_states],
-                #                                                            dfa_ycube=dfa_ycube,
-                #                                                            verify=False)
                 
                 # compute the intersetion of
+                g_layer_plan = {}
                 for _from_prod_dfa_state, _v in valid_pre_dfa_state.items():
                     if not _v.isZero():
                         # check the intersection of the corresponding layer's corresponding DFA state with preds_ts_list
@@ -504,8 +501,9 @@ class MultipleFormulaBFS(BaseSymbolicSearch):
 
                             if not intersection.isZero():
                                 for _ts_state in self.convert_cube_to_func(dd_func=intersection, curr_state_list=self.ts_x_list):
-                                    self._append_dict_value(dict_obj=parent_plan,
-                                                            key_dfa=f'{_from_prod_dfa_state}->{_to_dfa_states}',
+                                    self._append_dict_value(dict_obj=g_layer_plan,
+                                                            # key_dfa=f'{_from_prod_dfa_state}->{_to_dfa_states}',
+                                                            key_dfa=_from_prod_dfa_state,
                                                             key_ts=self.ts_sym_to_curr_state_map[_ts_state],
                                                             value=self.tr_action_idx_map.inv[tr_num])
                                 
@@ -514,6 +512,7 @@ class MultipleFormulaBFS(BaseSymbolicSearch):
                                 else:
                                     new_current_ts[_from_prod_dfa_state] = intersection
             
+            parent_plan[g_layer] = g_layer_plan
             current_ts_dict = new_current_ts
             # sym_current_dfa = self.dfa_add_sym_to_curr_state_map.inv[_dfa_state]
             g_layer -= 1

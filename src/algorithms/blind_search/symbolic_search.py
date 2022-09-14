@@ -401,7 +401,7 @@ class SymbolicSearch(object):
                         # loop over the tmp dictionary and add them to the their respective reach list
                         for _key, _ts_states in _states_to_be_added_to_reachlist.items():
                             if not _ts_states.isZero():
-                                # check if the state begin added has a;ready been explored or not for this DFA state
+                                # check if the state being added has already been explored or not for this DFA state
                                 _new_ts_state = _ts_states & ~parent_reached_list[_key]['closed']
                                 if not _new_ts_state.isZero():
                                     # if you are adding to the current then append, else add to the last layer of the other boxes

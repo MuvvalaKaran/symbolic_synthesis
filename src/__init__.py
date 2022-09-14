@@ -1,1 +1,1 @@
-__all__ = ["explicit_graphs", "symbolic_graphs", "algorithms"]
+__all__ = ["explicit_graphs", "symbolic_graphs", "algorithms", "simulate_strategy"]
