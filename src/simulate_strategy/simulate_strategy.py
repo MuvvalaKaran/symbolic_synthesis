@@ -20,30 +20,30 @@ PDDL_TO_GRIDWORLD_MAP = {'moveright': gridworld_handle.E,
 
 
 
-def convert_action_dict_to_gridworld_strategy_nLTL(action_map: dict,
-                                                transition_sys_tr,
-                                                tr_action_idx_map,
-                                                dfa_handle,
-                                                init_state_ts,
-                                                init_state_dfa_list,
-                                                target_DFA_list,
-                                                state_obs_dd,
-                                                ts_curr_vars: list,
-                                                ts_next_vars: list,
-                                                dfa_curr_vars: list,
-                                                dfa_next_vars: list,
-                                                ts_sym_to_curr_map,
-                                                dfa_sym_to_curr_map):
-    """
-    A DFA search over our dictionary of actions.
-    """
-    curr_ts_state = init_state_ts
-    curr_dfa_state_tuple = map_dfa_state_to_tuple(init_state_dfa_list,
-                                                    dfa_sym_to_curr_state_map=dfa_handle.dfa_predicate_sym_map_curr.inv,
-                                                    dfa_state_int_map=dfa_handle.node_int_map_dfas)
-    target_dfa_state_tuple = map_dfa_state_to_tuple(target_DFA_list,
-                                                    dfa_sym_to_curr_state_map=dfa_handle.dfa_predicate_sym_map_curr.inv,
-                                                    dfa_state_int_map=dfa_handle.node_int_map_dfas)
+# def convert_action_dict_to_gridworld_strategy_nLTL(action_map: dict,
+#                                                 transition_sys_tr,
+#                                                 tr_action_idx_map,
+#                                                 dfa_handle,
+#                                                 init_state_ts,
+#                                                 init_state_dfa_list,
+#                                                 target_DFA_list,
+#                                                 state_obs_dd,
+#                                                 ts_curr_vars: list,
+#                                                 ts_next_vars: list,
+#                                                 dfa_curr_vars: list,
+#                                                 dfa_next_vars: list,
+#                                                 ts_sym_to_curr_map,
+#                                                 dfa_sym_to_curr_map):
+#     """
+#     A DFA search over our dictionary of actions.
+#     """
+#     curr_ts_state = init_state_ts
+#     curr_dfa_state_tuple = map_dfa_state_to_tuple(init_state_dfa_list,
+#                                                     dfa_sym_to_curr_state_map=dfa_handle.dfa_predicate_sym_map_curr.inv,
+#                                                     dfa_state_int_map=dfa_handle.node_int_map_dfas)
+#     target_dfa_state_tuple = map_dfa_state_to_tuple(target_DFA_list,
+#                                                     dfa_sym_to_curr_state_map=dfa_handle.dfa_predicate_sym_map_curr.inv,
+#                                                     dfa_state_int_map=dfa_handle.node_int_map_dfas)
     
 
 
@@ -71,6 +71,52 @@ def get_dfa_evolution(dfa_handle, _nxt_ts_state, state_obs_dd, dfa_curr_vars, df
     curr_dfa_state_tuple = tuple(dfa_list)
 
     return curr_dfa_state_tuple
+
+
+def add_element_to_plan_list(plan_list, curr_dfa_state_tuple, curr_ts_state, curr_action, counter: int):
+    """
+    A helper function to add an element (state) to the graph. The plan list is a queue of nodes.
+    
+    IF two nodes that live in the same layer, then are added to the same bucket else a new bucket is created
+    """
+    if len(plan_list) > 0:
+        # check if the previous state is the same as the current state then add it to the same layer in the queue
+        if (curr_dfa_state_tuple in plan_list[-1] and curr_ts_state in plan_list[-1] and not(curr_action in plan_list[-1])):
+            # append as a list
+            plan_list[-1] = [plan_list[-1]]
+            plan_list[-1].append((curr_dfa_state_tuple, curr_ts_state , curr_action))
+            counter -= 1 
+        else:
+            plan_list.append((curr_dfa_state_tuple, curr_ts_state , curr_action))
+    else:
+        # this will only happen at the start of the iteration
+        plan_list.append((curr_dfa_state_tuple, curr_ts_state , curr_action))
+    
+    return plan_list, counter
+
+
+def pop_action_list(plan_list, counter: int):
+    """
+    Extract the last element in the plan list. If you are poping from the list then do not reduce the counter as this element lives in the same bucket. 
+    """
+
+    if isinstance(plan_list[-1], list):
+        if len(plan_list[-1]) > 1:
+            curr_dfa_state_tuple, curr_ts_state, curr_action = plan_list[-1].pop()
+        # once we pop the second last element, we can reconfigure bucket ot be not list
+        else:
+            plan_list[-1] = plan_list[-1][-1]
+            curr_dfa_state_tuple, curr_ts_state, curr_action = plan_list.pop()
+            counter -= 1
+
+    else:
+        curr_dfa_state_tuple, curr_ts_state, curr_action = plan_list.pop()
+        # closed_list.append((curr_ts_state, _, curr_dfa_state_tuple))
+        counter -= 1
+    
+    return curr_dfa_state_tuple, curr_ts_state, curr_action, counter
+
+
 
 
 def convert_action_dict_to_gridworld_strategy_nLTL(action_map: dict,
@@ -106,37 +152,35 @@ def convert_action_dict_to_gridworld_strategy_nLTL(action_map: dict,
 
     counter = 1
     while not target_dfa_state_tuple == curr_dfa_state_tuple:
-        assert 0 < counter <= len(action_map.keys()), "Error while simulating the strategy. FIX THIS!!!"
-        if curr_dfa_state_tuple in action_map[counter] and curr_ts_state in action_map[counter][curr_dfa_state_tuple]:
-            # if ts_sym_to_curr_map[curr_ts_state] in action_map[counter][curr_dfa_state_tuple]:
+        # assert 0 < counter <= len(action_map.keys()), "Error while simulating the strategy. FIX THIS!!!"
+        if 0 < counter <= len(action_map.keys()) and curr_dfa_state_tuple in action_map[counter] and curr_ts_state in action_map[counter][curr_dfa_state_tuple]:
             _actions = action_map[counter][curr_dfa_state_tuple][curr_ts_state]
 
-                # _actions.extend([ts_sym_to_curr_map[curr_ts_state]])
             if isinstance(_actions, list):
                 [open_list.append((_state_a)) for _state_a in  list(itertools.product([curr_ts_state], _actions, [curr_dfa_state_tuple]))]
             else:
                 [open_list.append((_state_a)) for _state_a in  list(itertools.product([curr_ts_state], [_actions], [curr_dfa_state_tuple]))]
 
-            # # remove elements in open list that were already explored:
-            # open_list = [x for x in open_list if x not in closed_list]
-
         else:
             # pop element from the closed list
-            curr_dfa_state_tuple, curr_ts_state, _a = plan_list.pop()
-            # closed_list.append((curr_ts_state, _, curr_dfa_state_tuple))
-            counter -= 1
+            # curr_dfa_state_tuple, curr_ts_state, _a = plan_list.pop()
+            # # closed_list.append((curr_ts_state, _, curr_dfa_state_tuple))
+            # counter -= 1
+            curr_dfa_state_tuple, curr_ts_state, _a, counter = pop_action_list(plan_list, counter)
+            
             if len(open_list) > 0:
                 while not (curr_dfa_state_tuple in open_list[-1] and curr_ts_state in open_list[-1]):
-                    curr_dfa_state_tuple, curr_ts_state, _a = plan_list.pop()
-                    # closed_list.append((curr_ts_state, _, curr_dfa_state_tuple))
-                    counter -= 1
-            else:
-                # since we do have the open list to check from, we check if the current DFA state exists in the
-                if not (curr_dfa_state_tuple in action_map[counter] and curr_ts_state in action_map[counter][curr_dfa_state_tuple]):
-                     # pop element from the closed list
-                    curr_dfa_state_tuple, curr_ts_state, _a = plan_list.pop()
-                    # closed_list.append((curr_ts_state, _, curr_dfa_state_tuple))
-                    counter -= 1
+                    # curr_dfa_state_tuple, curr_ts_state, _a = plan_list.pop()
+                    # # closed_list.append((curr_ts_state, _, curr_dfa_state_tuple))
+                    # counter -= 1
+                    curr_dfa_state_tuple, curr_ts_state, _a, counter = pop_action_list(plan_list, counter)
+            # else:
+            #     # since we do have the open list to check from, we check if the current DFA state exists in the
+            #     if not (curr_dfa_state_tuple in action_map[counter] and curr_ts_state in action_map[counter][curr_dfa_state_tuple]):
+            #          # pop element from the closed list
+            #         curr_dfa_state_tuple, curr_ts_state, _a = plan_list.pop()
+            #         # closed_list.append((curr_ts_state, _, curr_dfa_state_tuple))
+            #         counter -= 1
 
 
         # pop the top mode node, expand it and repeat
@@ -144,16 +188,31 @@ def convert_action_dict_to_gridworld_strategy_nLTL(action_map: dict,
             curr_ts_state , _a, curr_dfa_state_tuple = open_list.pop()
             while (curr_ts_state , _a, curr_dfa_state_tuple) in closed_list:
                 curr_ts_state , _a, curr_dfa_state_tuple = open_list.pop()
-                counter -=1
+                # counter -=1
 
         # add it to the closed list
-        closed_list.append((curr_ts_state, _a, curr_dfa_state_tuple))
+        if (curr_dfa_state_tuple, curr_ts_state , _a) not in closed_list:
+            closed_list.append((curr_ts_state, _a, curr_dfa_state_tuple))
 
         # if len(open_list) == 0:
         #     if (curr_ts_state , _a, curr_dfa_state_tuple) not in closed_list:
         #         plan_list.append((curr_dfa_state_tuple, curr_ts_state , _a))
         # else:
-        plan_list.append((curr_dfa_state_tuple, curr_ts_state , _a))
+        # if len(plan_list) > 0:
+        #     # check if the previous state is the same as the current state then add it to the same layer in the queue
+        #     if (curr_dfa_state_tuple in plan_list[-1] and curr_ts_state in plan_list[-1] and not(_a in plan_list[-1])):
+        #         # append as a list
+        #         plan_list[-1] = [plan_list[-1]]
+        #         plan_list[-1].append((curr_dfa_state_tuple, curr_ts_state , _a))
+        #         counter -= 1 
+        #     else:
+        #         plan_list.append((curr_dfa_state_tuple, curr_ts_state , _a))
+        # else:
+        #     # this will only happen at the start of the iteration
+        #     plan_list.append((curr_dfa_state_tuple, curr_ts_state , _a))
+        plan_list, counter = add_element_to_plan_list(plan_list, curr_dfa_state_tuple, curr_ts_state, _a, counter)
+
+
 
         _nxt_ts_state_sym = transition_sys_tr[tr_action_idx_map[_a]].restrict(ts_sym_to_curr_map.inv[curr_ts_state])
         _nxt_ts_state_sym = _nxt_ts_state_sym.swapVariables(ts_curr_vars, ts_next_vars)
@@ -179,7 +238,10 @@ def retrieve_plan(plan_list: List[tuple]) -> List:
     """
     _strategy = []
     for _plan in plan_list:
-        _strategy.append(PDDL_TO_GRIDWORLD_MAP[_plan[-1]])
+        if isinstance(_plan, list):
+            _strategy.append(PDDL_TO_GRIDWORLD_MAP[_plan[-1][-1]])    
+        else:
+            _strategy.append(PDDL_TO_GRIDWORLD_MAP[_plan[-1]])
     
     return _strategy
 
