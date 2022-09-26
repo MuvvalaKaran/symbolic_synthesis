@@ -98,7 +98,7 @@ class BaseSymbolicSearch(object):
             dict_obj[key_dfa] = {key_ts: value}
 
 
-    def convert_add_cube_to_func(self, dd_func: ADD, curr_state_list: List[ADD]) -> List[BDD]:
+    def convert_add_cube_to_func(self, dd_func: ADD, curr_state_list: List[ADD]) -> List[ADD]:
         """
         A helper function that convert a string of a path to its corresponding boolean form for a Given transition system
         """

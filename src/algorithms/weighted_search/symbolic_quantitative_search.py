@@ -12,17 +12,17 @@ from src.algorithms.base import BaseSymbolicSearch
 class SymbolicDijkstraSearch(BaseSymbolicSearch):
 
     def __init__(self,
-                 init_TS: BDD,
-                 target_DFA: BDD,
-                 init_DFA: BDD,
-                 ts_curr_vars: list,
-                 ts_next_vars: list,
-                 dfa_curr_vars: list,
-                 dfa_next_vars: list,
-                 ts_obs_vars: list,
+                 init_TS: ADD,
+                 target_DFA: ADD,
+                 init_DFA: ADD,
+                 ts_curr_vars: List[ADD],
+                 ts_next_vars: List[ADD],
+                 dfa_curr_vars: List[ADD],
+                 dfa_next_vars: List[ADD],
+                 ts_obs_vars: List[ADD],
                  ts_transition_func: ADD,
                  ts_trans_func_list: List[ADD],
-                 dfa_transition_func: BDD,
+                 dfa_transition_func: ADD,
                  ts_add_sym_to_curr_map: dict,
                  ts_bdd_sym_to_curr_map: dict,
                  ts_bdd_sym_to_S2O_map: dict,
@@ -84,7 +84,7 @@ class SymbolicDijkstraSearch(BaseSymbolicSearch):
             bucket |= states
     
 
-    def remove_state_explored(self, layer_num: int, open_list: dict, closed: ADD):
+    def remove_state_explored(self, layer_num: int, open_list: List[dict], closed: ADD):
         """
         A helper function to remove all the states that have already been explored, i.e., belong to the closed ADD function.
         """
@@ -92,7 +92,7 @@ class SymbolicDijkstraSearch(BaseSymbolicSearch):
             open_list[layer_num][_dfa] = open_list[layer_num][_dfa] & ~closed[_dfa]
     
 
-    def check_open_list_is_empty(self, layer_num: int, open_list: dict):
+    def check_open_list_is_empty(self, layer_num: int, open_list: List[dict]):
         """
         A helper function to check if the reached associated with all the dfa states is empty or not
         """
@@ -336,8 +336,6 @@ class SymbolicDijkstraSearch(BaseSymbolicSearch):
         """
         Retrieval of a plan for symbolic Dijkstra
         """
-        # plan = []
-        # current = add_freach_list[max_layer]
         ts_ycube = reduce(lambda a, b: a & b, self.ts_y_list)
         g_layer = self.manager.addConst(int(max_layer))
         dfa_final_state = self.dfa_add_sym_to_curr_state_map[self.target_DFA]

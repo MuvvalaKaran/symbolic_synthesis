@@ -1,20 +1,19 @@
 import re
 import sys
+import warnings
 import itertools
 
 from typing import List, Union
 from functools import reduce
-import warnings
 
 from cudd import Cudd, BDD, ADD
 from src.algorithms.base import BaseSymbolicSearch
 from src.symbolic_graphs import SymbolicMultipleDFA
 
-from utls import deprecated
 
 class MultipleFormulaBFS(BaseSymbolicSearch):
     """
-    Given a Transition systenm, and n DFAs associated with different Formulas, this class computed the shorted path (in terms of # of edges taken to)
+    Given a Transition systenm, and n DFAs associated with different Formulas, this class computes the shortest path (in terms of # of edges taken to)
     """
 
     def __init__(self,
@@ -104,7 +103,7 @@ class MultipleFormulaBFS(BaseSymbolicSearch):
 
         # get each individual cubes from the image of TS
         # get the observation of state(s)
-        ts_cubes = self.convert_cube_to_func(dd_func=bdd_func, curr_state_list=self.ts_x_list)
+        ts_cubes: List[BDD] = self.convert_cube_to_func(dd_func=bdd_func, curr_state_list=self.ts_x_list)
         dfa_tuple_ts_state_map = {}
         dfa_list = [0 for _ in range(len(self.dfa_transition_fun_list))]
 
@@ -143,7 +142,7 @@ class MultipleFormulaBFS(BaseSymbolicSearch):
         return tuple(_to_tuple)
 
     
-    def map_dfa_tuple_to_sym_states(self, dfa_tuple: tuple) -> List[str]:
+    def map_dfa_tuple_to_sym_states(self, dfa_tuple: tuple) -> List[BDD]:
         """
         Given a tuple, this function returns a list of DFA states
         """
@@ -174,9 +173,9 @@ class MultipleFormulaBFS(BaseSymbolicSearch):
             open_list.append({_key: ts_state})
             closed[_key] = self.manager.bddZero()
     
-    def remove_states_explored(self, layer_num: int, open_list: dict, closed: BDD):
+    def remove_states_explored(self, layer_num: int, open_list: list, closed: BDD):
         """
-        A helper function to remove all the states that have already been explored, i.e., belong to the closed ADD function.
+        A helper function to remove all the states that have already been explored, i.e., belong to the closed BDD function.
         """
         # if the closed set is empty, then return False. 
         for _prod_dfa in open_list[layer_num].keys():
@@ -206,7 +205,7 @@ class MultipleFormulaBFS(BaseSymbolicSearch):
         return False
     
 
-    def print_freach_list(self, open_list: List):
+    def print_freach_list(self, open_list: List[dict]):
         """
         A helper method to print the Forward reach set
         """
@@ -238,11 +237,8 @@ class MultipleFormulaBFS(BaseSymbolicSearch):
     
 
     def _get_pred_prod_dfa_ts_map(self,
-                                  ts_states: BDD,
-                                  ts_xcube: BDD,
                                   ts_obs_cube: BDD,
                                   sym_dfa_to_states: List[BDD],
-                                  dfa_xcube: BDD,
                                   dfa_ycube: BDD,
                                   verify: bool = False):
         """
@@ -263,7 +259,6 @@ class MultipleFormulaBFS(BaseSymbolicSearch):
                     Make sure your 'to-dfa-states' are in terms of next dfa variables "
 
         dfa_w_no_obs = self.dfa_monolithic_tr_func.existAbstract(ts_obs_cube)
-        ts_obs_bdd = self.obs_bdd.restrict(ts_states).existAbstract(ts_xcube)
         _sym_dfa_to_states_bdd = reduce(lambda a, b: a | b, sym_dfa_to_states)
 
         _pre_dfa = self.pre_per_action(trans_action=dfa_w_no_obs,
@@ -285,32 +280,75 @@ class MultipleFormulaBFS(BaseSymbolicSearch):
         # compute all possible combinations of valid pre dfa states
         _valid_pre_dfa_state_combos = list(itertools.product(*_dfa_list))
 
-        _pre_prod_dfa_ts_map = {}
-        # 1. we iterare through each pred_prod_dfa and current prod dfa,
-        # 2. get the set of observation that enables the transition between these
-        # 3. Take the intersection between the observation accosicated with current TS states and observation that enable a transition
-        # 4. Extract the labels that lie at the intersection, get their corresponding TS states and store them in a dictionary. 
+        # not all the prod states are physically possible on the actually giant product automaton. We need to remove such edges. 
+
+        _pre_prod_dfa_ts_map = {}        
+
         for _valid_pre in _valid_pre_dfa_state_combos:
-            _sym_pre_dfa_state = [self.dfa_sym_to_curr_state_map.inv[f'{_s}_{_idx}'] for _idx, _s in enumerate(_valid_pre)]
-            _sym_pre_dfa_states_bdd = reduce(lambda a, b: a | b, _sym_pre_dfa_state)
-            _possible_valid_obs_bdd = self.dfa_monolithic_tr_func.restrict(_sym_pre_dfa_states_bdd & \
-                 _sym_dfa_to_states_bdd.swapVariables(self.dfa_x_list, self.dfa_y_list))
+            _sym_pre_dfa_states = [self.dfa_sym_to_curr_state_map.inv[f'{_s}_{_idx}'] for _idx, _s in enumerate(_valid_pre)]
+            _actual_obs = self.manager.bddOne()            
+            # check if there exists a transition individually and check if there is a valid intersection of all.
+            for _dfa_idx, _sym_pre_dfa in enumerate(_sym_pre_dfa_states):
+                _possible_valid_obs_bdd = self.dfa_transition_fun_list[_dfa_idx].restrict(_sym_pre_dfa & sym_dfa_to_states[_dfa_idx].swapVariables(self.dfa_x_list, self.dfa_y_list))
+                _actual_obs = _actual_obs & _possible_valid_obs_bdd
             
-            _possible_valid_obs_bdd = _possible_valid_obs_bdd.existAbstract(dfa_xcube)
-            _possible_valid_obs_bdd = _possible_valid_obs_bdd.existAbstract(dfa_ycube)
-            _actual_obs = _possible_valid_obs_bdd & ts_obs_bdd
-
-            # get the associated states
-            _actual_ts = self.obs_bdd.restrict(_actual_obs)
-
-            _pre_prod_tuple = self.map_dfa_state_to_tuple(_sym_pre_dfa_state)
-            _pre_prod_dfa_ts_map[_pre_prod_tuple] = _actual_ts.existAbstract(ts_obs_cube)
-        
+            _pre_prod_tuple = self.map_dfa_state_to_tuple(_sym_pre_dfa_states)
+            _pre_prod_dfa_ts_map[_pre_prod_tuple] = _actual_obs
         
         return _pre_prod_dfa_ts_map
     
 
-    def updated_closed_list(self, closed: dict, bucket: BDD, verbose: bool = False) -> dict:
+    def check_from_to_dfa_evolution_validity(self,
+                                             from_dfa_state_tuple,
+                                             to_dfa_state_tuple,
+                                             ts_states, ts_xcube,
+                                             ts_ycube, ts_obs_cube,
+                                             ts_transition_fun) -> BDD:
+        """
+        A function to check if given a set of TS states, to and from DFA state, if any or all of the state enable that transition.
+        
+        Return the states that do enable the transition.   
+        """
+        # check if this intersection actually enables the transition _from_prod_dfa_state to _to_dfa_States
+        image_state_act = self.image_per_action(trans_action=ts_transition_fun,
+                                                From=ts_states,
+                                                xcube=ts_xcube,
+                                                x_list=self.ts_x_list,
+                                                y_list=self.ts_y_list)
+
+        _sym_from_dfa_state: List[str] = self.map_dfa_tuple_to_sym_states(from_dfa_state_tuple)
+        _sym_to_dfa_state: List[str] = self.map_dfa_tuple_to_sym_states(to_dfa_state_tuple)
+
+        # get the corresponding state observation
+        _ts_obs = self.obs_bdd.restrict(image_state_act)
+
+        _actual_obs = self.manager.bddOne()  
+        for _dfa_idx, (_sym_from_dfa, _sym_to_dfa) in enumerate(zip(_sym_from_dfa_state, _sym_to_dfa_state)):
+            _possible_valid_obs_bdd = self.dfa_transition_fun_list[_dfa_idx].restrict(_sym_from_dfa & _sym_to_dfa.swapVariables(self.dfa_x_list, self.dfa_y_list) & _ts_obs)
+            _actual_obs = _actual_obs & _possible_valid_obs_bdd
+        
+        # if all the states enable the transition from (x, y, z) ---> (x', y', z') then return the whole set
+        if _actual_obs.isOne():
+            return ts_states
+        # if even one the transitions in the prod DFA state fails the transition from (x, y, z) ---> (x', y', z') then return the empty set
+        elif _actual_obs.isZero():
+            return self.manager.bddZero() 
+        # its neither True nor False, meaning a subset of state enable the transtion 
+        else:
+            _actual_ts = self.obs_bdd.restrict(_actual_obs).existAbstract(ts_obs_cube)
+            # compute the pre and take the intersection with the current ts_states
+            pred_ts = self.pre_per_action(trans_action=ts_transition_fun,
+                                          From=_actual_ts,
+                                          ycube=ts_ycube,
+                                          x_list=self.ts_x_list,
+                                          y_list=self.ts_y_list)
+            _valid_intersection = pred_ts & ts_states
+            assert not _valid_intersection.isZero() , f"Error while computing valid pre TS states transtioning from {from_dfa_state_tuple} to {to_dfa_state_tuple}. FIX THIS!!!!!"
+            return _valid_intersection
+
+    
+
+    def updated_closed_list(self, closed: dict, bucket: dict, verbose: bool = False) -> dict:
         """
         Update the closed set by iterating over the entire bucket (all DFA states) reached list,
          and adding them to the expanded set (closed set)
@@ -329,7 +367,7 @@ class MultipleFormulaBFS(BaseSymbolicSearch):
         return closed
     
 
-    def symbolic_bfs_nLTL(self, verbose: bool = False):
+    def symbolic_bfs_nLTL(self, verbose: bool = False) -> dict:
         """
         Implement a general BFS planning algorithm over multiple formulas in a symbolic fashion.
 
@@ -372,7 +410,7 @@ class MultipleFormulaBFS(BaseSymbolicSearch):
 
                     for _key, _nxt_ts_state in _dfa_tuple_nxt_ts_map.items():
                         try:
-                            # if the bucket exisits thrn check if this prod dfa has been explored before or not
+                            # if the bucket exists then check if this prod dfa has been explored before or not
                             if _key in open_list[g_layer + 1]: 
                                 open_list[g_layer + 1][_key] |= _nxt_ts_state
                             else:
@@ -386,7 +424,7 @@ class MultipleFormulaBFS(BaseSymbolicSearch):
             
             g_layer += 1
         
-        print("Found a plan, Now retireving it!")
+        print(f"Found a plan with least cost lenght {g_layer}, Now retireving it!")
 
         if verbose:
             self.print_freach_list(open_list=open_list)
@@ -396,7 +434,7 @@ class MultipleFormulaBFS(BaseSymbolicSearch):
                                                     verbose=verbose)
     
 
-    def retrieve_symbolic_bfs_nLTL_plan(self, freach_list, max_layer: int, verbose: bool = False):
+    def retrieve_symbolic_bfs_nLTL_plan(self, freach_list: List[dict], max_layer: int, verbose: bool = False) -> dict:
         """
         Retrieve the plan from symbolic BFS algorithm for multiple DFAs. The list is sequence of composed states of TS and DFAs.
         """
@@ -432,12 +470,9 @@ class MultipleFormulaBFS(BaseSymbolicSearch):
                                             curr_state_list=self.ts_x_list,
                                             sym_map=self.ts_sym_to_curr_state_map)
 
-                # compute the valid state predecessors on the DFAs from which we could have transited to the current DFA states given by _to_dfa_states
-                valid_pre_dfa_state = self._get_pred_prod_dfa_ts_map(ts_states=current_ts,
-                                                                     ts_xcube=ts_xcube,
-                                                                     ts_obs_cube=ts_obs_cube,
+                # CHECK THIS: compute the valid state predecessors on the DFAs from which we could have transited to the current DFA states given by _to_dfa_states
+                valid_pre_dfa_state = self._get_pred_prod_dfa_ts_map(ts_obs_cube=ts_obs_cube,
                                                                      sym_dfa_to_states=sym_current_dfa_states,
-                                                                     dfa_xcube=dfa_xcube,
                                                                      dfa_ycube=dfa_ycube,
                                                                      verify=False)
                 
@@ -447,32 +482,41 @@ class MultipleFormulaBFS(BaseSymbolicSearch):
                         for tr_num, pred_ts_bdd in enumerate(preds_ts_list):
                             try:
                                 intersection: BDD = freach_list[g_layer - 1][_from_prod_dfa_state] & pred_ts_bdd
+ 
                             except:
                                 if verbose:
                                     print(f"The Forward reach list dose not contain {_from_prod_dfa_state} in bucket {g_layer - 1}.\
                                         For now skipping computing this intersection. This may cause issues in the future.")
                                 continue
-
+                            
                             if not intersection.isZero():
-                                for _ts_state in self.convert_cube_to_func(dd_func=intersection, curr_state_list=self.ts_x_list):
-                                    self._append_dict_value(dict_obj=g_layer_plan,
-                                                            # key_dfa=f'{_from_prod_dfa_state}->{_to_dfa_states}',
-                                                            key_dfa=_from_prod_dfa_state,
-                                                            key_ts=self.ts_sym_to_curr_state_map[_ts_state],
-                                                            value=self.tr_action_idx_map.inv[tr_num])
-                                
-                                if _from_prod_dfa_state in new_current_ts:
-                                    new_current_ts[_from_prod_dfa_state] |= intersection
-                                else:
-                                    new_current_ts[_from_prod_dfa_state] = intersection
+                                _valid_intersect: BDD = self.check_from_to_dfa_evolution_validity(from_dfa_state_tuple=_from_prod_dfa_state,
+                                                                                                  to_dfa_state_tuple=_to_dfa_states,
+                                                                                                  ts_states=intersection,
+                                                                                                  ts_xcube=ts_xcube,
+                                                                                                  ts_ycube=ts_ycube,
+                                                                                                  ts_obs_cube=ts_obs_cube,
+                                                                                                  ts_transition_fun=self.ts_transition_fun_list[tr_num])
+
+                                if not _valid_intersect.isZero():
+                                    for _ts_state in self.convert_cube_to_func(dd_func=_valid_intersect, curr_state_list=self.ts_x_list):
+                                        self._append_dict_value(dict_obj=g_layer_plan,
+                                                                # key_dfa=f'{_from_prod_dfa_state}->{_to_dfa_states}',
+                                                                key_dfa=_from_prod_dfa_state,
+                                                                key_ts=self.ts_sym_to_curr_state_map[_ts_state],
+                                                                value=self.tr_action_idx_map.inv[tr_num])
+                                    
+                                    if _from_prod_dfa_state in new_current_ts:
+                                        new_current_ts[_from_prod_dfa_state] |= _valid_intersect
+                                    else:
+                                        new_current_ts[_from_prod_dfa_state] = _valid_intersect
             
             parent_plan[g_layer] = g_layer_plan
             current_ts_dict = new_current_ts
 
-            if len(g_layer_plan.keys()) != len(new_current_ts.keys()):
-                print("Looks like something went wrong during backward search")
+            # if len(g_layer_plan.keys()) != len(new_current_ts.keys()):
+            #     print("Looks like something went wrong during backward search")
 
-            # sym_current_dfa = self.dfa_add_sym_to_curr_state_map.inv[_dfa_state]
             g_layer -= 1
             
             assert g_layer >= 0, "Error Retrieving a plan. FIX THIS!!"
