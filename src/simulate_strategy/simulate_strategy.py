@@ -1,8 +1,10 @@
 import re
 import itertools
 import warnings
+import random
 
 import  src.gridworld_visualizer.gridworld_vis.gridworld as gridworld_handle
+import src.gridworld_visualizer.gridworld_vis.matplotlib_gw as policy_plotter
 
 from typing import List
 from functools import reduce
@@ -19,32 +21,47 @@ PDDL_TO_GRIDWORLD_MAP = {'moveright': gridworld_handle.E,
                          'movedown': gridworld_handle.S}
 
 
-
-# def convert_action_dict_to_gridworld_strategy_nLTL(action_map: dict,
-#                                                 transition_sys_tr,
-#                                                 tr_action_idx_map,
-#                                                 dfa_handle,
-#                                                 init_state_ts,
-#                                                 init_state_dfa_list,
-#                                                 target_DFA_list,
-#                                                 state_obs_dd,
-#                                                 ts_curr_vars: list,
-#                                                 ts_next_vars: list,
-#                                                 dfa_curr_vars: list,
-#                                                 dfa_next_vars: list,
-#                                                 ts_sym_to_curr_map,
-#                                                 dfa_sym_to_curr_map):
-#     """
-#     A DFA search over our dictionary of actions.
-#     """
-#     curr_ts_state = init_state_ts
-#     curr_dfa_state_tuple = map_dfa_state_to_tuple(init_state_dfa_list,
-#                                                     dfa_sym_to_curr_state_map=dfa_handle.dfa_predicate_sym_map_curr.inv,
-#                                                     dfa_state_int_map=dfa_handle.node_int_map_dfas)
-#     target_dfa_state_tuple = map_dfa_state_to_tuple(target_DFA_list,
-#                                                     dfa_sym_to_curr_state_map=dfa_handle.dfa_predicate_sym_map_curr.inv,
-#                                                     dfa_state_int_map=dfa_handle.node_int_map_dfas)
+def plot_policy(action_dict):
+    """
+    A function to plot the gridworld policy using my policy plotting code.
+    """
     
+
+    plot_handle = policy_plotter.plotterClass(fig_title='gridworld_str')
+    plot_handle.plot_policy(width=GRID_WORLD_SIZE, height=GRID_WORLD_SIZE, sys_str=action_dict)
+    
+    file_name = PROJECT_ROOT + f'/plots/{plot_handle.fig_title}_N_{GRID_WORLD_SIZE}.png'
+    plot_handle.save_fig(file_name, dpi=500)
+    # plot_handle.close()
+
+
+def get_ADD_dfa_evolution(dfa_handle, _nxt_ts_state, state_obs_dd, dfa_curr_vars, dfa_next_vars, curr_dfa_state_tuple) -> tuple:
+    """
+    A function that compute the next states on each DFA given a state or a set of states
+
+    add_func: The add associated with the set of states of the Trasition System
+    from_dfa_states: The states of DFA states where you are right now. 
+    """
+    dfa_list = [0 for _ in range(len(dfa_handle.dfa_add_tr_list))]
+
+    curr_dfa_bdd_list = map_dfa_tuple_to_sym_states(dfa_tuple=curr_dfa_state_tuple,
+                                                    dfa_sym_to_curr_state_map=dfa_handle.dfa_predicate_add_sym_map_curr.inv,
+                                                    dfa_state_int_map=dfa_handle.node_int_map_dfas)
+
+    # for ts_state in ts_cubes:
+        
+    for dfa_idx, dfa_tr in enumerate(dfa_handle.dfa_add_tr_list):
+        # check where you evolve in each DFA
+        state_obs = state_obs_dd.restrict(_nxt_ts_state)
+        dfa_state: ADD = dfa_tr.restrict(state_obs & curr_dfa_bdd_list[dfa_idx])
+        dfa_state: ADD = dfa_state.swapVariables(dfa_curr_vars, dfa_next_vars)
+        dfa_state: str = re.split('_\d', dfa_handle.dfa_predicate_add_sym_map_curr.inv[dfa_state])[0]
+        dfa_list[dfa_idx] = dfa_handle.node_int_map_dfas[dfa_idx][dfa_state]
+    
+    curr_dfa_state_tuple = tuple(dfa_list)
+        
+    return curr_dfa_state_tuple
+
 
 
 
@@ -71,179 +88,6 @@ def get_dfa_evolution(dfa_handle, _nxt_ts_state, state_obs_dd, dfa_curr_vars, df
     curr_dfa_state_tuple = tuple(dfa_list)
 
     return curr_dfa_state_tuple
-
-
-def add_element_to_plan_list(plan_list, curr_dfa_state_tuple, curr_ts_state, curr_action, counter: int):
-    """
-    A helper function to add an element (state) to the graph. The plan list is a queue of nodes.
-    
-    IF two nodes that live in the same layer, then are added to the same bucket else a new bucket is created
-    """
-    if len(plan_list) > 0:
-        # check if the previous state is the same as the current state then add it to the same layer in the queue
-        if (curr_dfa_state_tuple in plan_list[-1] and curr_ts_state in plan_list[-1] and not(curr_action in plan_list[-1])):
-            # append as a list
-            plan_list[-1] = [plan_list[-1]]
-            plan_list[-1].append((curr_dfa_state_tuple, curr_ts_state , curr_action))
-            counter -= 1 
-        else:
-            plan_list.append((curr_dfa_state_tuple, curr_ts_state , curr_action))
-    else:
-        # this will only happen at the start of the iteration
-        plan_list.append((curr_dfa_state_tuple, curr_ts_state , curr_action))
-    
-    return plan_list, counter
-
-
-def pop_action_list(plan_list, counter: int):
-    """
-    Extract the last element in the plan list. If you are poping from the list then do not reduce the counter as this element lives in the same bucket. 
-    """
-
-    if isinstance(plan_list[-1], list):
-        if len(plan_list[-1]) > 1:
-            curr_dfa_state_tuple, curr_ts_state, curr_action = plan_list[-1].pop()
-        # once we pop the second last element, we can reconfigure bucket ot be not list
-        else:
-            plan_list[-1] = plan_list[-1][-1]
-            curr_dfa_state_tuple, curr_ts_state, curr_action = plan_list.pop()
-            counter -= 1
-
-    else:
-        curr_dfa_state_tuple, curr_ts_state, curr_action = plan_list.pop()
-        # closed_list.append((curr_ts_state, _, curr_dfa_state_tuple))
-        counter -= 1
-    
-    return curr_dfa_state_tuple, curr_ts_state, curr_action, counter
-
-
-
-
-def convert_action_dict_to_gridworld_strategy_nLTL(action_map: dict,
-                                                transition_sys_tr,
-                                                tr_action_idx_map,
-                                                dfa_handle,
-                                                init_state_ts_sym,
-                                                init_state_dfa_list,
-                                                target_DFA_list,
-                                                state_obs_dd,
-                                                ts_curr_vars: list,
-                                                ts_next_vars: list,
-                                                dfa_curr_vars: list,
-                                                dfa_next_vars: list,
-                                                ts_sym_to_curr_map) -> List:
-    """
-    A method that extract a the shortest path from the BFS dictionary computed by the nLTL BFS algorithm and then translated it 
-    to Gridworld action policy and simulated.
-    """    
-    curr_ts_state_sym = init_state_ts_sym
-    curr_ts_state = ts_sym_to_curr_map[curr_ts_state_sym]
-
-    curr_dfa_state_tuple = map_dfa_state_to_tuple(init_state_dfa_list,
-                                                    dfa_sym_to_curr_state_map=dfa_handle.dfa_predicate_sym_map_curr.inv,
-                                                    dfa_state_int_map=dfa_handle.node_int_map_dfas)
-    target_dfa_state_tuple = map_dfa_state_to_tuple(target_DFA_list,
-                                                    dfa_sym_to_curr_state_map=dfa_handle.dfa_predicate_sym_map_curr.inv,
-                                                    dfa_state_int_map=dfa_handle.node_int_map_dfas)
-    
-    open_list = []
-    plan_list = []
-    closed_list = []
-
-    counter = 1
-    while not target_dfa_state_tuple == curr_dfa_state_tuple:
-        # assert 0 < counter <= len(action_map.keys()), "Error while simulating the strategy. FIX THIS!!!"
-        if 0 < counter <= len(action_map.keys()) and curr_dfa_state_tuple in action_map[counter] and curr_ts_state in action_map[counter][curr_dfa_state_tuple]:
-            _actions = action_map[counter][curr_dfa_state_tuple][curr_ts_state]
-
-            if isinstance(_actions, list):
-                [open_list.append((_state_a)) for _state_a in  list(itertools.product([curr_ts_state], _actions, [curr_dfa_state_tuple]))]
-            else:
-                [open_list.append((_state_a)) for _state_a in  list(itertools.product([curr_ts_state], [_actions], [curr_dfa_state_tuple]))]
-
-        else:
-            # pop element from the closed list
-            # curr_dfa_state_tuple, curr_ts_state, _a = plan_list.pop()
-            # # closed_list.append((curr_ts_state, _, curr_dfa_state_tuple))
-            # counter -= 1
-            curr_dfa_state_tuple, curr_ts_state, _a, counter = pop_action_list(plan_list, counter)
-            
-            if len(open_list) > 0:
-                while not (curr_dfa_state_tuple in open_list[-1] and curr_ts_state in open_list[-1]):
-                    # curr_dfa_state_tuple, curr_ts_state, _a = plan_list.pop()
-                    # # closed_list.append((curr_ts_state, _, curr_dfa_state_tuple))
-                    # counter -= 1
-                    curr_dfa_state_tuple, curr_ts_state, _a, counter = pop_action_list(plan_list, counter)
-            # else:
-            #     # since we do have the open list to check from, we check if the current DFA state exists in the
-            #     if not (curr_dfa_state_tuple in action_map[counter] and curr_ts_state in action_map[counter][curr_dfa_state_tuple]):
-            #          # pop element from the closed list
-            #         curr_dfa_state_tuple, curr_ts_state, _a = plan_list.pop()
-            #         # closed_list.append((curr_ts_state, _, curr_dfa_state_tuple))
-            #         counter -= 1
-
-
-        # pop the top mode node, expand it and repeat
-        if len(open_list) > 0:
-            curr_ts_state , _a, curr_dfa_state_tuple = open_list.pop()
-            while (curr_ts_state , _a, curr_dfa_state_tuple) in closed_list:
-                curr_ts_state , _a, curr_dfa_state_tuple = open_list.pop()
-                # counter -=1
-
-        # add it to the closed list
-        if (curr_dfa_state_tuple, curr_ts_state , _a) not in closed_list:
-            closed_list.append((curr_ts_state, _a, curr_dfa_state_tuple))
-
-        # if len(open_list) == 0:
-        #     if (curr_ts_state , _a, curr_dfa_state_tuple) not in closed_list:
-        #         plan_list.append((curr_dfa_state_tuple, curr_ts_state , _a))
-        # else:
-        # if len(plan_list) > 0:
-        #     # check if the previous state is the same as the current state then add it to the same layer in the queue
-        #     if (curr_dfa_state_tuple in plan_list[-1] and curr_ts_state in plan_list[-1] and not(_a in plan_list[-1])):
-        #         # append as a list
-        #         plan_list[-1] = [plan_list[-1]]
-        #         plan_list[-1].append((curr_dfa_state_tuple, curr_ts_state , _a))
-        #         counter -= 1 
-        #     else:
-        #         plan_list.append((curr_dfa_state_tuple, curr_ts_state , _a))
-        # else:
-        #     # this will only happen at the start of the iteration
-        #     plan_list.append((curr_dfa_state_tuple, curr_ts_state , _a))
-        plan_list, counter = add_element_to_plan_list(plan_list, curr_dfa_state_tuple, curr_ts_state, _a, counter)
-
-
-
-        _nxt_ts_state_sym = transition_sys_tr[tr_action_idx_map[_a]].restrict(ts_sym_to_curr_map.inv[curr_ts_state])
-        _nxt_ts_state_sym = _nxt_ts_state_sym.swapVariables(ts_curr_vars, ts_next_vars)
-
-        curr_dfa_state_tuple = get_dfa_evolution(dfa_handle=dfa_handle,
-                                                 _nxt_ts_state=_nxt_ts_state_sym,
-                                                 curr_dfa_state_tuple=curr_dfa_state_tuple,
-                                                 state_obs_dd=state_obs_dd,
-                                                 dfa_curr_vars=dfa_curr_vars,
-                                                 dfa_next_vars=dfa_next_vars)
-        
-        
-        curr_ts_state_sym = _nxt_ts_state_sym
-        curr_ts_state = ts_sym_to_curr_map[curr_ts_state_sym]
-
-        counter += 1
-    
-    return retrieve_plan(plan_list)
-
-def retrieve_plan(plan_list: List[tuple]) -> List:
-    """
-    A function that compute a sequence of gridworld action, E, W, N, S
-    """
-    _strategy = []
-    for _plan in plan_list:
-        if isinstance(_plan, list):
-            _strategy.append(PDDL_TO_GRIDWORLD_MAP[_plan[-1][-1]])    
-        else:
-            _strategy.append(PDDL_TO_GRIDWORLD_MAP[_plan[-1]])
-    
-    return _strategy
 
 
 def create_gridworld(size: int, strategy: list, init_pos: tuple = (1, 1)):
@@ -290,21 +134,6 @@ def map_dfa_state_to_tuple(dfa_states: List[BDD], dfa_sym_to_curr_state_map: dic
     return tuple(_to_tuple)
 
 
-def map_dfa_state_to_tuple_no_list(dfa_states: List[BDD], dfa_sym_to_curr_state_map: dict, dfa_state_int_map: dict) -> tuple:
-    """
-    Given a list of sybolic DFA state, create  
-    """
-    _to_tuple = [None for _ in dfa_state_int_map.keys()]
-    for _sym_s in dfa_states:
-        if _sym_s in dfa_sym_to_curr_state_map.keys():
-            _s = dfa_sym_to_curr_state_map[_sym_s]
-            dfa_state = re.split('_\d', _s)[0]
-            dfa_idx = int(re.split('_', _s)[-1])
-            _to_tuple[dfa_idx] = dfa_state_int_map[dfa_idx][dfa_state]
-    
-    return tuple(_to_tuple)
-
-
 def map_dfa_tuple_to_sym_states(dfa_tuple: tuple, dfa_sym_to_curr_state_map: dict, dfa_state_int_map: dict) -> List[str]:
     """
     Given a tuple, this function returns a list of DFA states
@@ -316,6 +145,90 @@ def map_dfa_tuple_to_sym_states(dfa_tuple: tuple, dfa_sym_to_curr_state_map: dic
     return _dfa_states
 
 
+
+def updated_convert_action_dict_to_gridworld_strategy(action_map: dict,
+                                                      transition_sys_tr,
+                                                      tr_action_idx_map,
+                                                      dfa_handle,
+                                                      init_state_ts_sym,
+                                                      init_state_dfa_list,
+                                                      target_DFA_list,
+                                                      state_obs_dd,
+                                                      ts_curr_vars: list,
+                                                      ts_next_vars: list,
+                                                      dfa_curr_vars: list,
+                                                      dfa_next_vars: list,
+                                                      ts_sym_to_curr_map) -> List:
+    _strategy = []
+    ADD_flag: bool = False
+
+    curr_ts_state_sym = init_state_ts_sym
+    curr_ts_state = ts_sym_to_curr_map[curr_ts_state_sym]
+    if isinstance(init_state_dfa_list[0], ADD):
+        ADD_flag: bool = True
+        curr_dfa_state_tuple = map_dfa_state_to_tuple(init_state_dfa_list,
+                                                      dfa_sym_to_curr_state_map=dfa_handle.dfa_predicate_add_sym_map_curr.inv,
+                                                      dfa_state_int_map=dfa_handle.node_int_map_dfas)
+        target_dfa_state_tuple = map_dfa_state_to_tuple(target_DFA_list,
+                                                        dfa_sym_to_curr_state_map=dfa_handle.dfa_predicate_add_sym_map_curr.inv,
+                                                        dfa_state_int_map=dfa_handle.node_int_map_dfas)
+    else:
+        curr_dfa_state_tuple = map_dfa_state_to_tuple(init_state_dfa_list,
+                                                      dfa_sym_to_curr_state_map=dfa_handle.dfa_predicate_sym_map_curr.inv,
+                                                      dfa_state_int_map=dfa_handle.node_int_map_dfas)
+        target_dfa_state_tuple = map_dfa_state_to_tuple(target_DFA_list,
+                                                        dfa_sym_to_curr_state_map=dfa_handle.dfa_predicate_sym_map_curr.inv,
+                                                        dfa_state_int_map=dfa_handle.node_int_map_dfas)
+    counter = 0
+    while counter not in action_map:
+        counter += 1
+    while not target_dfa_state_tuple == curr_dfa_state_tuple:
+        _a = action_map[counter][curr_dfa_state_tuple][curr_ts_state]
+        
+        if isinstance(_a, list):
+            # randomly select an action from a list of actions
+            _a = random.choice(_a)
+            _strategy.append(PDDL_TO_GRIDWORLD_MAP.get(_a))
+        else:
+            _strategy.append(PDDL_TO_GRIDWORLD_MAP.get(_a))
+        
+        # bdd_tr_action = transition_sys_tr[tr_action_idx_map[_a]].bddPattern()
+        _nxt_ts_state_sym = transition_sys_tr[tr_action_idx_map[_a]].restrict(curr_ts_state_sym)
+        _nxt_ts_state_sym = _nxt_ts_state_sym.swapVariables(ts_curr_vars, ts_next_vars)
+        
+        if ADD_flag:
+            # remove the dependency on the weight by first converting it to BDD and then back to ADD.
+            _nxt_ts_state_sym = _nxt_ts_state_sym.bddPattern().toADD()
+
+
+        if ADD_flag:
+            curr_dfa_state_tuple = get_ADD_dfa_evolution(dfa_handle=dfa_handle,
+                                                         _nxt_ts_state=_nxt_ts_state_sym,
+                                                         curr_dfa_state_tuple=curr_dfa_state_tuple,
+                                                         state_obs_dd=state_obs_dd,
+                                                         dfa_curr_vars=dfa_curr_vars,
+                                                         dfa_next_vars=dfa_next_vars)
+        else:
+            curr_dfa_state_tuple = get_dfa_evolution(dfa_handle=dfa_handle,
+                                                     _nxt_ts_state=_nxt_ts_state_sym,
+                                                     curr_dfa_state_tuple=curr_dfa_state_tuple,
+                                                     state_obs_dd=state_obs_dd,
+                                                     dfa_curr_vars=dfa_curr_vars,
+                                                     dfa_next_vars=dfa_next_vars)
+        curr_ts_state_sym = _nxt_ts_state_sym
+        curr_ts_state = ts_sym_to_curr_map[curr_ts_state_sym]
+
+        if curr_dfa_state_tuple == target_dfa_state_tuple:
+            break
+        counter += 1
+        while counter not in action_map:
+            counter += 1
+    
+
+    return _strategy
+
+
+        
 def convert_action_dict_to_gridworld_strategy(action_map: dict,
                                               transition_sys_tr,
                                               tr_action_idx_map,

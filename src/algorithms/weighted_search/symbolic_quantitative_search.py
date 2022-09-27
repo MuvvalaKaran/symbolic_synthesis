@@ -1,4 +1,5 @@
 import re 
+import sys
 
 from functools import reduce
 from typing import Union, List
@@ -73,16 +74,20 @@ class SymbolicDijkstraSearch(BaseSymbolicSearch):
         else:
             dict_obj[key_dfa] = {key_ts: value}
     
-    def _add_to_rlist(self, bucket: dict, states: ADD):
+
+    def _get_max_tr_action_cost(self) -> int:
         """
-        A helper function to append the states being added to correcponding
+        A helper function that retireves the highest cost amongst all the transiton function costs
         """
-        if isinstance(bucket, None):
-            bucket = states
+        _max = 0
+        for tr_action in self.ts_transition_fun_list:
+                action_cost = tr_action.findMax()
+                action_cost_int = int(re.findall(r'\d+', action_cost.__repr__())[0])
+                if action_cost_int > _max:
+                    _max = action_cost_int
         
-        else:
-            bucket |= states
-    
+        return _max
+
 
     def remove_state_explored(self, layer_num: int, open_list: List[dict], closed: ADD):
         """
@@ -300,6 +305,8 @@ class SymbolicDijkstraSearch(BaseSymbolicSearch):
         ts_xcube = reduce(lambda x, y: x & y, self.ts_x_list)
 
         closed = {key: self.manager.addZero() for key in self.dfa_add_sym_to_curr_state_map.inv.keys()}
+        c_max = self._get_max_tr_action_cost()
+        empty_bucket_counter: int = 0
         g_val = self.manager.addZero()
         if g_val.isZero():
             g_layer = 0
@@ -324,6 +331,13 @@ class SymbolicDijkstraSearch(BaseSymbolicSearch):
                                                      ts_xcube=ts_xcube,
                                                     #  dfa_sym_curr_state=dfa_curr_state,
                                                      verbose=verbose)
+            else:
+                empty_bucket_counter += 1
+                # If Cmax consecutive layers are empty. . .
+                if empty_bucket_counter == c_max:
+                    print("No plan exists! Terminating algorithm.")
+                    sys.exit(-1)
+
 
             g_val = g_val + self.manager.addOne()
             g_layer += 1

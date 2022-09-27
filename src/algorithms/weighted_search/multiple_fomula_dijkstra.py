@@ -62,7 +62,7 @@ class MultipleFormulaDijkstra(BaseSymbolicSearch):
         _prod_init_state_tuple = self.map_dfa_state_to_tuple(self.init_DFA_list)
 
         assert len(_dfa_tuple_ts_state_map.keys()) == 1, "The initial state triggered multiple states in one of the DFA. FIX THIS!!!!"
-        if _prod_init_state_tuple is not list(_dfa_tuple_ts_state_map.keys())[0]:
+        if _prod_init_state_tuple != list(_dfa_tuple_ts_state_map.keys())[0]:
             print("*******************************************************************")
             warnings.warn("Looks like the initial state the robot is starting in, triggered at least one of DFA's evolution.")
             print("*******************************************************************")
@@ -131,6 +131,21 @@ class MultipleFormulaDijkstra(BaseSymbolicSearch):
             _name = sym_map.get(_s)
             assert _name is not None, "Couldn't convert Cube string to its corresponding State. FIX THIS!!!"
             print(_name)
+        
+    
+    def _get_max_tr_action_cost(self) -> int:
+        """
+        A helper function that retireves the highest cost amongst all the transiton function costs
+        """
+        _max = 0
+        for tr_action in self.ts_transition_fun_list:
+                action_cost = tr_action.findMax()
+                action_cost_int = int(re.findall(r'\d+', action_cost.__repr__())[0])
+                if action_cost_int > _max:
+                    _max = action_cost_int
+        
+        return _max
+
     
     def _print_freach_list(self, open_list: dict):
         """
@@ -397,6 +412,8 @@ class MultipleFormulaDijkstra(BaseSymbolicSearch):
         # The layer number is thus stored as key and BDDs as the value associated with it.
         open_list = {}
         closed = {}
+        c_max = self._get_max_tr_action_cost()
+        empty_bucket_counter: int = 0
 
         ts_xcube = reduce(lambda x, y: x & y, self.ts_x_list)
         g_val = self.manager.addZero()
@@ -414,6 +431,8 @@ class MultipleFormulaDijkstra(BaseSymbolicSearch):
 
             # If unexpanded states exist ... 
             if not self.check_open_list_is_empty(layer_num=g_layer, open_list=open_list):
+                # reset the empty bucket counter 
+                empty_bucket_counter = 0
                 # Add states to be expanded next to already expanded states
                 closed = self.updated_closed_list(closed, open_list[g_layer], verbose=False)
 
@@ -425,11 +444,19 @@ class MultipleFormulaDijkstra(BaseSymbolicSearch):
                                                      verbose=verbose)
             
             else:
-                print("No plan exists! Terminating algorithm.")
-                sys.exit(-1)
+                empty_bucket_counter += 1
+                # If Cmax consecutive layers are empty. . .
+                if empty_bucket_counter == c_max:
+                    print("No plan exists! Terminating algorithm.")
+                    sys.exit(-1)
             
             g_val = g_val + self.manager.addOne()
             g_layer += 1
+            
+            # keep updating g_layer up until the most recent bucket
+            while g_layer not in open_list:
+                g_val = g_val + self.manager.addOne()
+                g_layer += 1
 
         print(f"Found a plan with least cost lenght {g_layer}, Now retireving it!")
 
@@ -449,7 +476,6 @@ class MultipleFormulaDijkstra(BaseSymbolicSearch):
         ts_xcube = reduce(lambda x, y: x & y, self.ts_x_list)
         ts_obs_cube = reduce(lambda x, y: x & y, self.ts_obs_list)
         dfa_ycube = reduce(lambda x, y: x & y, self.dfa_y_list)
-        dfa_xcube = reduce(lambda x, y: x & y, self.dfa_x_list)
 
         prod_accp_state_tuple = self.map_dfa_state_to_tuple(self.target_DFA_list)
         current_ts_dict = {prod_accp_state_tuple: freach_list[max_layer][prod_accp_state_tuple]}
@@ -464,13 +490,21 @@ class MultipleFormulaDijkstra(BaseSymbolicSearch):
             for _to_dfa_state, current_ts in current_ts_dict.items():
                 if current_ts.isZero():
                     continue
+                sym_current_dfa_states = self.map_dfa_tuple_to_sym_states(_to_dfa_state)
+                # compute the valid state predecessors on the DFAs from which we could have transited to the current DFA states given by _to_dfa_states
+                valid_pre_dfa_state = self._get_pred_prod_dfa_ts_map(ts_obs_cube=ts_obs_cube,
+                                                                     sym_dfa_to_states=sym_current_dfa_states,
+                                                                     dfa_ycube=dfa_ycube,
+                                                                     verify=False)
                 for tr_num, tran_func_action in enumerate(self.ts_transition_fun_list):
-                    sym_current_dfa_states = self.map_dfa_tuple_to_sym_states(_to_dfa_state)
                     preds_ts = self.pre_per_action(trans_action=tran_func_action,
                                                    From=current_ts,
                                                    ycube=ts_ycube,
                                                    x_list=self.ts_x_list,
                                                    y_list=self.ts_y_list)
+                    
+                    if preds_ts.isZero():
+                        continue
                     
                     if verbose:
                         self.get_states_from_dd(dd_func=preds_ts,
@@ -483,20 +517,18 @@ class MultipleFormulaDijkstra(BaseSymbolicSearch):
                     if step.isZero():
                         step_val = 0
                     else:
-                        step_val = int(re.findall(r'\d+', step.__repr__())[0])
-
-                    
-                    # compute the valid state predecessors on the DFAs from which we could have transited to the current DFA states given by _to_dfa_states
-                    valid_pre_dfa_state = self._get_pred_prod_dfa_ts_map(ts_obs_cube=ts_obs_cube,
-                                                                         sym_dfa_to_states=sym_current_dfa_states,
-                                                                         dfa_ycube=dfa_ycube,
-                                                                         verify=False)
+                        step_val = int(re.findall(r'-?\d+', step.__repr__())[0])
+                        # there can be cases where step_val cam go negtive, we skip such iterations
+                        if step_val < 0:
+                            continue
                     
                     for _from_prod_dfa_state, _v in valid_pre_dfa_state.items():
                         if not _v.isZero():
                             # check the intersection of the corresponding layer's corresponding DFA state with preds_ts_list
-                            if _from_prod_dfa_state in freach_list[step_val]:
-                                intersection: ADD = freach_list[step_val][_from_prod_dfa_state] & preds_ts
+                            intersection = self.manager.addZero()
+                            if step_val in freach_list:
+                                if _from_prod_dfa_state in freach_list[step_val]:
+                                    intersection: ADD = freach_list[step_val][_from_prod_dfa_state] & preds_ts
                             else:
                                 continue
                         
@@ -515,16 +547,26 @@ class MultipleFormulaDijkstra(BaseSymbolicSearch):
                                                                 key_dfa=_from_prod_dfa_state,
                                                                 key_ts=self.ts_add_sym_to_curr_state_map[_ts_state],
                                                                 value=self.tr_action_idx_map.inv[tr_num])
+
                                     
                                     if _from_prod_dfa_state in new_current_ts:
                                         new_current_ts[_from_prod_dfa_state] |= _valid_intersect
                                     else:
                                         new_current_ts[_from_prod_dfa_state] = _valid_intersect
 
-            g_int = int(re.findall(r'\d+', g_layer.__repr__())[0])
-            parent_plan[g_int] = g_layer_plan
+                                    parent_plan[step_val] = g_layer_plan
+
+                                    if self.check_init_in_bucket(new_current_ts):
+                                        return parent_plan
+                                    g_layer = step
+
+            if g_layer.isZero():
+                g_int = 0
+            else:
+                g_int = int(re.findall(r'\d+', g_layer.__repr__())[0])
             current_ts_dict = new_current_ts
-            g_layer = step
+            
+            assert len(current_ts_dict.keys()) != 0, "Looks like something went wrong while retrieving plan. FIX THIS!!!"
 
             assert  g_int >= 0, "Error Retrieving a plan. FIX THIS!!"
 
