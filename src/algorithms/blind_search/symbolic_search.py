@@ -2,7 +2,6 @@
 This file implements Symbolic Graph search algorithms
 '''
 import sys
-import copy
 
 from bidict import bidict
 from functools import reduce
@@ -11,6 +10,8 @@ from cudd import Cudd, BDD, ADD
 from typing import List
 from itertools import product
 
+from src.symbolic_graphs import SymbolicDFA, SymbolicTransitionSystem
+
 
 class SymbolicSearch(object):
     """
@@ -18,39 +19,31 @@ class SymbolicSearch(object):
     """
 
     def __init__(self,
-                 init_TS: BDD,
-                 target_DFA: BDD,
-                 init_DFA: BDD,
+                 ts_handle: SymbolicTransitionSystem,
+                 dfa_handle: SymbolicDFA,
                  manager: Cudd,
                  ts_curr_vars: list,
                  ts_next_vars: list,
                  ts_obs_vars: list,
                  dfa_curr_vars: list,
-                 dfa_next_vars: list,
-                 ts_trans_func_list: BDD,
-                 dfa_transition_func: BDD,
-                 ts_sym_to_curr_map: dict,
-                 ts_sym_to_S2O_map: dict,
-                 dfa_sym_to_curr_map: dict,
-                 tr_action_idx_map: dict, 
-                 state_obs_bdd: BDD):
+                 dfa_next_vars: list):
 
-        self.init_TS = init_TS
-        self.target_DFA = target_DFA
-        self.init_DFA = init_DFA
+        self.init_TS = ts_handle.sym_init_states
+        self.target_DFA = dfa_handle.sym_goal_state
+        self.init_DFA = dfa_handle.sym_init_state
         self.manager = manager
         self.ts_x_list = ts_curr_vars
         self.ts_y_list = ts_next_vars
         self.dfa_x_list = dfa_curr_vars
         self.dfa_y_list = dfa_next_vars
         self.ts_obs_list = ts_obs_vars
-        self.ts_transition_fun_list = ts_trans_func_list
-        self.dfa_transition_fun = dfa_transition_func
-        self.ts_sym_to_curr_state_map: dict = ts_sym_to_curr_map
-        self.ts_sym_to_S2obs_map: dict = ts_sym_to_S2O_map
-        self.dfa_sym_to_curr_state_map: dict = dfa_sym_to_curr_map
-        self.obs_bdd = state_obs_bdd
-        self.tr_action_idx_map = tr_action_idx_map
+        self.ts_transition_fun_list = ts_handle.sym_tr_actions
+        self.dfa_transition_fun = dfa_handle.dfa_bdd_tr
+        self.ts_sym_to_curr_state_map: dict = ts_handle.predicate_sym_map_curr.inv
+        self.ts_sym_to_S2obs_map: dict = ts_handle.predicate_sym_map_lbl.inv
+        self.dfa_sym_to_curr_state_map: dict = dfa_handle.dfa_predicate_sym_map_curr.inv
+        self.obs_bdd = ts_handle.sym_state_labels
+        self.tr_action_idx_map = ts_handle.tr_action_idx_map
 
     
     def pre(self, From, ycube, x_list: list, y_list: list, transition_fun):

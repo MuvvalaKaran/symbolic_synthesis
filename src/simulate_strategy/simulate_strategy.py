@@ -1,17 +1,17 @@
 import re
-import itertools
 import warnings
 import random
 
 import  src.gridworld_visualizer.gridworld_vis.gridworld as gridworld_handle
 import src.gridworld_visualizer.gridworld_vis.matplotlib_gw as policy_plotter
 
-from typing import List
-from functools import reduce
+from typing import List, Union
 from config import *
 from cudd import Cudd, BDD, ADD
 
 from src.algorithms.base.base_symbolic_search import BaseSymbolicSearch
+from src.symbolic_graphs import SymbolicDFA, SymbolicAddDFA, SymbolicMultipleDFA, SymbolicMultipleAddDFA
+from src.symbolic_graphs import SymbolicTransitionSystem, SymbolicWeightedTransitionSystem
 
 
 
@@ -47,8 +47,6 @@ def get_ADD_dfa_evolution(dfa_handle, _nxt_ts_state, state_obs_dd, dfa_curr_vars
     curr_dfa_bdd_list = map_dfa_tuple_to_sym_states(dfa_tuple=curr_dfa_state_tuple,
                                                     dfa_sym_to_curr_state_map=dfa_handle.dfa_predicate_add_sym_map_curr.inv,
                                                     dfa_state_int_map=dfa_handle.node_int_map_dfas)
-
-    # for ts_state in ts_cubes:
         
     for dfa_idx, dfa_tr in enumerate(dfa_handle.dfa_add_tr_list):
         # check where you evolve in each DFA
@@ -64,14 +62,12 @@ def get_ADD_dfa_evolution(dfa_handle, _nxt_ts_state, state_obs_dd, dfa_curr_vars
 
 
 
-
 def get_dfa_evolution(dfa_handle, _nxt_ts_state, state_obs_dd, dfa_curr_vars, dfa_next_vars, curr_dfa_state_tuple):
     """
     A function to compute the next state of the DFA when evolving over the product of multiple tasks
     """
     
     # get the observation of this ts state
-    # _sym_obs = state_obs_dd.restrict(_nxt_ts_state)
     dfa_list = [0 for _ in range(len(dfa_handle.dfa_bdd_tr_list))]
     curr_dfa_bdd_list = map_dfa_tuple_to_sym_states(dfa_tuple=curr_dfa_state_tuple,
                                                     dfa_sym_to_curr_state_map=dfa_handle.dfa_predicate_sym_map_curr.inv,
@@ -146,26 +142,29 @@ def map_dfa_tuple_to_sym_states(dfa_tuple: tuple, dfa_sym_to_curr_state_map: dic
 
 
 
-def updated_convert_action_dict_to_gridworld_strategy(action_map: dict,
-                                                      transition_sys_tr,
-                                                      tr_action_idx_map,
-                                                      dfa_handle,
-                                                      init_state_ts_sym,
-                                                      init_state_dfa_list,
-                                                      target_DFA_list,
-                                                      state_obs_dd,
-                                                      ts_curr_vars: list,
-                                                      ts_next_vars: list,
-                                                      dfa_curr_vars: list,
-                                                      dfa_next_vars: list,
-                                                      ts_sym_to_curr_map) -> List:
+def convert_action_dict_to_gridworld_strategy_nLTL(ts_handle: Union[SymbolicWeightedTransitionSystem, SymbolicTransitionSystem],
+                                                   dfa_handle: Union[SymbolicMultipleAddDFA, SymbolicMultipleDFA],
+                                                   action_map: dict,
+                                                   init_state_ts_sym,
+                                                   state_obs_dd,
+                                                   ts_curr_vars: list,
+                                                   ts_next_vars: list,
+                                                   dfa_curr_vars: list,
+                                                   dfa_next_vars: list,
+                                                   ts_sym_to_curr_map) -> List:
     _strategy = []
     ADD_flag: bool = False
+
+    transition_sys_tr = ts_handle.sym_tr_actions
+    tr_action_idx_map = ts_handle.tr_action_idx_map
+
+    init_state_dfa_list = dfa_handle.sym_init_state_list
+    target_DFA_list = dfa_handle.sym_goal_state_list
 
     curr_ts_state_sym = init_state_ts_sym
     curr_ts_state = ts_sym_to_curr_map[curr_ts_state_sym]
     if isinstance(init_state_dfa_list[0], ADD):
-        ADD_flag: bool = True
+        ADD_flag = True
         curr_dfa_state_tuple = map_dfa_state_to_tuple(init_state_dfa_list,
                                                       dfa_sym_to_curr_state_map=dfa_handle.dfa_predicate_add_sym_map_curr.inv,
                                                       dfa_state_int_map=dfa_handle.node_int_map_dfas)
@@ -192,7 +191,6 @@ def updated_convert_action_dict_to_gridworld_strategy(action_map: dict,
         else:
             _strategy.append(PDDL_TO_GRIDWORLD_MAP.get(_a))
         
-        # bdd_tr_action = transition_sys_tr[tr_action_idx_map[_a]].bddPattern()
         _nxt_ts_state_sym = transition_sys_tr[tr_action_idx_map[_a]].restrict(curr_ts_state_sym)
         _nxt_ts_state_sym = _nxt_ts_state_sym.swapVariables(ts_curr_vars, ts_next_vars)
         
@@ -229,13 +227,10 @@ def updated_convert_action_dict_to_gridworld_strategy(action_map: dict,
 
 
         
-def convert_action_dict_to_gridworld_strategy(action_map: dict,
-                                              transition_sys_tr,
-                                              tr_action_idx_map,
-                                              dfa_tr,
+def convert_action_dict_to_gridworld_strategy(ts_handle: Union[SymbolicWeightedTransitionSystem, SymbolicTransitionSystem],
+                                              dfa_handle: Union[SymbolicAddDFA, SymbolicDFA],
+                                              action_map: dict,
                                               init_state_ts,
-                                              init_state_dfa,
-                                              target_DFA,
                                               state_obs_dd,
                                               ts_curr_vars: list,
                                               ts_next_vars: list,
@@ -253,38 +248,35 @@ def convert_action_dict_to_gridworld_strategy(action_map: dict,
     """
     
     _strategy = []
+    ADD_flag: bool = False
+    transition_sys_tr = ts_handle.sym_tr_actions
+    tr_action_idx_map = ts_handle.tr_action_idx_map
+
+    dfa_tr = dfa_handle.dfa_bdd_tr
+    init_state_dfa = dfa_handle.sym_init_state
+    target_DFA = dfa_handle.sym_goal_state
 
     curr_ts_state = init_state_ts
-    # get the observation of the initial state
-    # obs_dd = state_obs_dd.restrict(init_state_ts)
-
-    # check if any of the DFA edges are satisfied
-    # image_DFA = dfa_tr.restrict(init_state_dfa & obs_dd)
-    # image_DFA = image_DFA.swapVariables(dfa_next_vars, dfa_curr_vars)
-    # _explicit_dfa_state: str = dfa_sym_to_curr_map[image_DFA] 
-
-
+    if isinstance(init_state_dfa, ADD):
+        ADD_flag = True
     curr_dfa_state = init_state_dfa
 
     while not target_DFA == curr_dfa_state:
         # get the strategy
-        try:
-            _a = action_map[dfa_sym_to_curr_map[curr_dfa_state]][ts_sym_to_curr_map[curr_ts_state]]
-        except:
-            return _strategy
-
-        try:
+        _a = action_map[dfa_sym_to_curr_map[curr_dfa_state]][ts_sym_to_curr_map[curr_ts_state]]
+        if isinstance(_a, list):
+            # randomly select an action from a list of actions
+            _a = random.choice(_a)
             _strategy.append(PDDL_TO_GRIDWORLD_MAP.get(_a))
-        except:
-            _strategy.append(PDDL_TO_GRIDWORLD_MAP.get(_a[0]))
-
-        # get the next TS
-        try:
-            _nxt_ts_state = transition_sys_tr[tr_action_idx_map[_a]].restrict(curr_ts_state)
-        except:
-            _nxt_ts_state = transition_sys_tr[tr_action_idx_map[_a[0]]].restrict(curr_ts_state)
+        else:
+            _strategy.append(PDDL_TO_GRIDWORLD_MAP.get(_a))
         
+        # get the next TS
+        _nxt_ts_state = transition_sys_tr[tr_action_idx_map[_a]].restrict(curr_ts_state)
         _nxt_ts_state = _nxt_ts_state.swapVariables(ts_curr_vars, ts_next_vars)
+        if ADD_flag:
+            # remove the dependency on the weight by first converting it to BDD and then back to ADD.
+            _nxt_ts_state = _nxt_ts_state.bddPattern().toADD()
         
         # get the observation of this ts state
         _sym_obs = state_obs_dd.restrict(_nxt_ts_state)

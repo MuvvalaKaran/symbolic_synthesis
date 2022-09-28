@@ -8,50 +8,38 @@ from typing import Union, List
 from cudd import Cudd, BDD, ADD
 
 from src.algorithms.base import BaseSymbolicSearch
+from src.symbolic_graphs import SymbolicAddDFA, SymbolicWeightedTransitionSystem
 
 
 class SymbolicDijkstraSearch(BaseSymbolicSearch):
 
     def __init__(self,
-                 init_TS: ADD,
-                 target_DFA: ADD,
-                 init_DFA: ADD,
+                 ts_handle: SymbolicWeightedTransitionSystem,
+                 dfa_handle: SymbolicAddDFA,
                  ts_curr_vars: List[ADD],
                  ts_next_vars: List[ADD],
                  dfa_curr_vars: List[ADD],
                  dfa_next_vars: List[ADD],
                  ts_obs_vars: List[ADD],
-                 ts_transition_func: ADD,
-                 ts_trans_func_list: List[ADD],
-                 dfa_transition_func: ADD,
-                 ts_add_sym_to_curr_map: dict,
-                 ts_bdd_sym_to_curr_map: dict,
-                 ts_bdd_sym_to_S2O_map: dict,
-                 ts_add_sym_to_S2O_map: dict,
-                 dfa_bdd_sym_to_curr_map: dict,
-                 dfa_add_sym_to_curr_map: dict,
-                 tr_action_idx_map: dict, 
-                 state_obs_add: ADD,
                  cudd_manager: Cudd):
         super().__init__(ts_obs_vars, cudd_manager)
-        self.init_TS = init_TS
-        self.target_DFA = target_DFA
-        self.init_DFA = init_DFA
+        self.init_TS = ts_handle.sym_add_init_states
+        self.target_DFA = dfa_handle.sym_goal_state
+        self.init_DFA = dfa_handle.sym_init_state
         self.ts_x_list = ts_curr_vars
         self.ts_y_list = ts_next_vars
         self.dfa_x_list = dfa_curr_vars
         self.dfa_y_list = dfa_next_vars
-        self.ts_transition_fun = ts_transition_func
-        self.ts_transition_fun_list = ts_trans_func_list
-        self.dfa_transition_fun = dfa_transition_func
-        self.ts_add_sym_to_curr_state_map: dict = ts_add_sym_to_curr_map
-        self.ts_bdd_sym_to_curr_state_map: dict = ts_bdd_sym_to_curr_map
-        self.ts_bdd_sym_to_S2obs_map: dict = ts_bdd_sym_to_S2O_map
-        self.ts_add_sym_to_S2obs_map: dict = ts_add_sym_to_S2O_map
-        self.dfa_bdd_sym_to_curr_state_map: dict = dfa_bdd_sym_to_curr_map
-        self.dfa_add_sym_to_curr_state_map: dict = dfa_add_sym_to_curr_map
-        self.obs_add = state_obs_add
-        self.tr_action_idx_map = tr_action_idx_map
+        self.ts_transition_fun_list = ts_handle.sym_tr_actions
+        self.dfa_transition_fun = dfa_handle.dfa_bdd_tr
+        self.ts_add_sym_to_curr_state_map: dict = ts_handle.predicate_add_sym_map_curr.inv
+        self.ts_bdd_sym_to_curr_state_map: dict = ts_handle.predicate_sym_map_curr.inv
+        self.ts_bdd_sym_to_S2obs_map: dict = ts_handle.predicate_sym_map_lbl.inv
+        self.ts_add_sym_to_S2obs_map: dict = ts_handle.predicate_add_sym_map_lbl.inv
+        self.dfa_bdd_sym_to_curr_state_map: dict = dfa_handle.dfa_predicate_sym_map_curr.inv
+        self.dfa_add_sym_to_curr_state_map: dict = dfa_handle.dfa_predicate_add_sym_map_curr.inv
+        self.obs_add = ts_handle.sym_add_state_labels
+        self.tr_action_idx_map = ts_handle.tr_action_idx_map
     
     def _append_dict_value(self, dict_obj, key_ts, key_dfa, value):
         """
@@ -322,6 +310,8 @@ class SymbolicDijkstraSearch(BaseSymbolicSearch):
 
             # If unexpanded states with total cost g exist ... 
             if not self.check_open_list_is_empty(layer_num=g_layer, open_list=open_list):
+                # reset the empty bucket counter 
+                empty_bucket_counter = 0
                 # Add states to be expanded next to already expanded states
                 closed = self.updated_closed_list(closed, open_list[g_layer])
                 # Find successors and add them to their respectice buckets
@@ -341,8 +331,13 @@ class SymbolicDijkstraSearch(BaseSymbolicSearch):
 
             g_val = g_val + self.manager.addOne()
             g_layer += 1
+
+            # keep updating g_layer up until the most recent bucket
+            while g_layer not in open_list:
+                g_val = g_val + self.manager.addOne()
+                g_layer += 1
         
-        # open_list[g_layer][dfa_final_state] = open_list[g_layer][dfa_final_state] & self.target_DFA
+        print(f"Found a plan with least cost lenght {g_layer}, Now retireving it!")
 
         return self.retrieve_dijkstra(max_layer=g_layer, add_freach_list=open_list, verbose=verbose)
     
@@ -356,17 +351,13 @@ class SymbolicDijkstraSearch(BaseSymbolicSearch):
         current_ts_dict = {dfa_final_state: add_freach_list[max_layer][dfa_final_state]}
         ts_obs_cube = reduce(lambda x, y: x & y, self.ts_obs_list)
         dfa_ycube = reduce(lambda x, y: x & y, self.dfa_y_list)
-        # g_val = int(re.findall(r'\d+', g_layer.__repr__())[0])
-        # current_dfa = 'accept_all'
         print("Working Retrieval plan now")
         
 
         parent_plan = {}
 
         while not self.check_init_in_bucket(current_ts_dict):
-            # preds_ts_list = []
-            # valid_pred_ts = self.manager.addZero()
-            new_current_ts: dict = {key: self.manager.addZero() for key in self.dfa_add_sym_to_curr_state_map.inv.keys()}
+            new_current_ts: dict = {}
             for tr_num, tran_func_action in enumerate(self.ts_transition_fun_list):
                 for _to_dfa_state, current_ts in current_ts_dict.items():
                     if current_ts.isZero():
@@ -380,7 +371,9 @@ class SymbolicDijkstraSearch(BaseSymbolicSearch):
                     if preds_ts.isZero():
                         continue
                     if verbose:
-                        self.get_states_from_dd(dd_func=preds_ts, curr_state_list=self.ts_x_list, sym_map=self.ts_bdd_sym_to_curr_state_map)
+                        self.get_states_from_dd(dd_func=preds_ts,
+                                                curr_state_list=self.ts_x_list,
+                                                sym_map=self.ts_bdd_sym_to_curr_state_map)
 
                     # first get the corresponding transition action cost (constant at the terminal node)
                     action_cost_cnst = tran_func_action.findMax()
@@ -388,8 +381,10 @@ class SymbolicDijkstraSearch(BaseSymbolicSearch):
                     if step.isZero():
                         step_val = 0
                     else:
-                        step_val = int(re.findall(r'\d+', step.__repr__())[0])
-
+                        step_val = int(re.findall(r'-?\d+', step.__repr__())[0])
+                        # there can be cases where step_val cam go negtive, we skip such iterations
+                        if step_val < 0:
+                            continue
                 
                     # compute the pre on the DFA
                     # check any of the above pre intersects with their respective forward set
@@ -431,12 +426,24 @@ class SymbolicDijkstraSearch(BaseSymbolicSearch):
                     
                                 # this is our current_ts now
                                 # assert not valid_pred_ts.isZero(), "Error retireving a plan. The intersection of Forward and Backwards Reachable sets should NEVER be empty. FIX THIS!!!"
-                                new_current_ts[_from_dfa_state] |= intersection
+                                if _from_dfa_state in new_current_ts:
+                                    new_current_ts[_from_dfa_state] |= intersection
+                                else:
+                                    new_current_ts[_from_dfa_state] = intersection
 
+                                if self.check_init_in_bucket(new_current_ts):
+                                    return parent_plan
+                                g_layer = step
 
+            if g_layer.isZero():
+                g_int = 0
+            else:
+                g_int = int(re.findall(r'-?\d+', g_layer.__repr__())[0])
             current_ts_dict = new_current_ts
-            # sym_current_dfa = self.dfa_add_sym_to_curr_state_map.inv[_dfa_state]
-            g_layer = step
+
+            assert len(current_ts_dict.keys()) != 0, "Looks like something went wrong while retrieving plan. FIX THIS!!!"
+            assert  g_int >= 0, "Error Retrieving a plan. FIX THIS!!"
+            # g_layer = step
         
         return parent_plan
 

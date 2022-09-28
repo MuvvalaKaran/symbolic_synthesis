@@ -8,7 +8,7 @@ from functools import reduce
 
 from cudd import Cudd, BDD, ADD
 from src.algorithms.base import BaseSymbolicSearch
-from src.symbolic_graphs import SymbolicMultipleDFA
+from src.symbolic_graphs import SymbolicMultipleDFA, SymbolicTransitionSystem
 
 
 class MultipleFormulaBFS(BaseSymbolicSearch):
@@ -17,21 +17,16 @@ class MultipleFormulaBFS(BaseSymbolicSearch):
     """
 
     def __init__(self,
-                 init_TS: BDD,
+                 ts_handle: SymbolicTransitionSystem,
                  dfa_handle: SymbolicMultipleDFA,
                  ts_curr_vars: List[BDD],
                  ts_next_vars: List[BDD],
                  dfa_curr_vars: List[BDD],
                  dfa_next_vars: List[BDD],
                  ts_obs_vars: List[BDD],
-                 ts_trans_func_list: List[BDD], 
-                 ts_sym_to_curr_map: dict,
-                 ts_sym_to_S2O_map: dict,
-                 tr_action_idx_map: dict, 
-                 state_obs_bdd: BDD,
                  cudd_manager: Cudd):
         super().__init__(ts_obs_vars, cudd_manager)
-        self.init_TS = init_TS
+        self.init_TS = ts_handle.sym_init_states
         self.dfa_handle = dfa_handle
         self.target_DFA_list = dfa_handle.sym_goal_state_list
         self.init_DFA_list = dfa_handle.sym_init_state_list
@@ -39,14 +34,14 @@ class MultipleFormulaBFS(BaseSymbolicSearch):
         self.ts_y_list = ts_next_vars
         self.dfa_x_list = dfa_curr_vars
         self.dfa_y_list = dfa_next_vars
-        self.ts_transition_fun_list = ts_trans_func_list
+        self.ts_transition_fun_list =  ts_handle.sym_tr_actions
         self.dfa_monolithic_tr_func = reduce(lambda a, b: a | b,  dfa_handle.dfa_bdd_tr_list)
         self.dfa_transition_fun_list = dfa_handle.dfa_bdd_tr_list
-        self.ts_sym_to_curr_state_map: dict = ts_sym_to_curr_map
-        self.ts_sym_to_S2obs_map: dict = ts_sym_to_S2O_map
+        self.ts_sym_to_curr_state_map: dict = ts_handle.predicate_sym_map_curr.inv
+        self.ts_sym_to_S2obs_map: dict = ts_handle.predicate_sym_map_lbl.inv
         self.dfa_sym_to_curr_state_map: dict = dfa_handle.dfa_predicate_sym_map_curr.inv
-        self.obs_bdd = state_obs_bdd
-        self.tr_action_idx_map = tr_action_idx_map
+        self.obs_bdd = ts_handle.sym_state_labels
+        self.tr_action_idx_map = ts_handle.tr_action_idx_map
         self.dfa_state_int_map: dict = dfa_handle.node_int_map_dfas
         self.dfa_predecessors_mapping: List[dict] = []
         self._create_dfa_preds()

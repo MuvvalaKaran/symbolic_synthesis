@@ -485,7 +485,6 @@ class MultipleFormulaDijkstra(BaseSymbolicSearch):
 
         while not self.check_init_in_bucket(current_ts_dict):
             new_current_ts: dict = {}
-            # compute the intersetion of
             g_layer_plan = {}
             for _to_dfa_state, current_ts in current_ts_dict.items():
                 if current_ts.isZero():
@@ -563,7 +562,7 @@ class MultipleFormulaDijkstra(BaseSymbolicSearch):
             if g_layer.isZero():
                 g_int = 0
             else:
-                g_int = int(re.findall(r'\d+', g_layer.__repr__())[0])
+                g_int = int(re.findall(r'-?\d+', g_layer.__repr__())[0])
             current_ts_dict = new_current_ts
             
             assert len(current_ts_dict.keys()) != 0, "Looks like something went wrong while retrieving plan. FIX THIS!!!"
