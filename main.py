@@ -1,4 +1,5 @@
 import sys
+from tabnanny import verbose
 import time
 import graphviz as gv
 import math
@@ -601,7 +602,8 @@ if __name__ == "__main__":
             # The Mealey machine is a characteristic Function that represents a mapping from
             # current TS state x Obs associated with this state x State of the Automation to Next State in TS and next state in the DFA Automaton
             # TR : S_ts x Obs_bdd x S_dfa x S'_ts x S'_dfa
-            action_dict = graph_search.symbolic_bfs_wLTL(max_ts_state=ts_total_state, verbose=False)
+            graph_search.composed_symbolic_bfs_wLTL(verbose=False)
+            # action_dict = graph_search.symbolic_bfs_wLTL(max_ts_state=ts_total_state, verbose=False)
 
 
         stop: float = time.time()
@@ -650,12 +652,7 @@ if __name__ == "__main__":
             gridworld_strategy = convert_action_dict_to_gridworld_strategy(ts_handle=sym_tr,
                                                                            dfa_handle=dfa_tr,
                                                                            action_map=action_dict,
-                                                                        #    transition_sys_tr=sym_tr.sym_tr_actions,
-                                                                        #    dfa_tr=dfa_tr.dfa_bdd_tr,
                                                                            init_state_ts=sym_tr.sym_add_init_states,
-                                                                        #    init_state_dfa=dfa_tr.sym_init_state,
-                                                                        #    target_DFA=dfa_tr.sym_goal_state,
-                                                                        #    tr_action_idx_map=sym_tr.tr_action_idx_map,
                                                                            state_obs_dd=sym_tr.sym_add_state_labels,
                                                                            ts_curr_vars=ts_curr_state,
                                                                            ts_next_vars=ts_next_state,
@@ -669,12 +666,7 @@ if __name__ == "__main__":
             gridworld_strategy = convert_action_dict_to_gridworld_strategy(ts_handle=sym_tr,
                                                                            dfa_handle=dfa_tr,
                                                                            action_map=action_dict,
-                                                                        #    transition_sys_tr=sym_tr.sym_tr_actions,
-                                                                        #    dfa_tr=dfa_tr.dfa_bdd_tr,
                                                                            init_state_ts=sym_tr.sym_init_states,
-                                                                        #    init_state_dfa=dfa_tr.sym_init_state,
-                                                                        #    target_DFA=dfa_tr.sym_goal_state,
-                                                                        #    tr_action_idx_map=sym_tr.tr_action_idx_map,
                                                                            state_obs_dd=sym_tr.sym_state_labels,
                                                                            ts_curr_vars=ts_curr_state,
                                                                            ts_next_vars=ts_next_state,

@@ -77,12 +77,11 @@ class SymbolicTransitionSystem(object):
         self.sym_goal_states = reduce(lambda a, b: a | b, _goal_list)
 
     
-    def build_actions_tr_func(self, curr_edge_action: str):
+    def build_actions_tr_func(self, curr_edge_action: str, action_list: List):
         """
         A function to build a symbolic transition function corresponding to each action 
         """
 
-        _actions = list(self.actions.keys())
         # since pre, post condition are all forzenset, we iterate over it
         pre_conds = tuple(curr_edge_action.preconditions)
         add_effects = tuple(curr_edge_action.add_effects)
@@ -113,9 +112,9 @@ class SymbolicTransitionSystem(object):
         _action = _action[1:]   # remove the intial '(' braket
 
         # assert that its a valid name
-        assert _action in _actions, "FIX THIS: Failed extracting a valid action."
+        assert _action in action_list, "FIX THIS: Failed extracting a valid action."
 
-        # pre_sym - precondition will be false when starting from the initial states; mean you can take the action under all conditions
+        # pre_sym - precondition will be false when starting from the initial states; means you can take the action under all conditions
         if pre_sym.isZero():
             pre_sym = pre_sym.negate()
         
@@ -207,9 +206,11 @@ class SymbolicTransitionSystem(object):
         scheck_count_grasp = 0
         scheck_count_release = 0
         scheck_count_hmove = 0
+
+        action_list = list(self.actions.keys())
         
         for _action in self.task.operators:
-            edge_name = self.build_actions_tr_func(curr_edge_action=_action)
+            edge_name = self.build_actions_tr_func(curr_edge_action=_action, action_list=action_list)
             
             # if edge_name == 'transit':
             #     scheck_count_transit += 1
