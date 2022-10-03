@@ -1,2 +1,1 @@
 from .symbolic_search import SymbolicSearch
-from .multiple_formula_bfs import MultipleFormulaBFS
