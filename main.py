@@ -15,7 +15,7 @@ from src.symbolic_graphs import SymbolicDFA, SymbolicAddDFA, SymbolicMultipleDFA
 from src.symbolic_graphs import SymbolicTransitionSystem, SymbolicWeightedTransitionSystem
 
 from src.algorithms.blind_search import SymbolicSearch
-# from src.algorithms.old_disjoint_search import MultipleFormulaBFS
+from src.algorithms.monolithic_search.blind_search import MultipleFormulaBFS
 from src.algorithms.weighted_search import SymbolicDijkstraSearch
 # from src.algorithms.old_disjoint_search import MultipleFormulaDijkstra
 
@@ -441,7 +441,7 @@ if __name__ == "__main__":
 
         else:
             graph_search = MultipleFormulaBFS(ts_handle=sym_tr,
-                                              dfa_handle=dfa_tr,
+                                              dfa_handles=dfa_tr,
                                               ts_curr_vars=ts_curr_state,
                                               ts_next_vars=ts_next_state,
                                               dfa_curr_vars=dfa_curr_state,
@@ -491,19 +491,12 @@ if __name__ == "__main__":
             # The Mealey machine is a characteristic Function that represents a mapping from
             # current TS state x Obs associated with this state x State of the Automation to Next State in TS and next state in the DFA Automaton
             # TR : S_ts x Obs_bdd x S_dfa x S'_ts x S'_dfa
-            graph_search.composed_symbolic_bfs_wLTL(verbose=False)
+            action_dict = graph_search.composed_symbolic_bfs_wLTL(verbose=False)
 
 
         stop: float = time.time()
         print("Time took for plannig: ", stop - start)
         
-        if PRINT_STRATEGY:
-            print("Sequence of actions")
-            for _dfa_state, _ts_dict in action_dict.items():
-                print(f"******************Currently in DFA state {_dfa_state}******************")
-                for _ts_state, _action in _ts_dict.items(): 
-                    print(f"From State {_ts_state} take Action {_action}")
-
     if len(formulas) > 1:
         if SIMULATE_STRATEGY and QUANTITATIVE_SEARCH:
             gridworld_strategy = convert_action_dict_to_gridworld_strategy_nLTL(ts_handle=sym_tr,
@@ -552,7 +545,7 @@ if __name__ == "__main__":
 
         elif SIMULATE_STRATEGY:
             gridworld_strategy = convert_action_dict_to_gridworld_strategy(ts_handle=sym_tr,
-                                                                           dfa_handle=dfa_tr,
+                                                                           dfa_handle=dfa_tr[0],
                                                                            action_map=action_dict,
                                                                            init_state_ts=sym_tr.sym_init_states,
                                                                            state_obs_dd=sym_tr.sym_state_labels,
@@ -561,7 +554,7 @@ if __name__ == "__main__":
                                                                            dfa_curr_vars=dfa_curr_state,
                                                                            dfa_next_vars=dfa_next_state,
                                                                            ts_sym_to_curr_map=sym_tr.predicate_sym_map_curr.inv,
-                                                                           dfa_sym_to_curr_map=dfa_tr.dfa_predicate_sym_map_curr.inv)
+                                                                           dfa_sym_to_curr_map=dfa_tr[0].dfa_predicate_sym_map_curr.inv)
             create_gridworld(size=GRID_WORLD_SIZE, strategy=gridworld_strategy, init_pos=(0, 0))
 
     

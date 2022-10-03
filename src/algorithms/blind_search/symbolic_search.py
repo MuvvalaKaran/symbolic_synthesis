@@ -58,6 +58,10 @@ class SymbolicSearch(object):
         self.prod_xlist = self.ts_x_list + self.dfa_x_list
         self.prod_ylist = self.ts_y_list + self.dfa_y_list
         self.prod_xcube = reduce(lambda x, y: x & y, self.prod_xlist)
+        self.prod_ycube = reduce(lambda x, y: x & y, self.prod_ylist)
+
+        # composed monolithic TR
+        self.composed_tr_list = self._construct_composed_tr_function()
 
     
     def pre(self, From, ycube, x_list: list, y_list: list, transition_fun):
@@ -142,6 +146,30 @@ class SymbolicSearch(object):
             dict_obj[key_dfa] = {key_ts: value}
     
 
+    def _append_dict_value_simple(self, dict_obj, key_prod, action):
+        """
+        Check if key exist in dict or not.
+
+        If Key exist in dict:
+           Check if type of value of key is list or not
+           
+           If type is not list then make it list and Append the value in list
+        
+        else: add key-value pair
+        """
+        # compute all the cubes and store them individually
+        prod_cubes = self.convert_prod_cube_to_func(key_prod)
+
+        for key in prod_cubes:
+            if key in dict_obj:
+                # if key_ts in dict_obj[key_dfa]:
+                if not isinstance(dict_obj[key], list):
+                    dict_obj[key] = [dict_obj[key]]
+                dict_obj[key].append(action)
+            else:
+                dict_obj[key] = action
+    
+
     def _get_ts_states_to_dfa_evolution(self, ts_states, dfa_to_state, dfa_from_states):
         """
         A helpr function that give a set of Treansition system system, compute their respective observation.
@@ -177,6 +205,21 @@ class SymbolicSearch(object):
             _from_dfa_states_maps[self.dfa_sym_to_curr_state_map[_from_dfa_state]] |= _ts_state
         
         return _from_dfa_states_maps
+    
+    def _construct_composed_tr_function(self) -> List[BDD]:
+        """
+        A function that construct that conjoints the TR function of the TS and DFA along with S2P (state to obs BDD).
+
+        Note: We prime the S2P BDD because we want to extract the next state in the DFA after we evolve over the TS.
+        """
+
+        obs_bdd_prime = self.obs_bdd.swapVariables(self.ts_x_list, self.ts_y_list) 
+        composed_tr_list = []
+        for tr_action in self.ts_transition_fun_list:
+            composed_tr = tr_action & obs_bdd_prime & self.dfa_transition_fun
+            composed_tr_list.append(composed_tr)
+        
+        return composed_tr_list
     
 
     def get_states_from_dd(self, dd_func: BDD, obs_flag: bool = False) -> None:
@@ -392,17 +435,9 @@ class SymbolicSearch(object):
 
         # maintain a common layering number
         layer_num = 0
-        
-        obs_bdd_prime = self.obs_bdd.swapVariables(self.ts_x_list, self.ts_y_list) 
-        composed_tr_list = []
-        for tr_action in self.ts_transition_fun_list:
-            composed_tr = tr_action & obs_bdd_prime & self.dfa_transition_fun
-            composed_tr_list.append(composed_tr)
-
+                
         # add the init state to ite respective DFA state. Note, we could start in some other state than the usual T0_init
         open_list.append(self.init_TS & self.init_DFA)
-        # open_list.append(self.init_TS & self.init_DFA & self.obs_bdd)
-        # open_list.append(self.init_TS & self.init_DFA & self.obs_bdd.swapVariables(self.ts_x_list, self.ts_y_list))
 
         while not self.target_DFA <= open_list[layer_num].existAbstract(self.ts_xcube):
             # remove all states that have been explored
@@ -410,12 +445,14 @@ class SymbolicSearch(object):
 
             # If unexpanded states exist ... 
             if not open_list[layer_num].isZero():
+                if verbose:
+                    print(f"********************Layer: {layer_num}**************************")
                 # Add states to be expanded next to already expanded states
                 closed |= open_list[layer_num]
 
                 # compute the image of the TS states 
                 prod_image_bdd = self.manager.bddZero()
-                for prod_tr_action in composed_tr_list:
+                for prod_tr_action in self.composed_tr_list:
                     image_prod = self.image_per_action(trans_action=prod_tr_action,
                                                        From=open_list[layer_num],
                                                        xcube=self.prod_xcube,
@@ -437,10 +474,60 @@ class SymbolicSearch(object):
             
             layer_num += 1
         
-        
+        open_list[layer_num] = open_list[layer_num] & self.target_DFA
+
+        if verbose:
+            print("********************The goal state encountered is***********************")
+            self.get_states_from_dd(dd_func=open_list[layer_num], obs_flag=False)
+
         print(f"Found a plan with least cost length {layer_num}, Now retireving it!")
 
-        return
+        return self.retrieve_composed_symbolic_bfs(max_layer=layer_num, freach_list=open_list, verbose=verbose)
+    
+
+    def retrieve_composed_symbolic_bfs(self, max_layer: int, freach_list: dict, verbose: bool = False):
+        """
+        Retrieve the plan through Backward search by strarting from the Goal state and computing the interseaction of Forwards and Backwards
+         Reachable set. 
+        """
+        g_layer = max_layer
+        print("Working Retrieval plan now")
+
+        current_prod = freach_list[g_layer]
+
+        parent_plan = {}
+
+        # while not self.init_TS <= current_prod.existAbstract(self.dfa_xcube):
+        for g_layer in reversed(range(max_layer + 1)):
+            new_current_prod = self.manager.bddZero()
+            for tr_num, prod_tr_action in enumerate(self.composed_tr_list):
+                pred_prod= self.pre_per_action(trans_action=prod_tr_action,
+                                               From=current_prod,
+                                               ycube=self.prod_ycube,
+                                               x_list=self.prod_xlist,
+                                               y_list=self.prod_ylist)
+
+                if pred_prod & freach_list[g_layer - 1] != self.manager.bddZero():
+                    # store the predecessor per action
+                    tmp_current_prod = pred_prod & freach_list[g_layer - 1]
+                    if verbose:
+                        self.get_states_from_dd(dd_func=tmp_current_prod, obs_flag=False)
+                    tmp_current_prod_res = (pred_prod & freach_list[g_layer - 1]).existAbstract(self.ts_obs_cube)
+                    
+                    self._append_dict_value_simple(parent_plan,
+                                                   key_prod=tmp_current_prod_res,
+                                                   action=self.tr_action_idx_map.inv[tr_num])
+                    
+                    new_current_prod |= tmp_current_prod_res 
+            
+            current_prod = new_current_prod
+
+            # assert not current_prod.isZero(), "Error computing the predecessor, Fix this!"
+
+            # g_layer -= 1
+        
+        return parent_plan
+
 
 
 
