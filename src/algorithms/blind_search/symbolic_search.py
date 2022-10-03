@@ -438,7 +438,7 @@ class SymbolicSearch(object):
             layer_num += 1
         
         
-        print(f"Found a plan with least cost lenght {layer_num}, Now retireving it!")
+        print(f"Found a plan with least cost length {layer_num}, Now retireving it!")
 
         return
 

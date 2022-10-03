@@ -40,6 +40,19 @@ class SymbolicDijkstraSearch(BaseSymbolicSearch):
         self.dfa_add_sym_to_curr_state_map: dict = dfa_handle.dfa_predicate_add_sym_map_curr.inv
         self.obs_add = ts_handle.sym_add_state_labels
         self.tr_action_idx_map = ts_handle.tr_action_idx_map
+
+        # create corresponding cubes to avoid repetition
+        self.ts_xcube = reduce(lambda x, y: x & y, self.ts_x_list)
+        self.ts_ycube = reduce(lambda x, y: x & y, self.ts_y_list)
+        self.ts_obs_cube = reduce(lambda x, y: x & y, self.ts_obs_list)
+
+        self.dfa_xcube = reduce(lambda x, y: x & y, self.dfa_x_list)
+        self.dfa_ycube = reduce(lambda x, y: x & y, self.dfa_y_list)
+
+        # composed graph consists of state S, Z and hence are function TS and DFA vars
+        self.prod_xlist = self.ts_x_list + self.dfa_x_list
+        self.prod_ylist = self.ts_y_list + self.dfa_y_list
+        self.prod_xcube = reduce(lambda x, y: x & y, self.prod_xlist)
     
     def _append_dict_value(self, dict_obj, key_ts, key_dfa, value):
         """
@@ -147,20 +160,17 @@ class SymbolicDijkstraSearch(BaseSymbolicSearch):
         Note: Make sure that the dfa_ to_state variables are in terms of dfa next states and
          dfa_from_states are in terms of dfa_from_state variables.
         """
-        dfa_xcube = reduce(lambda x, y: x & y, self.dfa_x_list)
-        dfa_ycube = reduce(lambda x, y: x & y, self.dfa_y_list)
-
         if isinstance(dfa_to_state, ADD):
-            dfa_to_state.bddPattern().support() >= dfa_ycube.bddPattern()
+            dfa_to_state.bddPattern().support() >= self.dfa_ycube.bddPattern()
         else:
             # the support can contain some or all element of dfa_cubes. Thats is why >= rather than ==
-            assert dfa_to_state.support() >= dfa_ycube, "Error while computing TS states for 'to-dfa-state-evolution'. \
+            assert dfa_to_state.support() >= self.dfa_ycube, "Error while computing TS states for 'to-dfa-state-evolution'. \
             Make sure your 'to-dfa-states' are in terms of next dfa variables "
         
         if isinstance(dfa_from_states, ADD):
-            dfa_from_states.bddPattern().support() >= dfa_xcube.bddPattern()
+            dfa_from_states.bddPattern().support() >= self.dfa_xcube.bddPattern()
         else:
-            assert dfa_from_states.support() >= dfa_xcube, "Error while computing TS states for 'to-dfa-state-evolution'. \
+            assert dfa_from_states.support() >= self.dfa_xcube, "Error while computing TS states for 'to-dfa-state-evolution'. \
             Make sure your 'from-dfa-states' are in terms of current dfa variables "
 
         # compute all the possible Transition system states
@@ -186,8 +196,6 @@ class SymbolicDijkstraSearch(BaseSymbolicSearch):
 
     def compute_image_of_composed_graph(self,
                                         open_list: dict,
-                                        ts_xcube: ADD,
-                                        # dfa_sym_curr_state: ADD,
                                         g_layer: int,
                                         g_val: ADD,
                                         verbose: bool = False):
@@ -219,7 +227,7 @@ class SymbolicDijkstraSearch(BaseSymbolicSearch):
                 
                 image_c = self.image_per_action(trans_action=tr_action,
                                                 From=open_list[g_layer][_dfa_state],
-                                                xcube=ts_xcube,
+                                                xcube=self.ts_xcube,
                                                 x_list=self.ts_x_list,
                                                 y_list=self.ts_y_list)
             
@@ -272,6 +280,92 @@ class SymbolicDijkstraSearch(BaseSymbolicSearch):
                                 print("**************Found a Plan, Now retrieving it!**************")
                                 _reached_accp_state: bool = True
                                 break
+    
+    
+    def composed_symbolic_dijkstra_wLTL(self, verbose: bool = False):
+        """
+        A function that compose the TR function from the Transition system and DFA and search symbolically over the product graph.
+        """
+        open_list = {}
+        closed = self.manager.addZero()
+
+        c_max = self._get_max_tr_action_cost()
+        empty_bucket_counter: int = 0
+        g_val = self.manager.addZero()
+        if g_val.isZero():
+            g_layer = 0
+        
+        obs_bdd_prime = self.obs_add.swapVariables(self.ts_x_list, self.ts_y_list) 
+        composed_tr_list = []
+        for tr_action in self.ts_transition_fun_list:
+            composed_tr = tr_action & obs_bdd_prime & self.dfa_transition_fun
+            composed_tr_list.append(composed_tr)
+
+        # add the init state to ite respective DFA state. Note, we could start in some other state than the usual T0_init
+        open_list[g_layer] = self.init_TS & self.init_DFA
+
+        while not self.target_DFA <= open_list[g_layer].existAbstract(self.ts_xcube):
+            # remove all states that have been explored
+            open_list[g_layer] = open_list[g_layer] & ~closed
+
+            # If unexpanded states exist ... 
+            if not open_list[g_layer].isZero():
+                if verbose:
+                    print(f"********************Layer: {g_layer }**************************")
+                # reset the empty bucket counter 
+                empty_bucket_counter = 0
+                # Add states to be expanded next to already expanded states
+                closed |= open_list[g_layer]
+
+                for prod_tr_action in composed_tr_list:
+                    # first get the corresponding transition action cost (constant at the terminal node)
+                    action_cost = prod_tr_action.findMax()
+                    step = g_val + action_cost
+                    step_val = int(re.findall(r'\d+', step.__repr__())[0])
+
+                    # compute the image of the TS states 
+                    image_prod_add = self.image_per_action(trans_action=prod_tr_action,
+                                                           From=open_list[g_layer],
+                                                           xcube=self.prod_xcube,
+                                                           x_list=self.prod_xlist,
+                                                           y_list=self.prod_ylist)
+                    
+                    if image_prod_add.isZero():
+                        continue
+
+                    prod_image_restricted = image_prod_add.existAbstract(self.ts_obs_cube)
+                
+                    if verbose:
+                        self.get_prod_states_from_dd(dd_func=image_prod_add, obs_flag=False)
+                    
+                    # if the bucket exists then take the union else initialize the bucket
+                    if step_val in open_list:
+                        open_list[step_val] |= prod_image_restricted
+                    else:
+                        open_list[step_val] = prod_image_restricted
+
+            
+            else:
+                empty_bucket_counter += 1
+                # If Cmax consecutive layers are empty. . .
+                if empty_bucket_counter == c_max:
+                    print("No plan exists! Terminating algorithm.")
+                    sys.exit(-1)
+            
+
+            g_val = g_val + self.manager.addOne()
+            g_layer += 1
+
+            # keep updating g_layer up until the most recent bucket
+            while g_layer not in open_list:
+                g_val = g_val + self.manager.addOne()
+                g_layer += 1
+        
+        
+        print(f"Found a plan with least cost lenght {g_layer}, Now retireving it!")
+
+        return
+
 
 
     def symbolic_dijkstra(self, verbose: bool = False):
@@ -289,8 +383,6 @@ class SymbolicDijkstraSearch(BaseSymbolicSearch):
         # TODO: In future change thisn  - This is dictionary that stores our bucksets as list. BUt we use dictionary becuase,
         # 1. It is faster than list 2. You do not have to create placeholders for buckets before hand
         open_list = {}
-
-        ts_xcube = reduce(lambda x, y: x & y, self.ts_x_list)
 
         closed = {key: self.manager.addZero() for key in self.dfa_add_sym_to_curr_state_map.inv.keys()}
         c_max = self._get_max_tr_action_cost()
@@ -318,8 +410,6 @@ class SymbolicDijkstraSearch(BaseSymbolicSearch):
                 self.compute_image_of_composed_graph(open_list=open_list,
                                                      g_layer=g_layer,
                                                      g_val=g_val,
-                                                     ts_xcube=ts_xcube,
-                                                    #  dfa_sym_curr_state=dfa_curr_state,
                                                      verbose=verbose)
             else:
                 empty_bucket_counter += 1
@@ -337,7 +427,7 @@ class SymbolicDijkstraSearch(BaseSymbolicSearch):
                 g_val = g_val + self.manager.addOne()
                 g_layer += 1
         
-        print(f"Found a plan with least cost lenght {g_layer}, Now retireving it!")
+        print(f"Found a plan with least cost length {g_layer}, Now retireving it!")
 
         return self.retrieve_dijkstra(max_layer=g_layer, add_freach_list=open_list, verbose=verbose)
     
@@ -345,12 +435,9 @@ class SymbolicDijkstraSearch(BaseSymbolicSearch):
         """
         Retrieval of a plan for symbolic Dijkstra
         """
-        ts_ycube = reduce(lambda a, b: a & b, self.ts_y_list)
         g_layer = self.manager.addConst(int(max_layer))
         dfa_final_state = self.dfa_add_sym_to_curr_state_map[self.target_DFA]
         current_ts_dict = {dfa_final_state: add_freach_list[max_layer][dfa_final_state]}
-        ts_obs_cube = reduce(lambda x, y: x & y, self.ts_obs_list)
-        dfa_ycube = reduce(lambda x, y: x & y, self.dfa_y_list)
         print("Working Retrieval plan now")
         
 
@@ -365,7 +452,7 @@ class SymbolicDijkstraSearch(BaseSymbolicSearch):
                     sym_current_dfa = self.dfa_add_sym_to_curr_state_map.inv[_to_dfa_state]
                     preds_ts = self.pre_per_action(trans_action=tran_func_action,
                                                    From=current_ts,
-                                                   ycube=ts_ycube,
+                                                   ycube=self.ts_ycube,
                                                    x_list=self.ts_x_list,
                                                    y_list=self.ts_y_list)
                     if preds_ts.isZero():
@@ -388,11 +475,11 @@ class SymbolicDijkstraSearch(BaseSymbolicSearch):
                 
                     # compute the pre on the DFA
                     # check any of the above pre intersects with their respective forward set
-                    dfa_w_no_obs = self.dfa_transition_fun.existAbstract(ts_obs_cube)
+                    dfa_w_no_obs = self.dfa_transition_fun.existAbstract(self.ts_obs_cube)
 
                     pred_dfa = self.pre_per_action(trans_action=dfa_w_no_obs,
                                                    From=sym_current_dfa,
-                                                   ycube=dfa_ycube,
+                                                   ycube=self.dfa_ycube,
                                                    x_list=self.dfa_x_list,
                                                    y_list=self.dfa_y_list)    # this is in terms of current dfa state variables
                     

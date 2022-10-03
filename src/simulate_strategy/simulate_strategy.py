@@ -2,7 +2,7 @@ import re
 import warnings
 import random
 
-import  src.gridworld_visualizer.gridworld_vis.gridworld as gridworld_handle
+import src.gridworld_visualizer.gridworld_vis.gridworld as gridworld_handle
 import src.gridworld_visualizer.gridworld_vis.matplotlib_gw as policy_plotter
 
 from typing import List, Union

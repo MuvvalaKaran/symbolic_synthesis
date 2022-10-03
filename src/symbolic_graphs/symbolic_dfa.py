@@ -21,10 +21,15 @@ class SymbolicDFA(object):
     A class to construct a symbolic transition system for each DFA 
     """
 
-    def __init__(self, curr_states: List[BDD], next_states: List[BDD], ts_lbls: List[BDD], predicate_sym_map_lbl: dict,  dfa: DFAGraph, manager: Cudd, dfa_name):
+    def __init__(self,
+                 curr_states: List[BDD],
+                 next_states: List[BDD],
+                 predicate_sym_map_lbl: dict,
+                 dfa: DFAGraph,
+                 manager: Cudd,
+                 dfa_name):
         self.sym_vars_curr: List[BDD] = curr_states
         self.sym_vars_next: List[BDD] = next_states
-        self.sym_abs_lbs: List[BDD] = ts_lbls
         self.manager: Cudd = manager
         self.dfa = dfa
         self.init: str = dfa.get_initial_states()[0][0]
@@ -183,7 +188,6 @@ class SymbolicAddDFA(object):
     def __init__(self,
                 curr_states: List[ADD],
                 next_states: List[ADD],
-                ts_lbls: List[ADD],
                 predicate_add_sym_map_lbl: dict,
                 predicate_sym_map_lbl: dict,
                 dfa: DFAGraph,
@@ -191,7 +195,6 @@ class SymbolicAddDFA(object):
                 dfa_name: str):
         self.sym_add_vars_curr: List[ADD] = curr_states
         self.sym_add_vars_next: List[ADD] = next_states
-        self.sym_abs_lbs: List[ADD] = ts_lbls
         self.manager: Cudd = manager
         self.dfa = dfa
         self.init: str = dfa.get_initial_states()[0][0]
@@ -360,10 +363,14 @@ class SymbolicMultipleDFA(object):
     A class to construct a symbolic transition system for each DFA 
     """
 
-    def __init__(self, curr_states: List[BDD], next_states: List[BDD], ts_lbls: List[BDD], predicate_sym_map_lbl: dict,  dfa_list: List[DFAGraph], manager: Cudd):
+    def __init__(self,
+                 curr_states: List[BDD],
+                 next_states: List[BDD],
+                 predicate_sym_map_lbl: dict,
+                 dfa_list: List[DFAGraph],
+                 manager: Cudd):
         self.sym_vars_curr: List[BDD] = curr_states
         self.sym_vars_next: List[BDD] = next_states
-        self.sym_abs_lbs: List[BDD] = ts_lbls
         self.manager: Cudd = manager
         self.dfa_list = dfa_list
         self.sym_init_state_list: List[BDD] = [manager.bddZero() for _ in range(len(dfa_list))]

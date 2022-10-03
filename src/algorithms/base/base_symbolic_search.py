@@ -1,7 +1,7 @@
 import sys
 
 from functools import reduce
-from typing import Union, List
+from typing import Union, List, Optional
 from cudd import Cudd, BDD, ADD
 from itertools import product
 
@@ -232,3 +232,103 @@ class BaseSymbolicSearch(object):
             for bVar in self.ts_obs_list:
                 assert str(bVar) in _str_ele, "Error! The cube does not contain all the boolean variables in it! FIX THIS!!"
         return bddVars
+    
+
+    def get_prod_states_from_dd(self, dd_func: Union[BDD, ADD], obs_flag: bool = False) -> None:
+        """
+        A function thats wraps arounf convert_cube_to_func() and spits out the states in the corresponding. 
+
+        Set obs_flag to True if you want to print a state's corresponding label/predicate as well. 
+        """
+
+        if isinstance(dd_func, ADD):
+            ADD_flag: bool = True
+            tmp_dd_func: BDD = dd_func.bddPattern()
+            tmp_ts_x_list: List[BDD] = [_avar.bddPattern() for _avar in self.ts_x_list]
+            tmp_dfa_x_list: List[BDD] = [_avar.bddPattern() for _avar in self.dfa_x_list]
+            prod_cube_string: List[Union[BDD, ADD]] = self.convert_prod_cube_to_func(dd_func=tmp_dd_func,
+                                                                                     prod_curr_list=tmp_ts_x_list + tmp_dfa_x_list)
+        else:
+            prod_cube_string: List[Union[BDD, ADD]] = self.convert_prod_cube_to_func(dd_func=dd_func)
+
+        # prod_cube will have S, Z, P vairables in it. We have to parse it, look the split cubes in their corresponding dictionary individually.
+        # print("Prod State(s) Reached")
+        for prod_cube in prod_cube_string:
+            if ADD_flag:
+                prod_cube = prod_cube.toADD()
+            # first we extract TS state
+            _ts_dd = prod_cube.existAbstract(self.dfa_xcube & self.ts_obs_cube)
+            if ADD_flag:
+                _ts_name = self.ts_add_sym_to_curr_state_map.get(_ts_dd)
+            else:
+                _ts_name = self.ts_bdd_sym_to_curr_state_map.get(_ts_dd)
+            assert _ts_name is not None, "Couldn't convert TS Cube to its corresponding State. FIX THIS!!!"
+            # Second, we extract DFA state
+            _dfa_dd = prod_cube.existAbstract(self.ts_xcube & self.ts_obs_cube)
+            if ADD_flag:
+                _dfa_name = self.dfa_add_sym_to_curr_state_map.get(_dfa_dd)
+            else:
+                _dfa_name = self.dfa_bdd_sym_to_curr_state_map.get(_dfa_dd)
+            assert _dfa_name is not None, "Couldn't convert DFA Cube to its corresponding State. FIX THIS!!!"
+            if obs_flag:
+                # Finally, we extract State label
+                _pred_dd = prod_cube.existAbstract(self.prod_xcube)
+                if ADD_flag:
+                    _pred_name = self.ts_add_sym_to_S2obs_map.get(_pred_dd)
+                else:
+                    _pred_name = self.ts_bdd_sym_to_S2obs_map.get(_pred_dd)
+                assert _pred_name is not None, "Couldn't convert Predicate Cube to its corresponding State. FIX THIS!!!"
+                print(f"({_ts_name}, {_pred_name}, {_dfa_name})")
+            else:
+                print(f"({_ts_name}, {_dfa_name})")
+
+    
+
+    def convert_prod_cube_to_func(self, dd_func: Union[BDD, ADD], prod_curr_list = None) -> List[Union[BDD, ADD]]:
+        """
+        A helper function to determine the product state (S, Z) and the corresponding observation (S->P) from a given BDD
+
+        NOTE: A partitioned convert_cube_to_func for each Attribute, i.e., S, Z, P will not work for readibility as we dont know which is the right 
+        (S, Z, P) pair. For e.g.
+        
+         For fomula phi = F(l2) & F(l6) in 5x5 fridworld, Z corresponding to l2 and l6 is T0_S1 and T0_S3 respectibely. When we compute
+         the image of (s2, T0_S1) and (s6, T0_S3), we encounter states (s1, T0_S1); (s1, T0_S3); (s7, T0_S1); (s7, T0_S3) amomngst other.
+         Thus, we need a didcated function to identity the pairs individually. 
+        
+        Unlike other convert_to_cube function, this one does not check for a variable in the state list as the bdd function is fully defined
+        over the prod graph, i.e., we check variables that belong to S (TS state), Z (DFA state), and Prodicate (P)/ observations
+        """
+        # we dont add bdd Vars related P as they do have their prime counterparts and hence,
+        #  we will always include these vairbales in our cube construnction
+        if prod_curr_list is None:
+            prod_curr_list = self.ts_x_list + self.dfa_x_list
+
+        ddVars = []
+        for cube in dd_func.generate_cubes():
+            _amb_var = []
+            var_list = []
+            for _idx, var in enumerate(cube):
+                # skip the primed variables
+                if var == 2 and self.manager.bddVar(_idx) not in prod_curr_list:   # not x list is better than y _list because we also have dfa vairables 
+                    continue   # skipping over prime states 
+                else:
+                    if var == 2:
+                        _amb_var.append([self.manager.bddVar(_idx), ~self.manager.bddVar(_idx)])   # count how many vars are missing to fully define the bdd
+                    elif var == 0:
+                        var_list.append(~self.manager.bddVar(_idx))
+                    elif var == 1:
+                        var_list.append(self.manager.bddVar(_idx))
+                    else:
+                        print("CUDD ERRROR, A variable is assigned an unaccounted integret assignment. FIX THIS!!")
+                        sys.exit(-1)
+                
+            if len(_amb_var) != 0:
+                cart_prod = list(product(*_amb_var))  # *is to pass list as iterable
+                for _ele in cart_prod:
+                    var_list.extend(_ele)
+                    ddVars.append(reduce(lambda a, b: a & b, var_list))
+                    var_list = list(set(var_list) - set(_ele))
+            else:
+                ddVars.append(reduce(lambda a, b: a & b, var_list))
+        
+        return ddVars

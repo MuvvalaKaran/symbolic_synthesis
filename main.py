@@ -1,7 +1,5 @@
 import sys
-from tabnanny import verbose
 import time
-import graphviz as gv
 import math
 
 from typing import Tuple, List
@@ -16,8 +14,11 @@ from src.explicit_graphs import FiniteTransitionSystem
 from src.symbolic_graphs import SymbolicDFA, SymbolicAddDFA, SymbolicMultipleDFA, SymbolicMultipleAddDFA
 from src.symbolic_graphs import SymbolicTransitionSystem, SymbolicWeightedTransitionSystem
 
-from src.algorithms.blind_search import SymbolicSearch, MultipleFormulaBFS
-from src.algorithms.weighted_search import SymbolicDijkstraSearch, MultipleFormulaDijkstra
+from src.algorithms.blind_search import SymbolicSearch
+# from src.algorithms.old_disjoint_search import MultipleFormulaBFS
+from src.algorithms.weighted_search import SymbolicDijkstraSearch
+# from src.algorithms.old_disjoint_search import MultipleFormulaDijkstra
+
 from src.simulate_strategy import create_gridworld, \
      convert_action_dict_to_gridworld_strategy, plot_policy, convert_action_dict_to_gridworld_strategy_nLTL
 
@@ -95,9 +96,6 @@ def create_symbolic_lbl_vars(lbls,
      (l1, l2), (l2, else) (l2, l1), (l2, l2)}
 
     """
-    # create all combinations of locations - for gridworld you repeat -1
-    # possible_obs = list(product(lbls, repeat=1))
-
     # We modify the labels so that they are inline with promela's edge labelling format in DFA.
     #  The atomic propositions are always of the form (l2) or (!(l2))
 
@@ -120,8 +118,6 @@ def create_symbolic_lbl_vars(lbls,
 
     # get the number of variables in the manager. We will assign the next idex to the next lbl variables
     _num_of_sym_vars = cudd_manager.size()
-
-    # we subtract -2 as we have (skbn) and (!(skbn))(an agent) defined as an object. We do not need to allocate a var for this agent. 
 
     # NOTE: This might cause issue in the future. len - 2 is hack. You should actually remove the irrelevant objects from objs 
     num_of_lbls = len(possible_obs)
@@ -220,119 +216,31 @@ def create_symbolic_causal_graph(cudd_manager,
     return _causal_graph_instance.task, _causal_graph_instance.problem.domain, curr_state, next_state
 
 
-def build_multiple_bdd_symbolic_dfas(formulas: List[str],
-                                     ts_lbl_states: List[BDD],
-                                     sym_tr_handle: SymbolicWeightedTransitionSystem,
-                                     manager: Cudd,
-                                     verbose: bool = False,
-                                     plot: bool = False):
-    """
-    A function that first constructs all the DFAs, counts the # of states, creates required number of bdd Variables. 
-    Then, we iterate through each DFA and contruct the Transition Relation for each DFA and store it in a list. 
-    """
-    # create a list of DFAs
-    DFA_list = []
-    num_of_states: int = 0
-
-    for formula in formulas:
-        _two_player_instance = TwoPlayerGame(None, None)
-        _dfa = _two_player_instance.build_LTL_automaton(formula=formula, plot=False)
-        DFA_list.append(_dfa)
-        num_of_states += len(_dfa.get_states())
-    
-    # after your have created all the dfas, create the required number of boolean variables
-    # the number of boolean variables (|a|) = log⌈Σ |DFA_i states|⌉
-    dfa_curr_state, dfa_next_state = create_symbolic_vars(num_of_facts=num_of_states,
-                                                          manager=cudd_manager,
-                                                          curr_state_var_name='a',
-                                                          next_state_var_name='b',
-                                                          add_flag=False)
-    
-    # create TR corresponding to each DFA
-    dfa_tr = SymbolicMultipleDFA(curr_states=dfa_curr_state,
-                                 next_states=dfa_next_state,
-                                 ts_lbls=ts_lbl_states,
-                                 predicate_sym_map_lbl=sym_tr_handle.predicate_sym_map_lbl,
-                                 manager=manager,
-                                 dfa_list=DFA_list)
-
-    dfa_tr.create_multiple_dfa_transition_system(verbose=verbose,
-                                                 plot=plot)
-    
-    return dfa_tr, dfa_curr_state, dfa_next_state
-
-
-
-def build_multiple_add_symbolic_dfa(formulas: List[str],
-                                    sym_tr_handle: SymbolicWeightedTransitionSystem,
-                                    manager: Cudd,
-                                    verbose: bool = False,
-                                    plot: bool = False):
-    """
-    A function that first constructs all the DFAs, counts the # of states, creates required number of bdd Variables. 
-    Then, we iterate through each DFA and contruct the Transition Relation(TR) for each DFA and store it in a list. 
-
-    We construct the TR using ADD vairables as these DFAs will be used for quantitative search. 
-    """
-
-    # create a list of DFAs
-    DFA_list = []
-    num_of_states: int = 0
-
-    for formula in formulas:
-        _two_player_instance = TwoPlayerGame(None, None)
-        _dfa = _two_player_instance.build_LTL_automaton(formula=formula, plot=False)
-        DFA_list.append(_dfa)
-        num_of_states += len(_dfa.get_states())
-    
-    # after your have created all the dfas, create the required number of boolean variables
-    # the number of ADD variables (|a|) = log⌈Σ |DFA_i states|⌉
-    dfa_curr_state, dfa_next_state = create_symbolic_vars(num_of_facts=num_of_states,
-                                                          manager=cudd_manager,
-                                                          curr_state_var_name='a',
-                                                          next_state_var_name='b',
-                                                          add_flag=True)
-    
-    # create TR corresponding to each DFA
-    dfa_tr = SymbolicMultipleAddDFA(curr_states=dfa_curr_state,
-                                    next_states=dfa_next_state,
-                                    predicate_add_sym_map_lbl=sym_tr_handle.predicate_add_sym_map_lbl,
-                                    predicate_sym_map_lbl=sym_tr_handle.predicate_sym_map_lbl,
-                                    manager=manager,
-                                    dfa_list=DFA_list)
-    
-    dfa_tr.create_multiple_dfa_transition_system(verbose=verbose,
-                                                 plot=plot)
-    
-
-    return dfa_tr, dfa_curr_state, dfa_next_state
-
-
 
 def build_add_symbolic_dfa(formulas: List[str],
-                           add_ts_lbl_states: List[ADD],
                            sym_tr_handle: SymbolicWeightedTransitionSystem,
                            manager: Cudd,
                            verbose: bool = False,
-                           plot: bool = False) -> Tuple[SymbolicDFA, List[ADD], List[ADD]]:
+                           plot: bool = False) -> Tuple[List[SymbolicDFA], List[ADD], List[ADD]]:
     """
     A helper function to build a symbolic DFA given a formula from ADD Variables.
     """
     
     # create a list of DFAs
-    DFA_list = []
+    DFA_handles = []
+    DFA_curr_vars = []
+    DFA_nxt_vars = []
 
-    # for now dfa_num is zero. If you have multiple DFAs then loop over them and update DFA_num
     for _idx, fmla in enumerate(formulas):
-        # create boolean ADD variables
+        # create different ADD variables for different DFAs
         add_dfa_curr_state, add_dfa_next_state, _dfa = create_symbolic_dfa_graph(cudd_manager=cudd_manager,
                                                                                  formula= fmla,
                                                                                  dfa_num=_idx,
                                                                                  add_flag=True)
+
         # create TR corresponding to each DFA - dfa name is only used dumping graph 
         dfa_tr = SymbolicAddDFA(curr_states=add_dfa_curr_state,
                                 next_states=add_dfa_next_state,
-                                ts_lbls=add_ts_lbl_states,
                                 predicate_add_sym_map_lbl=sym_tr_handle.predicate_add_sym_map_lbl,
                                 predicate_sym_map_lbl=sym_tr_handle.predicate_sym_map_lbl,
                                 manager=manager,
@@ -342,44 +250,54 @@ def build_add_symbolic_dfa(formulas: List[str],
         dfa_tr.create_dfa_transition_system(verbose=verbose,
                                             plot=plot,
                                             valid_dfa_edge_formula_size=len(_dfa.get_symbols()))
+
+        # We extend DFA vars list as we dont need them in stored in separate lists
+        DFA_handles.append(dfa_tr)
+        DFA_curr_vars.extend(add_dfa_curr_state)
+        DFA_nxt_vars.extend(add_dfa_next_state)
     
-    return dfa_tr, add_dfa_curr_state, add_dfa_next_state
+    return DFA_handles, DFA_curr_vars, DFA_nxt_vars
 
 
 
 def build_bdd_symbolic_dfa(formulas: List[str],
-                           ts_lbl_states: List[BDD],
                            sym_tr_handle: SymbolicTransitionSystem,
                            manager: Cudd,
                            verbose: bool = False,
-                           plot: bool = False) -> Tuple[SymbolicDFA, List[BDD], List[BDD]]:
+                           plot: bool = False) -> Tuple[List[SymbolicDFA], List[BDD], List[BDD]]:
     """
     A helper function to build a symbolic DFA given a formul from BDD Variables.
     """
     
     # create a list of DFAs
-    DFA_list = []
+    DFA_handles = []
+    DFA_curr_vars = []
+    DFA_nxt_vars = []
 
-    # for now dfa_num is zero. If oyu rhave multiple DFAs then loop over them and update DFA_num
     for _idx, fmla in enumerate(formulas):
-        # create boolean variables
+        # create different boolean variables for different DFAs - [a0_i for ith DFA]
         dfa_curr_state, dfa_next_state, _dfa = create_symbolic_dfa_graph(cudd_manager=cudd_manager,
                                                                          formula= fmla,
                                                                          dfa_num=_idx)
+
         # create TR corresponding to each DFA - dfa name is only used dumping graph 
         dfa_tr = SymbolicDFA(curr_states=dfa_curr_state,
-                                next_states=dfa_next_state,
-                                ts_lbls=ts_lbl_states,
-                                predicate_sym_map_lbl=sym_tr_handle.predicate_sym_map_lbl,
-                                manager=manager,
-                                dfa=_dfa,
-                                dfa_name=f'dfa_{_idx}')
+                             next_states=dfa_next_state,
+                             predicate_sym_map_lbl=sym_tr_handle.predicate_sym_map_lbl,
+                             manager=manager,
+                             dfa=_dfa,
+                             dfa_name=f'dfa_{_idx}')
 
         dfa_tr.create_dfa_transition_system(verbose=verbose,
                                             plot=plot,
                                             valid_dfa_edge_formula_size=len(_dfa.get_symbols()))
+
+         # We extend DFA vars list as we dont need them in stored in separate lists
+        DFA_handles.append(dfa_tr)
+        DFA_curr_vars.extend(dfa_curr_state)
+        DFA_nxt_vars.extend(dfa_next_state)
     
-    return dfa_tr, dfa_curr_state, dfa_next_state
+    return DFA_handles, DFA_curr_vars, DFA_nxt_vars
 
 
 def build_bdd_abstraction(cudd_manager, problem_file_path, domain_file_path) -> Tuple[SymbolicTransitionSystem, list, list, list, int]:
@@ -434,7 +352,7 @@ def build_weighted_add_abstraction(cudd_manager, problem_file_path, domain_file_
     Pyperplan supports the following PDDL fragment: STRIPS without action costs
     """
     # explore a more robust version
-    c_a = cudd_manager.addConst(int(10))
+    c_a = cudd_manager.addConst(int(1))
     c_b = cudd_manager.addConst(int(1))
     c_c = cudd_manager.addConst(int(1))
     c_d = cudd_manager.addConst(int(1))
@@ -472,62 +390,33 @@ if __name__ == "__main__":
     else:
         problem_file_path = PROJECT_ROOT + f"/pddl_files/grid_world/problem{GRID_WORLD_SIZE}_{GRID_WORLD_SIZE}.pddl"
 
-    if EXPLICIT_GRAPH:
-        get_graph(problem_file=problem_file_path,
-                  domain_file=domain_file_path,
-                  formulas=["F(l13 & F(l25))", "!l21 U l1"],
-                  print_flag=True,
-                  plot_ts=True, plot_product=False)
-        sys.exit(-1)
-
     cudd_manager = Cudd()
-    
     
     # Build Transition with costs
     if QUANTITATIVE_SEARCH:
-        # As our Characteristic function associated with the set of valid transitions has costs associated with it, we build this TR using ADD Variables.
-        # As Each state has an associated label with (ADD State2OBs), we need to create Label Vars out ADD VAriables too. 
-        # As each each edge in DFA is dictated by a symbol (State label), the DFA states are also built out of ADD Variables. 
+        # All vars (TS, DFA and Predicate) are of type ADDs
         sym_tr, ts_curr_state, ts_next_state, ts_lbl_states, ts_total_state = build_weighted_add_abstraction(cudd_manager=cudd_manager,
                                                                                                              problem_file_path=problem_file_path,
                                                                                                              domain_file_path=domain_file_path,
                                                                                                              weight_list=[1, 1, 1, 1])
-
-        if len(formulas) == 1:
-            # Note: In future iterations you can remove ts_lbl_states as inputs as it not being used in this function 
-            dfa_tr, dfa_curr_state, dfa_next_state = build_add_symbolic_dfa(formulas=formulas,
-                                                                            add_ts_lbl_states=ts_lbl_states,
-                                                                            sym_tr_handle=sym_tr,
-                                                                            manager=cudd_manager,
-                                                                            verbose=False,
-                                                                            plot=False)
-        else:
-            dfa_tr, dfa_curr_state, dfa_next_state = build_multiple_add_symbolic_dfa(formulas=formulas,
-                                                                                     sym_tr_handle=sym_tr,
-                                                                                     manager=cudd_manager,
-                                                                                     verbose=False,
-                                                                                     plot=False)
-        
+        # The tuple contains the DFA handle, DFA curr and next vars in this specific order
+        dfa_tr, dfa_curr_state, dfa_next_state = build_add_symbolic_dfa(formulas=formulas,
+                                                                        sym_tr_handle=sym_tr,
+                                                                        manager=cudd_manager,
+                                                                        verbose=False,
+                                                                        plot=False)
+    # Build Transition with no costs
     else:
-        # Build Transition with no costs
         sym_tr, ts_curr_state, ts_next_state, ts_lbl_states, ts_total_state = build_bdd_abstraction(cudd_manager=cudd_manager,
                                                                                                     problem_file_path=problem_file_path,
                                                                                                     domain_file_path=domain_file_path)
 
-        if len(formulas) == 1:
-            dfa_tr, dfa_curr_state, dfa_next_state = build_bdd_symbolic_dfa(formulas=formulas,
-                                                                            ts_lbl_states=ts_next_state,
-                                                                            sym_tr_handle=sym_tr,
-                                                                            manager=cudd_manager,
-                                                                            verbose=False,
-                                                                            plot=False)
-        else:
-            dfa_tr, dfa_curr_state, dfa_next_state = build_multiple_bdd_symbolic_dfas(formulas=formulas,
-                                                                                      ts_lbl_states=ts_next_state,
-                                                                                      sym_tr_handle=sym_tr,
-                                                                                      manager=cudd_manager,
-                                                                                      verbose=False,
-                                                                                      plot=False)
+        dfa_tr, dfa_curr_state, dfa_next_state = build_bdd_symbolic_dfa(formulas=formulas,
+                                                                        sym_tr_handle=sym_tr,
+                                                                        manager=cudd_manager,
+                                                                        verbose=False,
+                                                                        plot=False)
+
     # sys.exit()
     if DYNAMIC_VAR_ORDERING:
         set_variable_reordering(manager=cudd_manager,
@@ -578,19 +467,19 @@ if __name__ == "__main__":
         if QUANTITATIVE_SEARCH:
             # shortest path graph search with Dijkstras
             graph_search =  SymbolicDijkstraSearch(ts_handle=sym_tr,
-                                                   dfa_handle=dfa_tr,
+                                                   dfa_handle=dfa_tr[0],
                                                    ts_curr_vars=ts_curr_state,
                                                    ts_next_vars=ts_next_state,
                                                    dfa_curr_vars=dfa_curr_state,
                                                    dfa_next_vars=dfa_next_state,
                                                    ts_obs_vars=ts_lbl_states,
                                                    cudd_manager=cudd_manager)
-            
-            action_dict = graph_search.symbolic_dijkstra(verbose=False)
+            graph_search.composed_symbolic_dijkstra_wLTL(verbose=False)
+
         else:
 
             graph_search = SymbolicSearch(ts_handle=sym_tr,
-                                          dfa_handle=dfa_tr,
+                                          dfa_handle=dfa_tr[0],
                                           manager=cudd_manager,
                                           ts_curr_vars=ts_curr_state,
                                           ts_next_vars=ts_next_state,
@@ -603,7 +492,6 @@ if __name__ == "__main__":
             # current TS state x Obs associated with this state x State of the Automation to Next State in TS and next state in the DFA Automaton
             # TR : S_ts x Obs_bdd x S_dfa x S'_ts x S'_dfa
             graph_search.composed_symbolic_bfs_wLTL(verbose=False)
-            # action_dict = graph_search.symbolic_bfs_wLTL(max_ts_state=ts_total_state, verbose=False)
 
 
         stop: float = time.time()
