@@ -76,6 +76,31 @@ class BaseSymbolicSearch(object):
             return ImgY.swapVariables(y_list, x_list)
     
 
+    def _append_dict_value_composed(self, dict_obj, key_prod, action):
+        """
+        Check if key exist in dict or not.
+
+        If Key exist in dict:
+           Check if type of value of key is list or not
+           
+           If type is not list then make it list and Append the value in list
+        
+        else: add key-value pair
+        """
+        # compute all the cubes and store them individually
+        # prod_cubes = self.convert_prod_cube_to_func(key_prod)
+        prod_cubes = self.get_prod_cubes(key_prod)
+
+        for key in prod_cubes:
+            if key in dict_obj:
+                # if key_ts in dict_obj[key_dfa]:
+                if not isinstance(dict_obj[key], list):
+                    dict_obj[key] = [dict_obj[key]]
+                dict_obj[key].append(action)
+            else:
+                dict_obj[key] = action
+    
+
     def _append_dict_value(self, dict_obj, key_ts, key_dfa, value):
         """
         Check if key exist in dict or not.
@@ -240,9 +265,9 @@ class BaseSymbolicSearch(object):
         and return the string
         """
         # this will succedd if we have only one dictionary
-
         try:
             _dfa_dd = prod_dd.existAbstract(self.ts_xcube & self.ts_obs_cube)
+            _dfa_dd = _dfa_dd.bddPattern()
             _dfa_name = dfa_dict.get(_dfa_dd)
             assert _dfa_name is not None, "Couldn't convert DFA Cube to its corresponding State. FIX THIS!!!"
             return _dfa_name
@@ -257,15 +282,30 @@ class BaseSymbolicSearch(object):
                     if cube_idx != idx:
                         exist_dfa_cube = exit_dfa_cube & cube
 
-                _dfa_dd = prod_dd.existAbstract(self.ts_xcube & self.ts_obs_cube & exist_dfa_cube)                
+                _dfa_dd = prod_dd.existAbstract(self.ts_xcube & self.ts_obs_cube & exist_dfa_cube)  
+                _dfa_dd = _dfa_dd.bddPattern()              
                 _dfa_name = _dfa_dict.get(_dfa_dd)
                 assert _dfa_name is not None, "Couldn't convert DFA Cube to its corresponding State. FIX THIS!!!"
                 _dfa_name_list.append(_dfa_name)
 
             return _dfa_name_list
-
-
     
+
+    def get_prod_cubes(self, dd_func: Union[BDD, ADD]):
+        """
+        A function that wraps around convert_prod_cube_to_func and returns a cubes corresponding the product states.
+        """
+        if isinstance(dd_func, ADD):
+            tmp_dd_func: BDD = dd_func.bddPattern()
+            tmp_ts_x_list: List[BDD] = [_avar.bddPattern() for _avar in self.ts_x_list]
+            tmp_dfa_x_list: List[BDD] = [_avar.bddPattern() for _avar in self.dfa_x_list]
+            prod_cube_string: List[Union[BDD, ADD]] = self.convert_prod_cube_to_func(dd_func=tmp_dd_func,
+                                                                                     prod_curr_list=tmp_ts_x_list + tmp_dfa_x_list)
+        else:
+            prod_cube_string: List[Union[BDD, ADD]] = self.convert_prod_cube_to_func(dd_func=dd_func)
+
+        return prod_cube_string
+
 
     def get_prod_states_from_dd(self, dd_func: Union[BDD, ADD], obs_flag: bool = False, **kwargs) -> None:
         """
@@ -292,28 +332,30 @@ class BaseSymbolicSearch(object):
                 prod_cube = prod_cube.toADD()
             # first we extract TS state
             _ts_dd = prod_cube.existAbstract(self.dfa_xcube & self.ts_obs_cube)
-            if ADD_flag:
-                _ts_name = self.ts_add_sym_to_curr_state_map.get(_ts_dd)
-            else:
-                _ts_name = self.ts_bdd_sym_to_curr_state_map.get(_ts_dd)
+            _ts_dd = _ts_dd.bddPattern()
+            # # if ADD_flag:
+            #     _ts_name = self.ts_add_sym_to_curr_state_map.get(_ts_dd)
+            # else:
+            _ts_name = self.ts_bdd_sym_to_curr_state_map.get(_ts_dd)
             assert _ts_name is not None, "Couldn't convert TS Cube to its corresponding State. FIX THIS!!!"
             # Second, we extract DFA state
-            if ADD_flag:
-                _dfa_name = self._look_up_dfa_name(prod_dd=prod_cube,
-                                                   dfa_dict=self.dfa_add_sym_to_curr_state_map,
-                                                   **kwargs)
-            else:
-                _dfa_name = self._look_up_dfa_name(prod_dd=prod_cube,
-                                                   dfa_dict=self.dfa_bdd_sym_to_curr_state_map,
-                                                   **kwargs)
+            # if ADD_flag:
+            #     _dfa_name = self._look_up_dfa_name(prod_dd=prod_cube,
+            #                                        dfa_dict=self.dfa_add_sym_to_curr_state_map,
+            #                                        **kwargs)
+            # else:
+            _dfa_name = self._look_up_dfa_name(prod_dd=prod_cube,
+                                                dfa_dict=self.dfa_bdd_sym_to_curr_state_map,
+                                                **kwargs)
             
             if obs_flag:
                 # Finally, we extract State label
                 _pred_dd = prod_cube.existAbstract(self.prod_xcube)
-                if ADD_flag:
-                    _pred_name = self.ts_add_sym_to_S2obs_map.get(_pred_dd)
-                else:
-                    _pred_name = self.ts_bdd_sym_to_S2obs_map.get(_pred_dd)
+                _pred_dd = _pred_dd.bddPattern()
+                # if ADD_flag:
+                #     _pred_name = self.ts_add_sym_to_S2obs_map.get(_pred_dd)
+                # else:
+                _pred_name = self.ts_bdd_sym_to_S2obs_map.get(_pred_dd)
                 assert _pred_name is not None, "Couldn't convert Predicate Cube to its corresponding State. FIX THIS!!!"
                 print(f"({_ts_name}, {_pred_name}, {_dfa_name})")
             else:

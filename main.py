@@ -474,7 +474,7 @@ if __name__ == "__main__":
                                                    dfa_next_vars=dfa_next_state,
                                                    ts_obs_vars=ts_lbl_states,
                                                    cudd_manager=cudd_manager)
-            graph_search.composed_symbolic_dijkstra_wLTL(verbose=False)
+            action_dict = graph_search.composed_symbolic_dijkstra_wLTL(verbose=False)
 
         else:
 
@@ -531,7 +531,7 @@ if __name__ == "__main__":
     else:
         if SIMULATE_STRATEGY and QUANTITATIVE_SEARCH:
             gridworld_strategy = convert_action_dict_to_gridworld_strategy(ts_handle=sym_tr,
-                                                                           dfa_handle=dfa_tr,
+                                                                           dfa_handle=dfa_tr[0],
                                                                            action_map=action_dict,
                                                                            init_state_ts=sym_tr.sym_add_init_states,
                                                                            state_obs_dd=sym_tr.sym_add_state_labels,
@@ -540,7 +540,7 @@ if __name__ == "__main__":
                                                                            dfa_curr_vars=dfa_curr_state,
                                                                            dfa_next_vars=dfa_next_state,
                                                                            ts_sym_to_curr_map=sym_tr.predicate_add_sym_map_curr.inv,
-                                                                           dfa_sym_to_curr_map=dfa_tr.dfa_predicate_add_sym_map_curr.inv)
+                                                                           dfa_sym_to_curr_map=dfa_tr[0].dfa_predicate_add_sym_map_curr.inv)
             create_gridworld(size=GRID_WORLD_SIZE, strategy=gridworld_strategy, init_pos=(0, 0))
 
         elif SIMULATE_STRATEGY:
