@@ -178,7 +178,7 @@ class SymbolicDijkstraSearch(BaseSymbolicSearch):
 
     def retrieve_composed_dijkstra(self, max_layer: int, freach_list: dict, verbose: bool = False):
         """
-        Retrieve the plan through Backward search by strarting from the Goal state and computing the interseaction of Forwards and Backwards
+        Retrieve the plan through Backward search by starting from the Goal state and computing the interseaction of Forwards and Backwards
          Reachable set. 
         """
         g_layer = self.manager.addConst(int(max_layer))
@@ -190,7 +190,6 @@ class SymbolicDijkstraSearch(BaseSymbolicSearch):
 
         parent_plan = {}
 
-        # for g_layer in reversed(range(max_layer + 1)):
         while not composed_prod_state <= freach_list[g_int]:
             new_current_prod = self.manager.addZero()
             for tr_num, prod_tr_action in enumerate(self.composed_tr_list):

@@ -416,6 +416,9 @@ class SymbolicSearch(object):
                                                x_list=self.prod_xlist,
                                                y_list=self.prod_ylist)
 
+                if pred_prod.isZero():
+                    continue
+                
                 if pred_prod & freach_list[g_layer - 1] != self.manager.bddZero():
                     # store the predecessor per action
                     tmp_current_prod = pred_prod & freach_list[g_layer - 1]

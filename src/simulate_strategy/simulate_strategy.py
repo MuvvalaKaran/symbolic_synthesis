@@ -8,6 +8,7 @@ import src.gridworld_visualizer.gridworld_vis.matplotlib_gw as policy_plotter
 from typing import List, Union
 from config import *
 from cudd import Cudd, BDD, ADD
+from functools import reduce
 
 from src.algorithms.base.base_symbolic_search import BaseSymbolicSearch
 from src.symbolic_graphs import SymbolicDFA, SymbolicAddDFA, SymbolicMultipleDFA, SymbolicMultipleAddDFA
@@ -143,47 +144,44 @@ def map_dfa_tuple_to_sym_states(dfa_tuple: tuple, dfa_sym_to_curr_state_map: dic
 
 
 def convert_action_dict_to_gridworld_strategy_nLTL(ts_handle: Union[SymbolicWeightedTransitionSystem, SymbolicTransitionSystem],
-                                                   dfa_handle: Union[SymbolicMultipleAddDFA, SymbolicMultipleDFA],
+                                                   dfa_handles: Union[SymbolicMultipleAddDFA, SymbolicMultipleDFA],
                                                    action_map: dict,
                                                    init_state_ts_sym,
                                                    state_obs_dd,
                                                    ts_curr_vars: list,
                                                    ts_next_vars: list,
                                                    dfa_curr_vars: list,
-                                                   dfa_next_vars: list,
-                                                   ts_sym_to_curr_map) -> List:
+                                                   dfa_next_vars: list) -> List:
     _strategy = []
     ADD_flag: bool = False
 
     transition_sys_tr = ts_handle.sym_tr_actions
     tr_action_idx_map = ts_handle.tr_action_idx_map
 
-    init_state_dfa_list = dfa_handle.sym_init_state_list
-    target_DFA_list = dfa_handle.sym_goal_state_list
+    dfa_transition_fun_list = [dfa_tr.dfa_bdd_tr for dfa_tr in dfa_handles]
+    dfa_monolithic_tr_func = reduce(lambda a, b: a & b,  dfa_transition_fun_list)
+
+    init_state_dfa_list = [dfa_tr.sym_init_state for dfa_tr in dfa_handles]
+    target_DFA_list = [dfa_tr.sym_goal_state for dfa_tr in dfa_handles]
 
     curr_ts_state_sym = init_state_ts_sym
-    curr_ts_state = ts_sym_to_curr_map[curr_ts_state_sym]
+
+    monolithic_dfa_init = reduce(lambda x, y: x & y, init_state_dfa_list)
+    monolithic_dfa_target = reduce(lambda x, y: x & y, target_DFA_list)
+
+    curr_dfa_state = monolithic_dfa_init
+
+
     if isinstance(init_state_dfa_list[0], ADD):
         ADD_flag = True
-        curr_dfa_state_tuple = map_dfa_state_to_tuple(init_state_dfa_list,
-                                                      dfa_sym_to_curr_state_map=dfa_handle.dfa_predicate_add_sym_map_curr.inv,
-                                                      dfa_state_int_map=dfa_handle.node_int_map_dfas)
-        target_dfa_state_tuple = map_dfa_state_to_tuple(target_DFA_list,
-                                                        dfa_sym_to_curr_state_map=dfa_handle.dfa_predicate_add_sym_map_curr.inv,
-                                                        dfa_state_int_map=dfa_handle.node_int_map_dfas)
-    else:
-        curr_dfa_state_tuple = map_dfa_state_to_tuple(init_state_dfa_list,
-                                                      dfa_sym_to_curr_state_map=dfa_handle.dfa_predicate_sym_map_curr.inv,
-                                                      dfa_state_int_map=dfa_handle.node_int_map_dfas)
-        target_dfa_state_tuple = map_dfa_state_to_tuple(target_DFA_list,
-                                                        dfa_sym_to_curr_state_map=dfa_handle.dfa_predicate_sym_map_curr.inv,
-                                                        dfa_state_int_map=dfa_handle.node_int_map_dfas)
+   
     counter = 0
-    while counter not in action_map:
-        counter += 1
-    while not target_dfa_state_tuple == curr_dfa_state_tuple:
-        _a = action_map[counter][curr_dfa_state_tuple][curr_ts_state]
-        
+    while not curr_dfa_state == monolithic_dfa_target:    
+        # _a = action_map[counter][curr_dfa_state_tuple][curr_ts_state]
+        if ADD_flag:
+            _a = action_map[curr_dfa_state.bddPattern() & curr_ts_state_sym.bddPattern()]
+        else:
+            _a = action_map[curr_dfa_state & curr_ts_state_sym]
         if isinstance(_a, list):
             # randomly select an action from a list of actions
             _a = random.choice(_a)
@@ -198,30 +196,18 @@ def convert_action_dict_to_gridworld_strategy_nLTL(ts_handle: Union[SymbolicWeig
             # remove the dependency on the weight by first converting it to BDD and then back to ADD.
             _nxt_ts_state_sym = _nxt_ts_state_sym.bddPattern().toADD()
 
+        # get the observation of this ts state
+        _sym_obs = state_obs_dd.restrict(_nxt_ts_state_sym)
 
-        if ADD_flag:
-            curr_dfa_state_tuple = get_ADD_dfa_evolution(dfa_handle=dfa_handle,
-                                                         _nxt_ts_state=_nxt_ts_state_sym,
-                                                         curr_dfa_state_tuple=curr_dfa_state_tuple,
-                                                         state_obs_dd=state_obs_dd,
-                                                         dfa_curr_vars=dfa_curr_vars,
-                                                         dfa_next_vars=dfa_next_vars)
-        else:
-            curr_dfa_state_tuple = get_dfa_evolution(dfa_handle=dfa_handle,
-                                                     _nxt_ts_state=_nxt_ts_state_sym,
-                                                     curr_dfa_state_tuple=curr_dfa_state_tuple,
-                                                     state_obs_dd=state_obs_dd,
-                                                     dfa_curr_vars=dfa_curr_vars,
-                                                     dfa_next_vars=dfa_next_vars)
+        # get the next DFA state
+        _nxt_dfa = dfa_monolithic_tr_func.restrict(curr_dfa_state & _sym_obs)
+
+        # finally swap variables of TS and DFA 
         curr_ts_state_sym = _nxt_ts_state_sym
-        curr_ts_state = ts_sym_to_curr_map[curr_ts_state_sym]
+        curr_dfa_state = _nxt_dfa.swapVariables(dfa_curr_vars, dfa_next_vars)
 
-        if curr_dfa_state_tuple == target_dfa_state_tuple:
-            break
+        assert counter <= len(action_map), "Error while extracting a valid plan from multiple DFAs."
         counter += 1
-        while counter not in action_map:
-            counter += 1
-    
 
     return _strategy
 
@@ -234,9 +220,7 @@ def convert_action_dict_to_gridworld_strategy(ts_handle: Union[SymbolicWeightedT
                                               ts_curr_vars: list,
                                               ts_next_vars: list,
                                               dfa_curr_vars: list,
-                                              dfa_next_vars: list,
-                                              ts_sym_to_curr_map,
-                                              dfa_sym_to_curr_map) -> List:
+                                              dfa_next_vars: list) -> List:
     """
     A helper function that compute a sequence of Gridworld based sequence of actions from the strategy compute by Graph search algorithm.
 

@@ -500,15 +500,14 @@ if __name__ == "__main__":
     if len(formulas) > 1:
         if SIMULATE_STRATEGY and QUANTITATIVE_SEARCH:
             gridworld_strategy = convert_action_dict_to_gridworld_strategy_nLTL(ts_handle=sym_tr,
-                                                                                dfa_handle=dfa_tr,
+                                                                                dfa_handles=dfa_tr,
                                                                                 action_map=action_dict,
                                                                                 init_state_ts_sym=sym_tr.sym_add_init_states,
                                                                                 state_obs_dd=sym_tr.sym_add_state_labels,
                                                                                 ts_curr_vars=ts_curr_state,
                                                                                 ts_next_vars=ts_next_state,
                                                                                 dfa_curr_vars=dfa_curr_state,
-                                                                                dfa_next_vars=dfa_next_state,
-                                                                                ts_sym_to_curr_map=sym_tr.predicate_add_sym_map_curr.inv)
+                                                                                dfa_next_vars=dfa_next_state)
 
 
             create_gridworld(size=GRID_WORLD_SIZE, strategy=gridworld_strategy, init_pos=(0, 0))
@@ -517,15 +516,14 @@ if __name__ == "__main__":
         elif SIMULATE_STRATEGY:
             # plot_policy(action_dict)
             gridworld_strategy = convert_action_dict_to_gridworld_strategy_nLTL(ts_handle=sym_tr,
-                                                                                dfa_handle=dfa_tr,
+                                                                                dfa_handles=dfa_tr,
                                                                                 action_map=action_dict,
                                                                                 init_state_ts_sym=sym_tr.sym_init_states,
                                                                                 state_obs_dd=sym_tr.sym_state_labels,
                                                                                 ts_curr_vars=ts_curr_state,
                                                                                 ts_next_vars=ts_next_state,
                                                                                 dfa_curr_vars=dfa_curr_state,
-                                                                                dfa_next_vars=dfa_next_state,
-                                                                                ts_sym_to_curr_map=sym_tr.predicate_sym_map_curr.inv)
+                                                                                dfa_next_vars=dfa_next_state)
 
             create_gridworld(size=GRID_WORLD_SIZE, strategy=gridworld_strategy, init_pos=(0, 0))
     else:
@@ -538,9 +536,7 @@ if __name__ == "__main__":
                                                                            ts_curr_vars=ts_curr_state,
                                                                            ts_next_vars=ts_next_state,
                                                                            dfa_curr_vars=dfa_curr_state,
-                                                                           dfa_next_vars=dfa_next_state,
-                                                                           ts_sym_to_curr_map=sym_tr.predicate_add_sym_map_curr.inv,
-                                                                           dfa_sym_to_curr_map=dfa_tr[0].dfa_predicate_add_sym_map_curr.inv)
+                                                                           dfa_next_vars=dfa_next_state)
             create_gridworld(size=GRID_WORLD_SIZE, strategy=gridworld_strategy, init_pos=(0, 0))
 
         elif SIMULATE_STRATEGY:
@@ -552,9 +548,7 @@ if __name__ == "__main__":
                                                                            ts_curr_vars=ts_curr_state,
                                                                            ts_next_vars=ts_next_state,
                                                                            dfa_curr_vars=dfa_curr_state,
-                                                                           dfa_next_vars=dfa_next_state,
-                                                                           ts_sym_to_curr_map=sym_tr.predicate_sym_map_curr.inv,
-                                                                           dfa_sym_to_curr_map=dfa_tr[0].dfa_predicate_sym_map_curr.inv)
+                                                                           dfa_next_vars=dfa_next_state)
             create_gridworld(size=GRID_WORLD_SIZE, strategy=gridworld_strategy, init_pos=(0, 0))
 
     

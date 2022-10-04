@@ -259,7 +259,7 @@ class BaseSymbolicSearch(object):
         return bddVars
 
     
-    def _look_up_dfa_name(self, prod_dd: BDD, dfa_dict: Union[dict, List[dict]], **kwargs) -> Union[str, List[str]]:
+    def _look_up_dfa_name(self, prod_dd: BDD, dfa_dict: Union[dict, List[dict]], ADD_flag: bool = False, **kwargs) -> Union[str, List[str]]:
         """
         A helper function that searched through a dictionary (single formula case) or a list of dictionaries (multiple formula case)
         and return the string
@@ -267,7 +267,8 @@ class BaseSymbolicSearch(object):
         # this will succedd if we have only one dictionary
         try:
             _dfa_dd = prod_dd.existAbstract(self.ts_xcube & self.ts_obs_cube)
-            _dfa_dd = _dfa_dd.bddPattern()
+            if ADD_flag:
+                _dfa_dd = _dfa_dd.bddPattern()
             _dfa_name = dfa_dict.get(_dfa_dd)
             assert _dfa_name is not None, "Couldn't convert DFA Cube to its corresponding State. FIX THIS!!!"
             return _dfa_name
@@ -282,8 +283,9 @@ class BaseSymbolicSearch(object):
                     if cube_idx != idx:
                         exist_dfa_cube = exit_dfa_cube & cube
 
-                _dfa_dd = prod_dd.existAbstract(self.ts_xcube & self.ts_obs_cube & exist_dfa_cube)  
-                _dfa_dd = _dfa_dd.bddPattern()              
+                _dfa_dd = prod_dd.existAbstract(self.ts_xcube & self.ts_obs_cube & exist_dfa_cube)
+                if ADD_flag:  
+                    _dfa_dd = _dfa_dd.bddPattern()              
                 _dfa_name = _dfa_dict.get(_dfa_dd)
                 assert _dfa_name is not None, "Couldn't convert DFA Cube to its corresponding State. FIX THIS!!!"
                 _dfa_name_list.append(_dfa_name)
@@ -332,7 +334,8 @@ class BaseSymbolicSearch(object):
                 prod_cube = prod_cube.toADD()
             # first we extract TS state
             _ts_dd = prod_cube.existAbstract(self.dfa_xcube & self.ts_obs_cube)
-            _ts_dd = _ts_dd.bddPattern()
+            if ADD_flag:
+                _ts_dd = _ts_dd.bddPattern()
             # # if ADD_flag:
             #     _ts_name = self.ts_add_sym_to_curr_state_map.get(_ts_dd)
             # else:
@@ -345,8 +348,9 @@ class BaseSymbolicSearch(object):
             #                                        **kwargs)
             # else:
             _dfa_name = self._look_up_dfa_name(prod_dd=prod_cube,
-                                                dfa_dict=self.dfa_bdd_sym_to_curr_state_map,
-                                                **kwargs)
+                                               dfa_dict=self.dfa_bdd_sym_to_curr_state_map,
+                                               ADD_flag=ADD_flag,
+                                               **kwargs)
             
             if obs_flag:
                 # Finally, we extract State label
