@@ -45,11 +45,11 @@ class MultipleFormulaBFS(BaseSymbolicSearch):
         self.dfa_monolithic_tr_func = reduce(lambda a, b: a & b,  self.dfa_transition_fun_list)
         
         self.ts_bdd_sym_to_curr_state_map: dict = ts_handle.predicate_sym_map_curr.inv
-        self.ts_bdd_sym_to_S2obs_map: dict = ts_handle.predicate_sym_map_lbl.inv
-        self.dfa_bdd_sym_to_curr_state_map: dict = [i.dfa_predicate_sym_map_curr.inv for i in dfa_handles]
+        self.ts_bdd_sym_to_S2obs_map: List[dict] = ts_handle.predicate_sym_map_lbl.inv
+        self.dfa_bdd_sym_to_curr_state_map: List[dict] = [i.dfa_predicate_sym_map_curr.inv for i in dfa_handles]
         self.obs_bdd = ts_handle.sym_state_labels
         self.tr_action_idx_map = ts_handle.tr_action_idx_map
-        # self.dfa_state_int_map: dict = dfa_handle.node_int_map_dfas [i.dfa_predicate_sym_map_curr.inv for i in dfa_handles]
+       
 
         # create corresponding cubes to avoid repetition
         self.ts_xcube = reduce(lambda x, y: x & y, self.ts_x_list)

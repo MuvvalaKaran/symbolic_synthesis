@@ -11,13 +11,13 @@ from src.explicit_graphs import CausalGraph
 from src.explicit_graphs import TwoPlayerGame
 from src.explicit_graphs import FiniteTransitionSystem
 
-from src.symbolic_graphs import SymbolicDFA, SymbolicAddDFA, SymbolicMultipleDFA, SymbolicMultipleAddDFA
+from src.symbolic_graphs import SymbolicDFA, SymbolicAddDFA
 from src.symbolic_graphs import SymbolicTransitionSystem, SymbolicWeightedTransitionSystem
 
 from src.algorithms.blind_search import SymbolicSearch
 from src.algorithms.monolithic_search.blind_search import MultipleFormulaBFS
 from src.algorithms.weighted_search import SymbolicDijkstraSearch
-# from src.algorithms.old_disjoint_search import MultipleFormulaDijkstra
+from src.algorithms.monolithic_search.weighted_search import MultipleFormulaDijkstra
 
 from src.simulate_strategy import create_gridworld, \
      convert_action_dict_to_gridworld_strategy, plot_policy, convert_action_dict_to_gridworld_strategy_nLTL
@@ -428,7 +428,7 @@ if __name__ == "__main__":
         start: float = time.time()
         if QUANTITATIVE_SEARCH:
             graph_search = MultipleFormulaDijkstra(ts_handle=sym_tr,
-                                                   dfa_handle=dfa_tr,
+                                                   dfa_handles=dfa_tr,
                                                    ts_curr_vars=ts_curr_state,
                                                    ts_next_vars=ts_next_state,
                                                    dfa_curr_vars=dfa_curr_state,
@@ -437,7 +437,7 @@ if __name__ == "__main__":
                                                    cudd_manager=cudd_manager)
 
             # call dijkstras for solving minimum cost path over nLTLs
-            action_dict: dict = graph_search.symbolic_dijkstra_nLTL(verbose=False)
+            action_dict: dict = graph_search.composed_symbolic_dijkstra_nLTL(verbose=False)
 
         else:
             graph_search = MultipleFormulaBFS(ts_handle=sym_tr,
@@ -454,13 +454,6 @@ if __name__ == "__main__":
 
         stop: float = time.time()
         print("Time took for plannig: ", stop - start)
-        if PRINT_STRATEGY:
-            for _dfa_state, _ts_dict in action_dict.items():
-                print(f"******************Currently in DFA state {_dfa_state}******************")
-                for _ts_state, _action in _ts_dict.items(): 
-                    print(f"From State {_ts_state} take Action {_action}")
-
-            print("Done with the plan")
 
     else:
         start: float = time.time()

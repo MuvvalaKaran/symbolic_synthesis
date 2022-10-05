@@ -278,7 +278,10 @@ class BaseSymbolicSearch(object):
             _dfa_name_list = []
             for idx, _dfa_dict in enumerate(dfa_dict):
                 # create a cube of the rest of the dfa vars
-                exit_dfa_cube = self.manager.bddOne()
+                if ADD_flag:
+                    exit_dfa_cube = self.manager.addOne()
+                else:
+                    exit_dfa_cube = self.manager.bddOne()
                 for cube_idx, cube in enumerate(kwargs['dfa_xcube_list']):
                     if cube_idx != idx:
                         exist_dfa_cube = exit_dfa_cube & cube

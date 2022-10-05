@@ -317,9 +317,7 @@ class SymbolicAddDFA(object):
 
         # if symbls is empty then create True edge
         if not symbls or 'true' in symbls:
-            # return self.manager.addOne()
-            # testing this feature - do not add edges associated with accepting or sink states as they cause problem during search
-            return self.manager.addZero()
+            return self.manager.addOne()
         else:
             if len(symbls) > valid_dfa_edge_formula_size:
                 return self.manager.addZero()
