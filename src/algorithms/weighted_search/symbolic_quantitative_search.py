@@ -6,6 +6,8 @@ from typing import Union, List
 
 
 from cudd import Cudd, BDD, ADD
+from numpy import deprecate
+from yaml import warnings
 
 from src.algorithms.base import BaseSymbolicSearch
 from src.symbolic_graphs import SymbolicAddDFA, SymbolicWeightedTransitionSystem
@@ -276,7 +278,6 @@ class SymbolicDijkstraSearch(BaseSymbolicSearch):
 
         # generate cubes, 
         int_leaves = [i[1] for i in  list(dd_func.generate_cubes())] 
-    
 
         # create a set to eliminate duplicates
         int_cubes = set(int_leaves)
@@ -295,7 +296,7 @@ class SymbolicDijkstraSearch(BaseSymbolicSearch):
 
 
     
-    def ADD_composed_symbolic_dijkstra_wLTL(self, verbose: bool = False, debug: bool = False):
+    def ADD_composed_symbolic_dijkstra_wLTL(self, verbose: bool = False):
         """
         This function implemented Dijstra's symbolic composed algorithm using ADDs.
 
@@ -314,55 +315,8 @@ class SymbolicDijkstraSearch(BaseSymbolicSearch):
 
         Use isConstant() and isNonConstant() to check if it is Constant ADD or not.
         """
-        self.old_code()
-        # self.manager.setBackground(self.manager.plusInfinity())
+        warnings.warn("This code is still Work In Progress. It does not work for non-uniform weights and retrieving plans.")
 
-        # # create TS adjacency map
-        # ts_adj_mat = reduce(lambda x, y: x | y, self.ts_transition_fun_list)
-        # ts_adj_mat = (~ts_adj_mat).ite(self.manager.plusInfinity(), ts_adj_mat)
-
-        # # create dfa adjaceny map
-        # dfa_adj_mat = (~self.dfa_transition_fun).ite(self.manager.plusInfinity(), self.manager.addZero())
-
-        # # create Obd adjacency map
-        # obs_add = self.obs_add.ite(self.manager.addZero(), self.manager.plusInfinity())
-
-
-        # # get the initial state, evolve over the TS
-        # init_TS = self.init_TS.ite(self.manager.addZero(), self.manager.plusInfinity())
-        # init_dfa = self.init_DFA.ite(self.manager.addZero(), self.manager.plusInfinity())
-        # init_state_obs = obs_add + init_TS
-
-        # target_dfa = self.target_DFA.ite(self.manager.addZero(), self.manager.plusInfinity())
-
-        # open_add = init_TS + init_dfa + init_state_obs
-
-        # while not open_add.isZero():
-        #     # next transition states
-            
-        #     nxt_ts_state = ts_adj_mat.triangle(open_add, self.ts_x_list).swapVariables(self.ts_x_list, self.ts_y_list)
-
-        #     # get the observation
-        #     state_obs = obs_add.restrict(nxt_ts_state)
-
-        #     # get the next DFA states          
-        #     nxt_dfa_states = dfa_adj_mat.triangle(nxt_ts_state + state_obs + init_dfa, self.dfa_x_list).swapVariables(self.dfa_x_list, self.dfa_y_list)
-
-        #     open_add = nxt_dfa_states
-        #     nxt_ts_state = nxt_dfa_states
-        #     # get the prod states,
-        #     print("NXT DFA STate")
-
-        
-        
-        
-        
-        
-        
-        
-    
-    def old_code(self, verbose: bool = False):
-        ####### OLD CODE #####################
         self.manager.setBackground(self.manager.plusInfinity())
         adj_mat: ADD = self._construct_adj_mat(verbose=False)
         init_TS = self.init_TS.ite(self.manager.addZero(), self.manager.plusInfinity())
@@ -371,18 +325,14 @@ class SymbolicDijkstraSearch(BaseSymbolicSearch):
         composed_init = (self.init_TS & self.init_DFA).ite(self.manager.addZero(), self.manager.plusInfinity())
         open_add = composed_init
         # closed = self.manager.addZero()
-        
-        # if debug: 
         closed_add = self.manager.plusInfinity()
-        # closed_add = self.manager.bddZero()
+        layer = 0
         
 
         while not open_add.isZero():
             # open_add = closed_add - open_add
-
             # finding the states with minimum g value
             new_add = open_add.min(open_add)
-            # closed_add |= new_add.bddPattern()
             new_closed_add = closed_add.min(new_add)
 
             if new_closed_add.agreement(closed_add).isOne():
@@ -390,51 +340,47 @@ class SymbolicDijkstraSearch(BaseSymbolicSearch):
             
             closed_add = new_closed_add
 
-
-            # f_min = open_add.findMin()
-            # # get the add associated with it
-            # if f_min.isZero():
-            #     f_min_int = 0
-            #     # get the BDD associated with the min f value
-            #     new_bdd: BDD = open_add.bddInterval(f_min_int, f_min_int)
-            #     new_add: ADD = new_bdd.toADD()
-
-            #     # after converting ADD, we need to reset the false edges (labelled as 0 due to BDDtoADD comversion) to +infinity
-            #     new_add: ADD = new_add.ite(f_min, self.manager.plusInfinity())
-
-            # else:
-            #     f_min_int = int(re.findall(r'-?\d+', f_min.__repr__())[0])
-            #     new = open_add.bddInterval(f_min_int, f_min_int).toADD()
-
             # open_add = open_add - new_add   # FIX THIS!!
             # Keep track of the lowest g associared with each state
             # closed_add = closed_add.min(open_add) 
             if not new_add.restrict(self.target_DFA) == self.manager.plusInfinity():
-                return 
-            # if new_add.restrict(self.target_DFA) == self.manager.plusInfinity():
+                print(f"*****************The Shortest length path is {layer}****************************")
+                return
+                return self.retrieve_ADD_composed_symbolic_dijkstra_wLTL(freach=closed_add, verbose=verbose, maxd =layer)
+           
             # closed_add = closed_add.min(open_add)
             nxt: ADD = adj_mat.triangle(new_add, self.prod_xlist).swapVariables(self.prod_xlist, self.prod_ylist)
 
             nxt = self.ADD_existAbstract(dd_func=nxt)
-            # nxt_min = nxt.findMin()
-            # nxt_min_int = int(re.findall(r'-?\d+', nxt_min.__repr__())[0])
-
-            # nxt_max = nxt.findMax()
-            # nxt_max_int = int(re.findall(r'-?\d+', nxt_max.__repr__())[0])
-
-            # assert nxt_max_int >= nxt_min_int, "Error while converting successors to current state on the composed graph using existAbstract"
-
-            # get the BDD associated with the min f value
-            # + 1 can be replaced with 
-            # nxt_bdd: BDD = nxt.bddInterval(nxt_min_int, nxt_min_int).existAbstract(self.ts_obs_cube.bddPattern())
-            # nxt_add: ADD = nxt_bdd.toADD().ite()
 
             if verbose:
-                self.get_prod_states_from_dd(dd_func=nxt, obs_flag=False)
+                # self.get_prod_states_from_dd(dd_func=nxt, obs_flag=False)
+                self.add_get_prod_stated_from_dd(dd_func=nxt, obs_flag=False)
 
             # retain the minimum onces only
             # open_add: ADD = new_add.min(nxt)
             open_add: ADD = nxt
+            layer += 1
+    
+    @deprecate
+    def retrieve_ADD_composed_symbolic_dijkstra_wLTL(self, freach: ADD, maxd: int, verbose: bool = False):
+        """
+        Backward search algorithm to retreive the action to be taken at each step
+        """
+
+        adj_mat: ADD = self._construct_adj_mat(verbose=False)
+
+        # revesr the edges for backward search 
+        adj_mat = adj_mat.swapVariables(self.prod_xlist, self.prod_ylist)
+
+        test_target = (~self.target_DFA).ite(self.manager.plusInfinity(), self.manager.addConst(maxd))
+
+        # start from the accepting state and do a backards search
+        composed_acc = freach.agreement(test_target)
+
+        raise NotImplementedError()
+
+
 
     
                 

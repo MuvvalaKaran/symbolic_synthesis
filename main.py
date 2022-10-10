@@ -14,10 +14,8 @@ from src.explicit_graphs import FiniteTransitionSystem
 from src.symbolic_graphs import SymbolicDFA, SymbolicAddDFA
 from src.symbolic_graphs import SymbolicTransitionSystem, SymbolicWeightedTransitionSystem
 
-from src.algorithms.blind_search import SymbolicSearch
-from src.algorithms.monolithic_search.blind_search import MultipleFormulaBFS
-from src.algorithms.weighted_search import SymbolicDijkstraSearch
-from src.algorithms.monolithic_search.weighted_search import MultipleFormulaDijkstra
+from src.algorithms.blind_search import SymbolicSearch, MultipleFormulaBFS
+from src.algorithms.weighted_search import SymbolicDijkstraSearch, MultipleFormulaDijkstra
 
 from src.simulate_strategy import create_gridworld, \
      convert_action_dict_to_gridworld_strategy, plot_policy, convert_action_dict_to_gridworld_strategy_nLTL
@@ -467,6 +465,8 @@ if __name__ == "__main__":
                                                    dfa_next_vars=dfa_next_state,
                                                    ts_obs_vars=ts_lbl_states,
                                                    cudd_manager=cudd_manager)
+
+            # action_dict = graph_search.ADD_composed_symbolic_dijkstra_wLTL(verbose=False)
             action_dict = graph_search.composed_symbolic_dijkstra_wLTL(verbose=False)
 
         else:
