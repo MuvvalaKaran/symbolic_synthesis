@@ -90,6 +90,24 @@ class SymbolicDijkstraSearch(BaseSymbolicSearch):
         
         return _max
     
+
+    def _construct_adj_mat(self, verbose: bool = False) -> ADD:
+        """
+        A helper function that create the Adjacency matric used to compute the image of the successor states.
+        """
+        
+        obs_bdd_prime = self.obs_add.swapVariables(self.ts_x_list, self.ts_y_list) 
+        composed_tr = self.manager.addZero()
+        for tr_action in self.ts_transition_fun_list:
+            composed_tr |= tr_action & self.dfa_transition_fun & obs_bdd_prime
+        
+        # We use ~T to obtain a 0-1 ADD (as required by ITE).
+        composed_tr = (~composed_tr).ite(self.manager.plusInfinity(), composed_tr)
+        if verbose:
+            print("************************ Adjacency Matrix*******************")
+            composed_tr.display(3)
+        return composed_tr 
+    
     
     def composed_symbolic_dijkstra_wLTL(self, verbose: bool = False):
         """
@@ -243,6 +261,193 @@ class SymbolicDijkstraSearch(BaseSymbolicSearch):
                 self.get_prod_states_from_dd(dd_func=tmp_current_prod, obs_flag=False)
             
         return parent_plan
+    
+
+    def ADD_existAbstract(self, dd_func: ADD) -> ADD:
+        """
+        In the ADD implementation of Dijkstra's algorithm, we compute the image anbd shortest 1-step distance by taking Semi Ring matrix operation as defined 
+        by Fabio Somenzi in his ADD paper.
+
+        As all the valid paths have value >= 0 and invalid paths have values plusInfinity, when we apply existAbstract := Apply(+, func|x, func|~x),
+        The invalid edges with plusInfinity add to finite int weights and end up giving infinity. 
+
+        Hence, to existAbstract(), we first conver the ADD to 0-1 ADD and then do the existential Abstraction 
+        """
+
+        # generate cubes, 
+        int_leaves = [i[1] for i in  list(dd_func.generate_cubes())] 
+    
+
+        # create a set to eliminate duplicates
+        int_cubes = set(int_leaves)
+
+        # loop over each int leaf, extract the bdd, then perform existential Abstraction and ocnvert back to ADD
+        for num in int_cubes:
+            dd: BDD = dd_func.bddInterval(num, num)
+            new_dd: ADD = dd.existAbstract(self.ts_obs_cube.bddPattern()).toADD()
+
+            # now add the int values at the leaves back to the ADD
+            new_dd = (~new_dd).ite(self.manager.plusInfinity(), self.manager.addConst(num))
+        
+        assert new_dd <= dd_func, "Error Computing the existential Abstraction of successor states during forward search. FIX THIS!!!!"
+        # TODO: need to append all the dds and then return 
+        return new_dd
+
+
+    
+    def ADD_composed_symbolic_dijkstra_wLTL(self, verbose: bool = False, debug: bool = False):
+        """
+        This function implemented Dijstra's symbolic composed algorithm using ADDs.
+
+        This algorithm is based off of ADDA* algorithm proposed by  Hansen, Zhou and Feng in 2002-
+         "Symbolic heuristic search using decision diagrams."
+        
+        Using this approach - we can use
+        1. Single ADD instead of buckets (vector of) of BDD.
+        2. Keeping Track of G values as part of the staates instead of extracting them and then storing their corresponding BDDs.
+
+        Boolean Operators on ADDs are only defined when the leaves of ADD are 0 & 1. 
+
+        bddThreshold(value: int) - return the BDD associated with leaves that are >= value
+        bddStrictThreshold(value: int) - return the BDD associated with leaves that are (stictly) > value
+        bddInterval(value: int) - return the BDD associated with leaves that satisfy lower <= value <= upper
+
+        Use isConstant() and isNonConstant() to check if it is Constant ADD or not.
+        """
+        self.old_code()
+        # self.manager.setBackground(self.manager.plusInfinity())
+
+        # # create TS adjacency map
+        # ts_adj_mat = reduce(lambda x, y: x | y, self.ts_transition_fun_list)
+        # ts_adj_mat = (~ts_adj_mat).ite(self.manager.plusInfinity(), ts_adj_mat)
+
+        # # create dfa adjaceny map
+        # dfa_adj_mat = (~self.dfa_transition_fun).ite(self.manager.plusInfinity(), self.manager.addZero())
+
+        # # create Obd adjacency map
+        # obs_add = self.obs_add.ite(self.manager.addZero(), self.manager.plusInfinity())
+
+
+        # # get the initial state, evolve over the TS
+        # init_TS = self.init_TS.ite(self.manager.addZero(), self.manager.plusInfinity())
+        # init_dfa = self.init_DFA.ite(self.manager.addZero(), self.manager.plusInfinity())
+        # init_state_obs = obs_add + init_TS
+
+        # target_dfa = self.target_DFA.ite(self.manager.addZero(), self.manager.plusInfinity())
+
+        # open_add = init_TS + init_dfa + init_state_obs
+
+        # while not open_add.isZero():
+        #     # next transition states
+            
+        #     nxt_ts_state = ts_adj_mat.triangle(open_add, self.ts_x_list).swapVariables(self.ts_x_list, self.ts_y_list)
+
+        #     # get the observation
+        #     state_obs = obs_add.restrict(nxt_ts_state)
+
+        #     # get the next DFA states          
+        #     nxt_dfa_states = dfa_adj_mat.triangle(nxt_ts_state + state_obs + init_dfa, self.dfa_x_list).swapVariables(self.dfa_x_list, self.dfa_y_list)
+
+        #     open_add = nxt_dfa_states
+        #     nxt_ts_state = nxt_dfa_states
+        #     # get the prod states,
+        #     print("NXT DFA STate")
+
+        
+        
+        
+        
+        
+        
+        
+    
+    def old_code(self, verbose: bool = False):
+        ####### OLD CODE #####################
+        self.manager.setBackground(self.manager.plusInfinity())
+        adj_mat: ADD = self._construct_adj_mat(verbose=False)
+        init_TS = self.init_TS.ite(self.manager.addZero(), self.manager.plusInfinity())
+        init_dfa = self.init_DFA.ite(self.manager.addZero(), self.manager.plusInfinity())
+
+        composed_init = (self.init_TS & self.init_DFA).ite(self.manager.addZero(), self.manager.plusInfinity())
+        open_add = composed_init
+        # closed = self.manager.addZero()
+        
+        # if debug: 
+        closed_add = self.manager.plusInfinity()
+        # closed_add = self.manager.bddZero()
+        
+
+        while not open_add.isZero():
+            # open_add = closed_add - open_add
+
+            # finding the states with minimum g value
+            new_add = open_add.min(open_add)
+            # closed_add |= new_add.bddPattern()
+            new_closed_add = closed_add.min(new_add)
+
+            if new_closed_add.agreement(closed_add).isOne():
+                print("Reached a Fixed Point, No path exisits.")
+            
+            closed_add = new_closed_add
+
+
+            # f_min = open_add.findMin()
+            # # get the add associated with it
+            # if f_min.isZero():
+            #     f_min_int = 0
+            #     # get the BDD associated with the min f value
+            #     new_bdd: BDD = open_add.bddInterval(f_min_int, f_min_int)
+            #     new_add: ADD = new_bdd.toADD()
+
+            #     # after converting ADD, we need to reset the false edges (labelled as 0 due to BDDtoADD comversion) to +infinity
+            #     new_add: ADD = new_add.ite(f_min, self.manager.plusInfinity())
+
+            # else:
+            #     f_min_int = int(re.findall(r'-?\d+', f_min.__repr__())[0])
+            #     new = open_add.bddInterval(f_min_int, f_min_int).toADD()
+
+            # open_add = open_add - new_add   # FIX THIS!!
+            # Keep track of the lowest g associared with each state
+            # closed_add = closed_add.min(open_add) 
+            if not new_add.restrict(self.target_DFA) == self.manager.plusInfinity():
+                return 
+            # if new_add.restrict(self.target_DFA) == self.manager.plusInfinity():
+            # closed_add = closed_add.min(open_add)
+            nxt: ADD = adj_mat.triangle(new_add, self.prod_xlist).swapVariables(self.prod_xlist, self.prod_ylist)
+
+            nxt = self.ADD_existAbstract(dd_func=nxt)
+            # nxt_min = nxt.findMin()
+            # nxt_min_int = int(re.findall(r'-?\d+', nxt_min.__repr__())[0])
+
+            # nxt_max = nxt.findMax()
+            # nxt_max_int = int(re.findall(r'-?\d+', nxt_max.__repr__())[0])
+
+            # assert nxt_max_int >= nxt_min_int, "Error while converting successors to current state on the composed graph using existAbstract"
+
+            # get the BDD associated with the min f value
+            # + 1 can be replaced with 
+            # nxt_bdd: BDD = nxt.bddInterval(nxt_min_int, nxt_min_int).existAbstract(self.ts_obs_cube.bddPattern())
+            # nxt_add: ADD = nxt_bdd.toADD().ite()
+
+            if verbose:
+                self.get_prod_states_from_dd(dd_func=nxt, obs_flag=False)
+
+            # retain the minimum onces only
+            # open_add: ADD = new_add.min(nxt)
+            open_add: ADD = nxt
+
+    
+                
+
+
+
+                
+
+
+
+
+
+
 
 
 
