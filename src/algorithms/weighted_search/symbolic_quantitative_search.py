@@ -114,9 +114,6 @@ class SymbolicDijkstraSearch(BaseSymbolicSearch):
     def composed_symbolic_dijkstra_wLTL(self, verbose: bool = False):
         """
         A function that compose the TR function from the Transition system and DFA and search symbolically over the product graph.
-
-        TODO: Modify the implementation where we retrieve the plan bu starting from the highest cost Action and them iterating 
-        over them in a descending manner.  
         """
         open_list = {}
         closed = self.manager.addZero()

@@ -3,7 +3,7 @@ import sys
 import copy
 import graphviz as gv
 
-from typing import Tuple, List
+from typing import Tuple, List, Dict
 from functools import reduce
 from cudd import Cudd, BDD, ADD
 from itertools import product
@@ -285,12 +285,13 @@ class SymbolicWeightedTransitionSystem(object):
     domain : Pyperplan object that contains information regarding the domain
     observations: All the possible observations for a give problem type. For grid world this is same a objects
     manager: CUDD Manager
+    weight_dict: A mapping from pddl action to their corresponding weights in the dictionary. 
 
     We had to create a dedicated class for this as allthe variables are ad variables in the this class.
     This includes, states, transition function, and labels 
     """
 
-    def __init__(self, curr_states: List[ADD] , next_states: List[ADD], lbl_states: List[ADD], task, domain, observations, manager: Cudd):
+    def __init__(self, curr_states: List[ADD] , next_states: List[ADD], lbl_states: List[ADD], task, domain, weight_dict, observations, manager: Cudd):
         self.sym_add_vars_curr: List[ADD] = curr_states
         self.sym_add_vars_next: List[ADD] = next_states
         self.sym_add_vars_lbl: List[ADD] = lbl_states
@@ -301,7 +302,8 @@ class SymbolicWeightedTransitionSystem(object):
         self.domain: dict = domain
         self.domain_lbls = observations
         self.manager: Cudd = manager
-        self.actions: dict = domain.actions
+        self.weight_dict: Dict[str, List[ADD]] = weight_dict
+
         self.tr_action_idx_map: dict = {}
         self.sym_add_init_states = manager.addZero()
         self.sym_add_goal_states = manager.addZero()
@@ -327,12 +329,12 @@ class SymbolicWeightedTransitionSystem(object):
         """
         #  initiate BDDs for all the action 
         action_idx_map = bidict()
-        _actions = list(self.actions.keys())
+        _actions = list(self.weight_dict.keys())
         for _idx, _action in enumerate(_actions):
             action_idx_map[_action] = _idx
         
         self.tr_action_idx_map = action_idx_map
-        self.sym_tr_actions = [self.manager.addZero() for _ in range(len(self.actions))]
+        self.sym_tr_actions = [self.manager.addZero() for _ in range(len(self.weight_dict))]
     
 
     def _initialize_sym_init_goal_states(self):
@@ -428,16 +430,16 @@ class SymbolicWeightedTransitionSystem(object):
         self.predicate_sym_map_lbl = _node_bdd_int_map_lbl
     
 
-    def create_weighted_transition_system(self, weight_list, verbose: bool = False, plot: bool = False):
+    def create_weighted_transition_system(self, verbose: bool = False, plot: bool = False):
         """
         A function to create the TR function for each Action we have defined in the domain along with its weight
         """
-        if not all(isinstance(tr_const, ADD) for tr_const in weight_list):
+        if not all(isinstance(tr_const, ADD) for tr_const in self.weight_dict.values()):
             print("Please Make sure your edge weights are of type ADD. FIX THIS!!!")
             sys.exit()
 
         for _action in self.task.operators:
-            self.build_actions_tr_func_weighted(curr_edge_action=_action, weight_list=weight_list)
+            self.build_actions_tr_func_weighted(curr_edge_action=_action)
 
         if verbose:
             for _action, _idx in self.tr_action_idx_map.items():
@@ -450,19 +452,19 @@ class SymbolicWeightedTransitionSystem(object):
                     gv.render(engine='dot', format='pdf', filepath=file_path, outfile=file_name)
     
 
-    def build_actions_tr_func_weighted(self, curr_edge_action: str, weight_list: list):
+    def build_actions_tr_func_weighted(self, curr_edge_action: str):
         """
         A function to build a symbolic transition function corresponding to each action along with its weight
         """
 
-        _actions = list(self.actions.keys())
+        _actions = list(self.weight_dict.keys())
         # since pre, post condition are all forzenset, we iterate over it
         pre_conds = tuple(curr_edge_action.preconditions)
         add_effects = tuple(curr_edge_action.add_effects)
         del_effects = tuple(curr_edge_action.del_effects)
 
         # get the bool formula for the above predicates in terms of add variables
-        # Note add in the predictice_add... is not the same as addition but its Algebraic Decision Diagram
+        # Note add in the predictice_add... is not the same as addition but it is Algebraic Decision Diagram
         pre_list = [self.predicate_add_sym_map_curr.get(pre_cond) for pre_cond in pre_conds]
         add_list = [self.predicate_add_sym_map_nxt.get(add_effect) for add_effect in add_effects]
         del_list = [self.predicate_add_sym_map_nxt.get(del_effect) for del_effect in del_effects]
@@ -498,7 +500,7 @@ class SymbolicWeightedTransitionSystem(object):
 
         _idx = self.tr_action_idx_map.get(_action)  
 
-        self.sym_tr_actions[_idx] |= pre_sym & add_sym & ~del_sym & weight_list[_idx]
+        self.sym_tr_actions[_idx] |= pre_sym & add_sym & ~del_sym & self.weight_dict[_action]
         
         return _action
     

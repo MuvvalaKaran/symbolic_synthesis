@@ -9,10 +9,11 @@ from bidict import bidict
 from functools import reduce
 from itertools import product
 
-from cudd import Cudd, BDD, ADD 
+from cudd import Cudd, BDD, ADD
 
 from regret_synthesis_toolbox.src.graph import DFAGraph
 
+from utls import *
 from config import *
 
 
@@ -355,7 +356,7 @@ class SymbolicAddDFA(object):
                 gv.render(engine='dot', format='pdf', filepath=file_path, outfile=file_name)
 
 
-
+@deprecated
 class SymbolicMultipleDFA(object):
     """
     A class to construct a symbolic transition system for each DFA 
@@ -565,7 +566,7 @@ class SymbolicMultipleDFA(object):
                     self.manager.dumpDot([self.dfa_bdd_tr], file_path=file_path)
                     gv.render(engine='dot', format='pdf', filepath=file_path, outfile=file_name)
 
-
+@deprecated
 class SymbolicMultipleAddDFA(object):
     """
     A class to construct a symbolic transition system for each DFA using ADD variables 

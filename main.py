@@ -2,7 +2,7 @@ import sys
 import time
 import math
 
-from typing import Tuple, List
+from typing import Tuple, List, Dict
 from cudd import Cudd, BDD, ADD
 from itertools import product
 
@@ -343,40 +343,40 @@ def build_bdd_abstraction(cudd_manager, problem_file_path, domain_file_path) -> 
 
 
 
-def build_weighted_add_abstraction(cudd_manager, problem_file_path, domain_file_path, weight_list: list) -> Tuple[SymbolicTransitionSystem, list, list, list, int]:
+def build_weighted_add_abstraction(cudd_manager, problem_file_path, domain_file_path, weight_dict: Dict[str, int]) -> \
+     Tuple[SymbolicTransitionSystem, List[ADD], List[ADD], List[ADD], int]:
     """
     Main Function to Build Transition System that represents valid edges without their corresponding weights
 
     Pyperplan supports the following PDDL fragment: STRIPS without action costs
     """
-    # explore a more robust version
-    c_a = cudd_manager.addConst(int(1))
-    c_b = cudd_manager.addConst(int(1))
-    c_c = cudd_manager.addConst(int(1))
-    c_d = cudd_manager.addConst(int(1))
+
+    # sort them according to their weights and then convert them in to addConst; reverse will sort the weighs in descending order
+    weight_dict = {k: v for k, v in sorted(weight_dict.items(), key=lambda item: item[1], reverse=True)}
+    for action, w in weight_dict.items():
+        weight_dict[action] = cudd_manager.addConst(int(w))
 
     task, domain, possible_obs, add_ts_curr_state, add_ts_next_state, add_ts_lbl_states  = create_symbolic_causal_graph(cudd_manager=cudd_manager,
-                                                                                                                    problem_pddl_file=problem_file_path,
-                                                                                                                    domain_pddl_file=domain_file_path,
-                                                                                                                    create_lbl_vars=True,
-                                                                                                                    max_valid_formula_size=1,
-                                                                                                                    draw_causal_graph=DRAW_EXPLICIT_CAUSAL_GRAPH,
-                                                                                                                    add_flag=True)
+                                                                                                                        problem_pddl_file=problem_file_path,
+                                                                                                                        domain_pddl_file=domain_file_path,
+                                                                                                                        create_lbl_vars=True,
+                                                                                                                        max_valid_formula_size=1,
+                                                                                                                        draw_causal_graph=DRAW_EXPLICIT_CAUSAL_GRAPH,
+                                                                                                                        add_flag=True)
     sym_tr = SymbolicWeightedTransitionSystem(curr_states=add_ts_curr_state,
                                               next_states=add_ts_next_state,
                                               lbl_states=add_ts_lbl_states,
                                               observations=possible_obs,
+                                              weight_dict=weight_dict,
                                               task=task,
                                               domain=domain,
                                               manager=cudd_manager)
 
-    ts_total_state = len(task.facts)
-    # All action have equal weight of 1 unit 
-    sym_tr.create_weighted_transition_system(verbose=False, plot=False, weight_list=[c_a, c_b, c_c, c_d])
+    sym_tr.create_weighted_transition_system(verbose=False, plot=False)
 
     sym_tr.create_state_obs_add(verbose=False, plot=False)
 
-    return  sym_tr, add_ts_curr_state, add_ts_next_state, add_ts_lbl_states, ts_total_state 
+    return  sym_tr, add_ts_curr_state, add_ts_next_state, add_ts_lbl_states
 
         
 
@@ -392,11 +392,22 @@ if __name__ == "__main__":
     
     # Build Transition with costs
     if QUANTITATIVE_SEARCH:
+        
+        # create a weight diction fro action defined in the domain file;
+        #  For grid world - moveLeft; moveRight; moveUp; moveDown
+        # NOTE: PyPerplan lowercases all the action names for some reason
+        wgt_dict = {
+        "moveleft"  : 1,
+        "moveright" : 2,
+        "moveup"    : 3,
+        "movedown"  : 4
+        }
+
         # All vars (TS, DFA and Predicate) are of type ADDs
-        sym_tr, ts_curr_state, ts_next_state, ts_lbl_states, ts_total_state = build_weighted_add_abstraction(cudd_manager=cudd_manager,
-                                                                                                             problem_file_path=problem_file_path,
-                                                                                                             domain_file_path=domain_file_path,
-                                                                                                             weight_list=[1, 1, 1, 1])
+        sym_tr, ts_curr_state, ts_next_state, ts_lbl_states = build_weighted_add_abstraction(cudd_manager=cudd_manager,
+                                                                                             problem_file_path=problem_file_path,
+                                                                                             domain_file_path=domain_file_path,
+                                                                                             weight_dict=wgt_dict)
         # The tuple contains the DFA handle, DFA curr and next vars in this specific order
         dfa_tr, dfa_curr_state, dfa_next_state = build_add_symbolic_dfa(formulas=formulas,
                                                                         sym_tr_handle=sym_tr,
@@ -405,9 +416,9 @@ if __name__ == "__main__":
                                                                         plot=False)
     # Build Transition with no costs
     else:
-        sym_tr, ts_curr_state, ts_next_state, ts_lbl_states, ts_total_state = build_bdd_abstraction(cudd_manager=cudd_manager,
-                                                                                                    problem_file_path=problem_file_path,
-                                                                                                    domain_file_path=domain_file_path)
+        sym_tr, ts_curr_state, ts_next_state, ts_lbl_states = build_bdd_abstraction(cudd_manager=cudd_manager,
+                                                                                    problem_file_path=problem_file_path,
+                                                                                    domain_file_path=domain_file_path)
 
         dfa_tr, dfa_curr_state, dfa_next_state = build_bdd_symbolic_dfa(formulas=formulas,
                                                                         sym_tr_handle=sym_tr,
@@ -447,7 +458,7 @@ if __name__ == "__main__":
                                               ts_obs_vars=ts_lbl_states,
                                               cudd_manager=cudd_manager)
 
-            # BFS for multiple will return multiple paths. One of them will be the shortest path. 
+            # call BFS for multiple formulas 
             action_dict: dict = graph_search.symbolic_bfs_nLTL(verbose=False)
 
         stop: float = time.time()
