@@ -312,7 +312,7 @@ class SymbolicDijkstraSearch(BaseSymbolicSearch):
 
         Use isConstant() and isNonConstant() to check if it is Constant ADD or not.
         """
-        warnings.warn("This code is still Work In Progress. It does not work for non-uniform weights and retrieving plans.")
+        warnings.warn("This code is still a Work In Progress. It does not work for non-uniform weights and retrieving plans.")
 
         self.manager.setBackground(self.manager.plusInfinity())
         adj_mat: ADD = self._construct_adj_mat(verbose=False)

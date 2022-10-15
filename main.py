@@ -15,7 +15,7 @@ from src.symbolic_graphs import SymbolicDFA, SymbolicAddDFA
 from src.symbolic_graphs import SymbolicTransitionSystem, SymbolicWeightedTransitionSystem
 
 from src.algorithms.blind_search import SymbolicSearch, MultipleFormulaBFS
-from src.algorithms.weighted_search import SymbolicDijkstraSearch, MultipleFormulaDijkstra
+from src.algorithms.weighted_search import SymbolicDijkstraSearch, MultipleFormulaDijkstra, SymbolicBDDAStar
 
 from src.simulate_strategy import create_gridworld, \
      convert_action_dict_to_gridworld_strategy, plot_policy, convert_action_dict_to_gridworld_strategy_nLTL
@@ -391,7 +391,7 @@ if __name__ == "__main__":
     cudd_manager = Cudd()
     
     # Build Transition with costs
-    if QUANTITATIVE_SEARCH:
+    if DIJKSTRAS or ASTAR:
         
         # create a weight diction fro action defined in the domain file;
         #  For grid world - moveLeft; moveRight; moveUp; moveDown
@@ -435,7 +435,7 @@ if __name__ == "__main__":
 
     if len(formulas) > 1:
         start: float = time.time()
-        if QUANTITATIVE_SEARCH:
+        if DIJKSTRAS:
             graph_search = MultipleFormulaDijkstra(ts_handle=sym_tr,
                                                    dfa_handles=dfa_tr,
                                                    ts_curr_vars=ts_curr_state,
@@ -447,6 +447,9 @@ if __name__ == "__main__":
 
             # call dijkstras for solving minimum cost path over nLTLs
             action_dict: dict = graph_search.composed_symbolic_dijkstra_nLTL(verbose=False)
+        
+        elif ASTAR:
+            raise NotImplementedError()
 
         else:
             graph_search = MultipleFormulaBFS(ts_handle=sym_tr,
@@ -466,7 +469,7 @@ if __name__ == "__main__":
 
     else:
         start: float = time.time()
-        if QUANTITATIVE_SEARCH:
+        if DIJKSTRAS:
             # shortest path graph search with Dijkstras
             graph_search =  SymbolicDijkstraSearch(ts_handle=sym_tr,
                                                    dfa_handle=dfa_tr[0],
@@ -479,6 +482,20 @@ if __name__ == "__main__":
 
             # action_dict = graph_search.ADD_composed_symbolic_dijkstra_wLTL(verbose=False)
             action_dict = graph_search.composed_symbolic_dijkstra_wLTL(verbose=False)
+        
+        elif ASTAR:
+            # shortest path graph search with Symbolic A*
+            graph_search =  SymbolicBDDAStar(ts_handle=sym_tr,
+                                             dfa_handle=dfa_tr[0],
+                                             ts_curr_vars=ts_curr_state,
+                                             ts_next_vars=ts_next_state,
+                                             dfa_curr_vars=dfa_curr_state,
+                                             dfa_next_vars=dfa_next_state,
+                                             ts_obs_vars=ts_lbl_states,
+                                             cudd_manager=cudd_manager)
+            
+            action_dict = graph_search.composed_symbolic_Astar_search(verbose=False)
+
 
         else:
 
@@ -502,7 +519,7 @@ if __name__ == "__main__":
         print("Time took for plannig: ", stop - start)
         
     if len(formulas) > 1:
-        if SIMULATE_STRATEGY and QUANTITATIVE_SEARCH:
+        if SIMULATE_STRATEGY and DIJKSTRAS:
             gridworld_strategy = convert_action_dict_to_gridworld_strategy_nLTL(ts_handle=sym_tr,
                                                                                 dfa_handles=dfa_tr,
                                                                                 action_map=action_dict,
@@ -516,6 +533,8 @@ if __name__ == "__main__":
 
             create_gridworld(size=GRID_WORLD_SIZE, strategy=gridworld_strategy, init_pos=(0, 0))
         
+        elif SIMULATE_STRATEGY and ASTAR:
+            raise NotImplementedError()
         
         elif SIMULATE_STRATEGY:
             # plot_policy(action_dict)
@@ -531,7 +550,7 @@ if __name__ == "__main__":
 
             create_gridworld(size=GRID_WORLD_SIZE, strategy=gridworld_strategy, init_pos=(0, 0))
     else:
-        if SIMULATE_STRATEGY and QUANTITATIVE_SEARCH:
+        if SIMULATE_STRATEGY and DIJKSTRAS:
             gridworld_strategy = convert_action_dict_to_gridworld_strategy(ts_handle=sym_tr,
                                                                            dfa_handle=dfa_tr[0],
                                                                            action_map=action_dict,
@@ -542,6 +561,9 @@ if __name__ == "__main__":
                                                                            dfa_curr_vars=dfa_curr_state,
                                                                            dfa_next_vars=dfa_next_state)
             create_gridworld(size=GRID_WORLD_SIZE, strategy=gridworld_strategy, init_pos=(0, 0))
+        
+        elif SIMULATE_STRATEGY and ASTAR:
+            raise NotImplementedError()
 
         elif SIMULATE_STRATEGY:
             gridworld_strategy = convert_action_dict_to_gridworld_strategy(ts_handle=sym_tr,
