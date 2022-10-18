@@ -1,11 +1,13 @@
+from multiprocessing import managers
 import re
 import sys
 
+from math import inf
 from functools import reduce
 from tabnanny import verbose
 
 from cudd import Cudd, BDD, ADD
-from typing import Union, List
+from typing import Union, List, Tuple
 from config import GRID_WORLD_SIZE
 
 from src.algorithms.base import BaseSymbolicSearch
@@ -63,7 +65,7 @@ class SymbolicBDDAStar(BaseSymbolicSearch):
 
         # compute all the valid states in the Transition System
         self.ts_states: ADD = self._compute_set_of_TS(sanity_check=True)
-        self.heur_add: ADD = self._compute_min_cost_to_goal(verbose=True)
+        self.heur_add, self.heur_max = self._compute_min_cost_to_goal(verbose=False)
     
 
     def _construct_composed_tr_function(self) -> List[ADD]:
@@ -114,7 +116,7 @@ class SymbolicBDDAStar(BaseSymbolicSearch):
         
         return _max
     
-    def _convert_vector_BDD_to_ADD(self, reach_list: List[ADD], verbose: bool = False) -> ADD:
+    def _convert_vector_BDD_to_ADD(self, reach_list: List[ADD], verbose: bool = False) -> Tuple[ADD, float]:
         """
         A function that compute the minimum distance to the accepting state in a product automaton given a vectors of ADDs. 
 
@@ -128,7 +130,7 @@ class SymbolicBDDAStar(BaseSymbolicSearch):
             # if the bucket has accepting states, assign them a h value of zero and add them to the closed ADD
             accp_states_og: ADD = bucket.restrict(self.target_DFA)
 
-            # if accetpgin states exists. . .
+            # if accepting states exists. . .
             if not accp_states_og.isZero():
                 # add the DFA accepting state
                 prod_accp_s: ADD = accp_states_og & self.target_DFA
@@ -148,22 +150,25 @@ class SymbolicBDDAStar(BaseSymbolicSearch):
             if not new_bucket.isZero():
                 # assign the current value to the state's h value and then add them to ADD
                 new_bucket_w = new_bucket.ite(self.manager.addConst(int(layer)), self.manager.plusInfinity())
-
-                
                 closed_add = closed_add.min(new_bucket_w)
+        
+        # compute the max heuristic 
+        est_cubes: List[tuple] =  list(filter(lambda x: x[1] != inf, list(closed_add.generate_cubes())))
+
+        # the [1] is for sorting and then only return the int value
+        heur_max: float = max(est_cubes, key=lambda est_cubes: est_cubes[1])[1]
         
         if verbose:
             for layer in reach_list.keys():
                 prod_states = closed_add.bddInterval(layer, layer).toADD()
                 if not prod_states.isZero():
-                    # convert to bdd and print out the prod state h value
                     print(f"*****************States with h value {layer}****************************")
                     self.get_prod_states_from_dd(dd_func=prod_states, obs_flag=False)
 
-        return closed_add
+        return closed_add, heur_max
     
 
-    def _compute_min_cost_to_goal(self, verbose: bool = False) -> ADD:
+    def _compute_min_cost_to_goal(self, verbose: bool = False) -> Tuple[ADD, int]:
         """
         Given a product Trasition Relation (TR) corresponding to one formula, compute the h value assocated with each
          product state (s, z) where s \in S belongs to the Treansition System and z \in Z belongs to the DFA for \phi_i where
@@ -258,9 +263,96 @@ class SymbolicBDDAStar(BaseSymbolicSearch):
         print(f"********************Took {g_layer} layers to reach a fixed point********************")
 
         # retain the minimum distance to goal
-        estimate_add: ADD = self._convert_vector_BDD_to_ADD(reach_list=open_list, verbose=verbose)
+        estimate_add, heur_max = self._convert_vector_BDD_to_ADD(reach_list=open_list, verbose=verbose)
             
-        return estimate_add
+        return estimate_add, int(heur_max)
+    
+
+    def __add_state_to_ind_buckets(self,
+                                   state_vals: ADD,
+                                   g_val: int, action_c: int,
+                                   f_max: int, open_list: dict,
+                                   accp_flag: bool = False) -> int:
+        """
+        A helper called by the _add_states_to_buckets() to identify the right bucket and add the states to it.  
+
+        If an accepting state BDD is passed then, manually override the associoated cube's state value to zero and add
+         it to its corresponding vucket
+        """
+
+        # assert that when the accpeting flag is True, the state_val dd only has accepting prod states in it.
+        if accp_flag:
+            assert state_vals.restrict(~self.target_DFA).isZero() is True, "Error Adding the accepting states to its respective bucket."
+
+        for cube, tmp_h_val in list(state_vals.generate_cubes()):
+            if not accp_flag:
+                inttmp_h_val = int(tmp_h_val)
+            else:
+                inttmp_h_val = 0
+
+            if g_val + action_c in open_list:
+                if inttmp_h_val in open_list[g_val + action_c]:
+                    open_list[g_val + action_c][inttmp_h_val] |= self.manager.fromLiteralList(cube).toADD()  # convert cube to 0-1 ADD
+                else:
+                    open_list[g_val + action_c].update({inttmp_h_val : self.manager.fromLiteralList(cube).toADD()})
+            else:
+                open_list[g_val + action_c] = {inttmp_h_val : self.manager.fromLiteralList(cube).toADD()}
+
+
+            # Update maximal f value
+            if g_val + action_c + inttmp_h_val > f_max:
+                f_max = g_val + action_c + inttmp_h_val
+        
+        return f_max
+    
+
+    def _add_states_to_bucket(self, prod_image: ADD, g_val: int, action_c: int, f_max: int, open_list: dict) -> int:
+        """
+        A helper function that s used to compute the state's h value and add it to the bucket.
+        """
+        # Note: ADD `&` operation implies product. Since Image return 0-1 ADD, the `&` projects the state and its corresponding h value
+        # get their corresponding h values 
+
+        # if accepting states exists
+        # state_vals = self.manager.addZero()
+        if not prod_image.restrict(self.target_DFA).isZero():
+            accp_states = prod_image.restrict(self.target_DFA)
+            accp_state_vals = accp_states & self.target_DFA
+            f_max = self.__add_state_to_ind_buckets(state_vals=accp_state_vals,
+                                                    g_val=g_val,
+                                                    action_c=action_c,
+                                                    f_max=f_max,
+                                                    open_list=open_list,
+                                                    accp_flag=True)
+            # state_vals |= (accp_states & self.target_DFA).ite(self.manager.addZero(), self.manager.plusInfinity())
+
+        state_vals = self.heur_add & prod_image
+        # state_vals: ADD = self.heur_add.restrict(prod_image_restricted)
+    
+        # Check all possible h values and Insert successors into correct bucket
+        if not state_vals.isZero():
+            f_max = self.__add_state_to_ind_buckets(state_vals=state_vals,
+                                                    g_val=g_val,
+                                                    action_c=action_c,
+                                                    f_max=f_max,
+                                                    open_list=open_list)
+        
+        # for cube, tmp_h_val in list(state_vals.generate_cubes()):
+        #     inttmp_h_val = int(tmp_h_val)
+        #     if g_val + action_c in open_list:
+        #         if inttmp_h_val in open_list[g_val + action_c]:
+        #             open_list[g_val + action_c][inttmp_h_val] |= self.manager.fromLiteralList(cube).toADD()  # convert cube to 0-1 ADD
+        #         else:
+        #             open_list[g_val + action_c].update({inttmp_h_val : self.manager.fromLiteralList(cube).toADD()})
+        #     else:
+        #         open_list[g_val + action_c] = {inttmp_h_val : self.manager.fromLiteralList(cube).toADD()}
+
+
+        #     # Update maximal f value
+        #     if g_val + action_c + inttmp_h_val > f_max:
+        #         f_max = g_val + action_c + inttmp_h_val
+        
+        return f_max
     
 
     def composed_symbolic_Astar_search(self, verbose: bool = False):
@@ -268,6 +360,144 @@ class SymbolicBDDAStar(BaseSymbolicSearch):
         A function that symbolic BDDA* algorithm by Prof. Stefan Edelkam and Peeter Kissmann in his Ph.D. dissertation thesis.
         """
 
-        raise NotImplementedError()
+        # A Map of Mapping
+        # 2d array where each element is a set of states with its corresponding g and h value
+        # first key is g value and second key is h value
+        open_list = {}
+        closed = {}
+
+        composed_init = self.init_TS & self.init_DFA
+
+        # Find f value for the initial state.
+        f_val: ADD = self.heur_add.restrict(composed_init)
+        assert f_val.isConstant() is True, "Error computing F value for the Initial prod state while initializing A* search algorithm"
+
+        # get the int value
+        intf_val: int = int(list(self.heur_add.restrict(composed_init).generate_cubes())[0][1])
+        
+        # # intially the g value is zero
+        # intg_val: int = 0
+
+        # Insert prod init state into the correct bucket
+        open_list[0] = {intf_val : composed_init}
+
+        # Maximal f value initially is the same as that of prod init state
+        # f_max = f_val
+        intf_max = intf_val
+        
+        # so far, no states have been expanded
+        # for inth_val in range(int(self.heur_max)):
+        while True:
+            # Stop when all states expanded 
+            if intf_val > intf_max:
+                print("********************No Plan Found********************")
+                return 
+            
+            # follow the f diagonal
+            if verbose:
+                print(f"********************Expanding States with f: {intf_val}********************\n")
+            for intg_val in range(intf_val + 1):
+                inth_val = intf_val - intg_val  # Determine the h value
+
+                # We cannot have h values greater than max estimated value
+                if inth_val > self.heur_max:
+                    continue
+                
+                # Remove all states already expanded with same h value
+                if open_list.get(intg_val, {}).get(inth_val) is None:
+                    continue 
+                open_list[intg_val][inth_val] = open_list[intg_val][inth_val] & ~closed.get(inth_val, self.manager.addZero())
+
+                # If current bucket not empty. . .
+                if not open_list[intg_val][inth_val].isZero():
+                    
+                    # if goal state found. . .
+                    if inth_val == 0 and (not open_list[intg_val][inth_val].restrict(self.target_DFA).isZero()):
+                        open_list[intg_val][inth_val] = open_list[intg_val][inth_val] & self.target_DFA
+                        print(f"********************Found a plan with least cost lenght {intg_val}, Now retireving it!********************")
+                        return
+                    
+                    # Add states to be expanded next to closed list
+                    if inth_val in closed:
+                        # if the bucket exists then take the union else initialize the bucket
+                        closed[inth_val] |= open_list[intg_val][inth_val]
+                    else:
+                        closed[inth_val] = open_list[intg_val][inth_val]
+                    
+                    if verbose:
+                        # self.get_prod_states_from_dd(dd_func=image_prod_add, obs_flag=False)
+                        print(f"********************Expanding States with g: {intg_val} h:{inth_val}********************")
+                        self.get_prod_states_from_dd(open_list[intg_val][inth_val], obs_flag=False)
+                        print("\n")
+
+                    # Calculate successors. . .
+                    for prod_tr_action in self.composed_tr_list:
+                        # first get the corresponding transition action cost (constant at the terminal node)
+                        action_cost: ADD = prod_tr_action.findMax()
+                        assert action_cost.isConstant() is True, "Error computing action cost during A* search algorithm"
+                        intaction_cost: int = int(list(action_cost.generate_cubes())[0][1])
+
+                        # compute the image of the TS states 
+                        image_prod_add: ADD = self.image_per_action(trans_action=prod_tr_action,
+                                                                    From=open_list[intg_val][inth_val],
+                                                                    xcube=self.prod_xcube,
+                                                                    x_list=self.prod_xlist,
+                                                                    y_list=self.prod_ylist)
+                        
+                        if image_prod_add.isZero():
+                            continue
+                        
+                        prod_image_restricted: ADD = image_prod_add.existAbstract(self.ts_obs_cube)
+
+                        # if verbose:
+                        #     # self.get_prod_states_from_dd(dd_func=image_prod_add, obs_flag=False)
+                        #     print(f"********************Expanding States with g: {intg_val} h:{inth_val}********************")
+                        #     self.get_prod_states_from_dd(open_list[intg_val][inth_val], obs_flag=False)
+
+                        intf_max = self._add_states_to_bucket(prod_image=prod_image_restricted,
+                                                              g_val=intg_val,
+                                                              action_c=intaction_cost,
+                                                              f_max=intf_max,
+                                                              open_list=open_list)
+                        
+                        # # Note: ADD `&` operation implies product. Since Image return 0-1 ADD, the `&` projects the state and its corresponding h value
+                        # # get their corresponding h values 
+
+                        # # if accepting states exists
+                        # state_vals = self.manager.addZero()
+                        # if not prod_image_restricted.restrict(self.target_DFA).isZero():
+                        #     accp_states = prod_image_restricted.restrict(self.target_DFA)
+                        #     state_vals |= (accp_states & self.target_DFA).ite(self.manager.addZero(), self.manager.plusInfinity())
+
+                        # state_vals |= self.heur_add & prod_image_restricted
+                        # # state_vals: ADD = self.heur_add.restrict(prod_image_restricted)
+                    
+                        # # Check all possible h values and Insert successors into correct bucket
+                        # for cube, tmp_h_val in list(state_vals.generate_cubes()):
+                        #     inttmp_h_val = int(tmp_h_val)
+                        #     if intg_val + intaction_cost in open_list:
+                        #         if inttmp_h_val in open_list[intg_val + intaction_cost]:
+                        #             open_list[intg_val + intaction_cost][inttmp_h_val] |= self.manager.fromLiteralList(cube).toADD()  # convert cube to 0-1 ADD
+                        #         else:
+                        #             open_list[intg_val + intaction_cost].update({inttmp_h_val : self.manager.fromLiteralList(cube).toADD()})
+                        #     else:
+                        #         open_list[intg_val + intaction_cost] = {inttmp_h_val : self.manager.fromLiteralList(cube).toADD()}
+
+
+                        #     # Update maximal f value
+                        #     if intg_val + intaction_cost + inttmp_h_val > intf_max:
+                        #         intf_max = intg_val + intaction_cost + inttmp_h_val
+
+            # Go over the next f diagonal 
+            intf_val += 1
+
+
+
+
+
+
+
+
+
 
 
