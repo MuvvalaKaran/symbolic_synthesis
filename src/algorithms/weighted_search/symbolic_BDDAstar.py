@@ -391,7 +391,7 @@ class SymbolicBDDAStar(BaseSymbolicSearch):
                     if inth_val == 0 and (not open_list[intg_val][inth_val].restrict(self.target_DFA).isZero()):
                         open_list[intg_val][inth_val] = open_list[intg_val][inth_val] & self.target_DFA
                         print(f"********************Found a plan with least cost lenght {intg_val}, Now retireving it!********************")
-                        return
+                        return self.retrieve_composed_symbolic_Astar( g_val=intg_val, freach_list=open_list, verbose=verbose)
                     
                     # Add states to be expanded next to closed list
                     if inth_val in closed:
@@ -437,6 +437,88 @@ class SymbolicBDDAStar(BaseSymbolicSearch):
                                                               open_list=open_list)
             # Go over the next f diagonal 
             intf_val += 1
+    
+
+    def retrieve_composed_symbolic_Astar(self,  g_val: int, freach_list: dict, verbose: bool = False):
+        """
+        A function to retrieve the policy from the A* algorithm. 
+        """
+
+        # Initial f diagonal has value g
+        f_max = g_val
+
+        # start with the final bucket
+        current_prod = freach_list[f_max][0]
+        composed_prod_state = self.init_TS & self.init_DFA
+
+        # Initialize empty plan
+        parent_plan = {}
+
+
+        while not composed_prod_state <= current_prod:
+            # Compute the predecessors using action prod_tr_action
+            breaker: bool = False 
+            for tr_num, prod_tr_action in enumerate(self.composed_tr_list):
+                pred_prod= self.pre_per_action(trans_action=prod_tr_action,
+                                               From=current_prod,
+                                               ycube=self.prod_ycube,
+                                               x_list=self.prod_xlist,
+                                               y_list=self.prod_ylist)
+                
+                if pred_prod.isZero():
+                    continue
+                
+                # first get the corresponding transition action cost (constant at the terminal node)
+                action_cost_cnst: ADD = prod_tr_action.findMax()
+                assert action_cost_cnst.isConstant() is True, "Error computing action cost during A* search algorithm"
+                intaction_cost: int = int(list(action_cost_cnst.generate_cubes())[0][1])
+
+                step = f_max - (g_val - intaction_cost)
+
+                if (g_val - intaction_cost) < 0 or (g_val - intaction_cost) not in freach_list:
+                    continue
+
+                # Search for instance containing pred
+                for h_val in range(step + 1):
+                    # If some predecessors are in bucket freach_list[g−c][h]. . . 
+                    if not (h_val in freach_list[g_val - intaction_cost]):
+                        continue
+
+                    if pred_prod & freach_list[g_val - intaction_cost][h_val] != self.manager.addZero():
+                        # Take those predecessors as current states
+                        tmp_current_prod = pred_prod & freach_list[g_val - intaction_cost][h_val]
+
+                        tmp_current_prod_res = (tmp_current_prod).existAbstract(self.ts_obs_cube)
+
+                        # Extend plan by found action
+                        self._append_dict_value_composed(parent_plan,
+                                                         key_prod=tmp_current_prod_res,
+                                                         action=self.tr_action_idx_map.inv[tr_num])
+                        
+                        current_prod = tmp_current_prod_res
+
+                        # Update cost for next iteration
+                        g_val = g_val - intaction_cost
+
+                        # Store value of new f diagonal 
+                        f_max = g_val + h_val
+                        breaker = True 
+                        break
+
+                # hacky way to break the composed TR for loop
+                if breaker:
+                    break
+            # if g_layer.isZero():
+            #     g_int = 0
+            # else:
+            #     g_int = int(re.findall(r'-?\d+', g_layer.__repr__())[0])
+            assert  g_val >= 0, "Error Retrieving a plan. FIX THIS!!"
+
+            if verbose:
+                print(f"********************Layer: {g_val}**************************")
+                self.get_prod_states_from_dd(dd_func=tmp_current_prod, obs_flag=False)
+            
+        return parent_plan 
 
 
 

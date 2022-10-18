@@ -493,7 +493,8 @@ if __name__ == "__main__":
                                              dfa_next_vars=dfa_next_state,
                                              ts_obs_vars=ts_lbl_states,
                                              cudd_manager=cudd_manager)
-            
+            # For A* we ignore heuristic computation time                                  
+            start: float = time.time()
             action_dict = graph_search.composed_symbolic_Astar_search(verbose=False)
 
 
@@ -550,7 +551,7 @@ if __name__ == "__main__":
 
             create_gridworld(size=GRID_WORLD_SIZE, strategy=gridworld_strategy, init_pos=(0, 0))
     else:
-        if SIMULATE_STRATEGY and DIJKSTRAS:
+        if SIMULATE_STRATEGY and (ASTAR or DIJKSTRAS):
             gridworld_strategy = convert_action_dict_to_gridworld_strategy(ts_handle=sym_tr,
                                                                            dfa_handle=dfa_tr[0],
                                                                            action_map=action_dict,
@@ -561,9 +562,6 @@ if __name__ == "__main__":
                                                                            dfa_curr_vars=dfa_curr_state,
                                                                            dfa_next_vars=dfa_next_state)
             create_gridworld(size=GRID_WORLD_SIZE, strategy=gridworld_strategy, init_pos=(0, 0))
-        
-        elif SIMULATE_STRATEGY and ASTAR:
-            raise NotImplementedError()
 
         elif SIMULATE_STRATEGY:
             gridworld_strategy = convert_action_dict_to_gridworld_strategy(ts_handle=sym_tr,

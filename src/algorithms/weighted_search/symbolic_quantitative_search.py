@@ -211,7 +211,7 @@ class SymbolicDijkstraSearch(BaseSymbolicSearch):
         parent_plan = {}
 
         while not composed_prod_state <= freach_list[g_int]:
-            # new_current_prod = self.manager.addZero()
+
             for tr_num, prod_tr_action in enumerate(self.composed_tr_list):
                 pred_prod= self.pre_per_action(trans_action=prod_tr_action,
                                                From=current_prod,
@@ -243,13 +243,10 @@ class SymbolicDijkstraSearch(BaseSymbolicSearch):
                                                      key_prod=tmp_current_prod_res,
                                                      action=self.tr_action_idx_map.inv[tr_num])
                     
-                    # new_current_prod |= tmp_current_prod_res 
                     current_prod = tmp_current_prod_res 
 
                     g_layer = step
                     break
-            
-            # current_prod = new_current_prod
 
             if g_layer.isZero():
                 g_int = 0
