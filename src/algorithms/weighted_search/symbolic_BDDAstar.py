@@ -27,7 +27,8 @@ class SymbolicBDDAStar(BaseSymbolicSearch):
                  ts_obs_vars: List[ADD],
                  cudd_manager: Cudd,
                  verbose: bool = False,
-                 ts_sanity_check: bool = True):
+                 ts_sanity_check: bool = True,
+                 print_h_vals: bool = False):
         super().__init__(ts_obs_vars, cudd_manager)
         self.init_TS = ts_handle.sym_add_init_states
         self.target_DFA = dfa_handle.sym_goal_state
@@ -67,7 +68,7 @@ class SymbolicBDDAStar(BaseSymbolicSearch):
 
         # compute all the valid states in the Transition System
         self.ts_states: ADD = self._compute_set_of_TS(sanity_check=ts_sanity_check)
-        self.heur_add, self.heur_max = self._compute_min_cost_to_goal(verbose=verbose)
+        self.heur_add, self.heur_max = self._compute_min_cost_to_goal(verbose=verbose, print_h_vals=print_h_vals)
     
 
     def _construct_composed_tr_function(self) -> List[ADD]:
@@ -169,7 +170,7 @@ class SymbolicBDDAStar(BaseSymbolicSearch):
         return closed_add, heur_max
     
 
-    def _compute_min_cost_to_goal(self, verbose: bool = False) -> Tuple[ADD, int]:
+    def _compute_min_cost_to_goal(self, verbose: bool = False,  print_h_vals: bool = False) -> Tuple[ADD, int]:
         """
         Given a product Trasition Relation (TR) corresponding to one formula, compute the h value assocated with each
          product state (s, z) where s \in S belongs to the Treansition System and z \in Z belongs to the DFA for \phi_i where
@@ -263,7 +264,7 @@ class SymbolicBDDAStar(BaseSymbolicSearch):
         print(f"********************Took {g_layer} layers to reach a fixed point********************")
 
         # retain the minimum distance to goal
-        estimate_add, heur_max = self._convert_vector_BDD_to_ADD(reach_list=open_list, verbose=verbose)
+        estimate_add, heur_max = self._convert_vector_BDD_to_ADD(reach_list=open_list, verbose=print_h_vals)
             
         return estimate_add, int(heur_max)
     
