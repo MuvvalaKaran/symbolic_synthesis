@@ -15,7 +15,8 @@ from src.symbolic_graphs import SymbolicDFA, SymbolicAddDFA
 from src.symbolic_graphs import SymbolicTransitionSystem, SymbolicWeightedTransitionSystem
 
 from src.algorithms.blind_search import SymbolicSearch, MultipleFormulaBFS
-from src.algorithms.weighted_search import SymbolicDijkstraSearch, MultipleFormulaDijkstra, SymbolicBDDAStar
+from src.algorithms.weighted_search import SymbolicDijkstraSearch, MultipleFormulaDijkstra
+from src.algorithms.weighted_search import SymbolicBDDAStar, MultipleFormulaBDDAstar
 
 from src.simulate_strategy import create_gridworld, \
      convert_action_dict_to_gridworld_strategy, plot_policy, convert_action_dict_to_gridworld_strategy_nLTL
@@ -31,17 +32,17 @@ from config import *
 
 def set_variable_reordering(manager: Cudd, make_tree_node: bool = False, verbose: bool = False, **kwargs):
     """
-    This function is called if variable reordering is set to true.
+    This function is called when DYNAMIC_VAR_ORDERING is True.
 
     Different ways to speed up the process
-    1. AutodynaEnable() - Enable Dyanmic vairable reordering
+    1. AutodynaEnable() - Enable Dyanmic variable reordering
     2. ReorderingStatus() - Return the current reordering status and default method
-    3. EnablingOrderingMonitoring() - Enable monitoring of a variaable order 
+    3. EnablingOrderingMonitoring() - Enable monitoring of a variable order 
     4. maxReorderings() - Read and set maximum number of variable reorderings 
     5. EnablereorderingReport() - Enable reporting of variable reordering
 
-    MakeTreeNode() - allows us to specify constraints over groups of variables. For example, we can that x, x'
-    need to always be contiguous. Thus the relative ordering within the group is left unchanged. 
+    MakeTreeNode() - Allows us to specify constraints over groups of variables. For example, we can constrain x, x'
+     to always be contiguous. Thus, the relative ordering within the group is left unchanged. 
 
     MTR takes in two args -
      low: 
@@ -77,7 +78,7 @@ def create_symbolic_lbl_vars(lbls,
                              valid_dfa_edge_symbol_size: int = 1,
                              add_flag: bool = False):
     """
-    This function create boolean vairables used to create observation labels for each state. Note that in this method we do create
+    This function creates Boolean vairables used to create observation labels for each state. Note that in this method we do create
     prime variables as they do not switch their values.
 
     The number of variable you needs to represent the state observation depends on two factors.
@@ -449,7 +450,16 @@ if __name__ == "__main__":
             action_dict: dict = graph_search.composed_symbolic_dijkstra_nLTL(verbose=False)
         
         elif ASTAR:
-            raise NotImplementedError()
+            graph_search =  MultipleFormulaBDDAstar(ts_handle=sym_tr,
+                                                    dfa_handles=dfa_tr,
+                                                    ts_curr_vars=ts_curr_state,
+                                                    ts_next_vars=ts_next_state,
+                                                    dfa_curr_vars=dfa_curr_state,
+                                                    dfa_next_vars=dfa_next_state,
+                                                    ts_obs_vars=ts_lbl_states,
+                                                    cudd_manager=cudd_manager)
+
+            graph_search.composed_symbolic_Astar_search_nLTL(verbose=False)
 
         else:
             graph_search = MultipleFormulaBFS(ts_handle=sym_tr,
@@ -514,7 +524,6 @@ if __name__ == "__main__":
             # current TS state x Obs associated with this state x State of the Automation to Next State in TS and next state in the DFA Automaton
             # TR : S_ts x Obs_bdd x S_dfa x S'_ts x S'_dfa
             action_dict = graph_search.composed_symbolic_bfs_wLTL(verbose=False)
-
 
         stop: float = time.time()
         print("Time took for plannig: ", stop - start)

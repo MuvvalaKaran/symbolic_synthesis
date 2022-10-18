@@ -6,15 +6,22 @@ from typing import Union, List
 
 
 from cudd import Cudd, BDD, ADD
-from numpy import deprecate
+from utls import deprecated
 from yaml import warnings
+
 
 from src.algorithms.base import BaseSymbolicSearch
 from src.symbolic_graphs import SymbolicAddDFA, SymbolicWeightedTransitionSystem
 
 
 class SymbolicDijkstraSearch(BaseSymbolicSearch):
+    """
+    Given a Transition systenm, and a DFA associated with one Formula, this class computes the minimum cost path
+    by searching over the composed graph using the Symbolic Dijkstras algorithm.
 
+    Algorithm from Peter Kissmann's PhD thesis - Symbolic Search in Planning and General Game Playing.
+     Link - https://media.suub.uni-bremen.de/handle/elib/405
+    """
     def __init__(self,
                  ts_handle: SymbolicWeightedTransitionSystem,
                  dfa_handle: SymbolicAddDFA,
@@ -52,7 +59,7 @@ class SymbolicDijkstraSearch(BaseSymbolicSearch):
         self.dfa_xcube = reduce(lambda x, y: x & y, self.dfa_x_list)
         self.dfa_ycube = reduce(lambda x, y: x & y, self.dfa_y_list)
 
-        # composed graph consists of state S, Z and hence are function TS and DFA vars
+        # composed graph consists of state S, Z and hence are function of TS and DFA vars
         self.prod_xlist = self.ts_x_list + self.dfa_x_list
         self.prod_ylist = self.ts_y_list + self.dfa_y_list
         self.prod_xcube = reduce(lambda x, y: x & y, self.prod_xlist)
@@ -233,7 +240,7 @@ class SymbolicDijkstraSearch(BaseSymbolicSearch):
                     if step_val < 0:
                         continue
 
-                if pred_prod & freach_list[step_val] != self.manager.addZero():
+                if pred_prod & freach_list.get(step_val, self.manager.addZero()) != self.manager.addZero():
                     # store the predecessor per action
                     tmp_current_prod = pred_prod & freach_list[step_val]
 
@@ -358,7 +365,7 @@ class SymbolicDijkstraSearch(BaseSymbolicSearch):
             open_add: ADD = nxt
             layer += 1
     
-    @deprecate
+    @deprecated
     def retrieve_ADD_composed_symbolic_dijkstra_wLTL(self, freach: ADD, maxd: int, verbose: bool = False):
         """
         Backward search algorithm to retreive the action to be taken at each step

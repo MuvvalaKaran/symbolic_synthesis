@@ -12,7 +12,10 @@ from src.algorithms.base import BaseSymbolicSearch
 class MultipleFormulaDijkstra(BaseSymbolicSearch):
     """
     Given a Transition systenm, and n DFAs associated with different Formulas, this class computes the minimum cost path
-    by searcgin over the composed graph
+    by searching over the composed graph using the Symbolic Dijkstras algorithm.
+
+    Algorithm inspired from Peter Kissmann's PhD thesis - Symbolic Search in Planning and General Game Playing.
+     Link - https://media.suub.uni-bremen.de/handle/elib/405
     """
     def __init__(self,
                  ts_handle: SymbolicWeightedTransitionSystem,
@@ -73,9 +76,9 @@ class MultipleFormulaDijkstra(BaseSymbolicSearch):
 
     def _construct_composed_tr_function(self) -> List[ADD]:
         """
-        A function that construct that conjoints the TR function of the TS and DFA along with S2P (state to obs BDD).
+        A function that construct that conjoints the TR function of the TS and DFA along with S2P (state to obs ADD).
 
-        Note: We prime the S2P BDD because we want to extract the next state in the DFA after we evolve over the TS.
+        Note: We prime the S2P ADD because we want to extract the next state in the DFA after we evolve over the TS.
         """
 
         obs_bdd_prime = self.obs_add.swapVariables(self.ts_x_list, self.ts_y_list) 
@@ -118,13 +121,6 @@ class MultipleFormulaDijkstra(BaseSymbolicSearch):
         This function implements a Dijkstra's algorithm as outlined in Peter Kissmann Ph.D. Thesis. 
 
         We implement bucket based approach to expand and store the search frontier.
-
-        Todo: Write code to check if all the edge weights are same or not:
-        if yes, check if they are all equal to one: then just call multiple_formula_bfs() as that code uses BDD
-         which are inherently faster
-            else: TODO: We need to write code in which we do not loop over each TR individually, but as a whole. 
-        else:
-            we run the current implementation we have. 
         """
         # compute cubes of each DFA, used only for looking up DFA state in the monolithic DFATR
         dfa_xcube_list = self._create_dfa_cubes()
@@ -234,7 +230,7 @@ class MultipleFormulaDijkstra(BaseSymbolicSearch):
         parent_plan = {}
 
         while not composed_prod_state <= freach_list[g_int]:
-            new_current_prod = self.manager.addZero()
+            # new_current_prod = self.manager.addZero()
             for tr_num, prod_tr_action in enumerate(self.composed_tr_list):
                 pred_prod= self.pre_per_action(trans_action=prod_tr_action,
                                                From=current_prod,
@@ -256,24 +252,25 @@ class MultipleFormulaDijkstra(BaseSymbolicSearch):
                     if step_val < 0:
                         continue
                     
-                if pred_prod & freach_list[step_val] != self.manager.addZero():
+                if pred_prod & freach_list.get(step_val, self.manager.addZero()) != self.manager.addZero():
                     # store the predecessor per action
                     tmp_current_prod = pred_prod & freach_list[step_val]
                     
                     if verbose:
                         self.get_prod_states_from_dd(dd_func=tmp_current_prod, obs_flag=False, dfa_xcube_list=dfa_xcube_list)
                     
-                    tmp_current_prod_res = (pred_prod & freach_list[step_val]).existAbstract(self.ts_obs_cube)
+                    tmp_current_prod_res = tmp_current_prod.existAbstract(self.ts_obs_cube)
                     
                     self._append_dict_value_composed(parent_plan,
                                                      key_prod=tmp_current_prod_res,
                                                      action=self.tr_action_idx_map.inv[tr_num])
                     
-                    new_current_prod |= tmp_current_prod_res
+                    current_prod = tmp_current_prod_res 
 
                     g_layer = step 
-            
-            current_prod = new_current_prod
+                    break
+
+            # current_prod = new_current_prod
 
             if g_layer.isZero():
                 g_int = 0

@@ -25,7 +25,9 @@ class SymbolicBDDAStar(BaseSymbolicSearch):
                  dfa_curr_vars: List[ADD],
                  dfa_next_vars: List[ADD],
                  ts_obs_vars: List[ADD],
-                 cudd_manager: Cudd):
+                 cudd_manager: Cudd,
+                 verbose: bool = False,
+                 ts_sanity_check: bool = True):
         super().__init__(ts_obs_vars, cudd_manager)
         self.init_TS = ts_handle.sym_add_init_states
         self.target_DFA = dfa_handle.sym_goal_state
@@ -64,8 +66,8 @@ class SymbolicBDDAStar(BaseSymbolicSearch):
         self.composed_tr_list = self._construct_composed_tr_function()
 
         # compute all the valid states in the Transition System
-        self.ts_states: ADD = self._compute_set_of_TS(sanity_check=True)
-        self.heur_add, self.heur_max = self._compute_min_cost_to_goal(verbose=False)
+        self.ts_states: ADD = self._compute_set_of_TS(sanity_check=ts_sanity_check)
+        self.heur_add, self.heur_max = self._compute_min_cost_to_goal(verbose=verbose)
     
 
     def _construct_composed_tr_function(self) -> List[ADD]:
@@ -90,7 +92,6 @@ class SymbolicBDDAStar(BaseSymbolicSearch):
         """
         ts_states: BDD = self.manager.bddZero()
         for tr_ac in self.ts_transition_fun_list:
-            # ts_states |= tr_ac.existAbstract(self.ts_ycube.bddPattern()).bddPattern() 
             ts_states |= tr_ac.bddPattern().existAbstract(self.ts_ycube.bddPattern())
 
         ts_x_list_bdd = [var.bddPattern() for var in self.ts_x_list]
@@ -198,9 +199,8 @@ class SymbolicBDDAStar(BaseSymbolicSearch):
         if verbose:
             self.get_prod_states_from_dd(dd_func=composed_prod_state, obs_flag=False)
 
-        # while not composed_prod_state <= freach_list[g_int]:
+
         while not open_list[g_layer].isZero():
-            # new_current_prod = self.manager.addZero()
             # remove all states that have been explored
             open_list[g_layer] = open_list[g_layer] & ~closed
 
@@ -443,7 +443,6 @@ class SymbolicBDDAStar(BaseSymbolicSearch):
         """
         A function to retrieve the policy from the A* algorithm. 
         """
-
         # Initial f diagonal has value g
         f_max = g_val
 
@@ -453,7 +452,6 @@ class SymbolicBDDAStar(BaseSymbolicSearch):
 
         # Initialize empty plan
         parent_plan = {}
-
 
         while not composed_prod_state <= current_prod:
             # Compute the predecessors using action prod_tr_action
@@ -508,11 +506,8 @@ class SymbolicBDDAStar(BaseSymbolicSearch):
                 # hacky way to break the composed TR for loop
                 if breaker:
                     break
-            # if g_layer.isZero():
-            #     g_int = 0
-            # else:
-            #     g_int = int(re.findall(r'-?\d+', g_layer.__repr__())[0])
-            assert  g_val >= 0, "Error Retrieving a plan. FIX THIS!!"
+          
+            assert  g_val >= 0, "Error Retrieving A* plan. FIX THIS!!"
 
             if verbose:
                 print(f"********************Layer: {g_val}**************************")
