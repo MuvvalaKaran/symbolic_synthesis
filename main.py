@@ -458,8 +458,9 @@ if __name__ == "__main__":
                                                     dfa_next_vars=dfa_next_state,
                                                     ts_obs_vars=ts_lbl_states,
                                                     cudd_manager=cudd_manager)
-
-            graph_search.composed_symbolic_Astar_search_nLTL(verbose=False)
+            # For A* we ignore heuristic computation time                                  
+            start: float = time.time()
+            action_dict = graph_search.composed_symbolic_Astar_search_nLTL(verbose=False)
 
         else:
             graph_search = MultipleFormulaBFS(ts_handle=sym_tr,
@@ -529,7 +530,7 @@ if __name__ == "__main__":
         print("Time took for plannig: ", stop - start)
         
     if len(formulas) > 1:
-        if SIMULATE_STRATEGY and DIJKSTRAS:
+        if SIMULATE_STRATEGY and (DIJKSTRAS or ASTAR):
             gridworld_strategy = convert_action_dict_to_gridworld_strategy_nLTL(ts_handle=sym_tr,
                                                                                 dfa_handles=dfa_tr,
                                                                                 action_map=action_dict,
@@ -542,9 +543,6 @@ if __name__ == "__main__":
 
 
             create_gridworld(size=GRID_WORLD_SIZE, strategy=gridworld_strategy, init_pos=(0, 0))
-        
-        elif SIMULATE_STRATEGY and ASTAR:
-            raise NotImplementedError()
         
         elif SIMULATE_STRATEGY:
             # plot_policy(action_dict)

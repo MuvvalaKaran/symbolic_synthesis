@@ -440,7 +440,7 @@ class SymbolicBDDAStar(BaseSymbolicSearch):
             intf_val += 1
     
 
-    def retrieve_composed_symbolic_Astar(self,  g_val: int, freach_list: dict, verbose: bool = False):
+    def retrieve_composed_symbolic_Astar(self,  g_val: int, freach_list: dict, verbose: bool = False) -> dict:
         """
         A function to retrieve the policy from the A* algorithm. 
         """

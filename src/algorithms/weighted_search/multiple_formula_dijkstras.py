@@ -106,8 +106,8 @@ class MultipleFormulaDijkstra(BaseSymbolicSearch):
 
     def _create_dfa_cubes(self):
         """
-        A helper function that create cubses of each DFA and store in a list in the same order as the DFA handles. These cubes are used when 
-        conver a BDD to DFA state where we need to extract each DFA state.
+        A helper function that create cubses of each DFA and store them in a list in the same order as the DFA handles. These cubes are used
+         when we convert a BDD to DFA state where we need to extract each DFA state.
         """
         dfa_xcube_list = [] 
         for handle in self.dfa_handle_list:
@@ -118,7 +118,7 @@ class MultipleFormulaDijkstra(BaseSymbolicSearch):
 
     def composed_symbolic_dijkstra_nLTL(self, verbose: bool = False) -> dict:
         """
-        This function implements a Dijkstra's algorithm as outlined in Peter Kissmann Ph.D. Thesis. 
+        This function implements a Dijkstra's algorithm for nLTL formulas. 
 
         We implement bucket based approach to expand and store the search frontier.
         """

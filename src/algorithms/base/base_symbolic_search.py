@@ -5,6 +5,8 @@ from typing import Union, List, Optional
 from cudd import Cudd, BDD, ADD
 from itertools import product
 
+from utls import deprecated
+
 
 class BaseSymbolicSearch(object):
 
@@ -15,7 +17,7 @@ class BaseSymbolicSearch(object):
         self.manager = cudd_manager
         
     
-
+    @deprecated
     def pre(self, From, ycube, x_list: list, y_list: list, transition_fun) -> BDD:
         """
         Compute the predecessors of 'From'.
@@ -39,6 +41,7 @@ class BaseSymbolicSearch(object):
             return trans_action.andAbstract(fromY, ycube)
     
 
+    @deprecated
     def image(self, From, xcube, x_list: list, y_list: list, transition_fun) -> Union[BDD, ADD]:
         """
         Compute the set of possible state reachable from 'From' state.

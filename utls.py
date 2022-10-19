@@ -9,6 +9,7 @@ from src.explicit_graphs import CausalGraph
 from src.explicit_graphs import TwoPlayerGame
 from src.explicit_graphs import FiniteTransitionSystem
 
+
 def get_graph(domain_file: str,
               problem_file: str,
               formulas: List[str] = '',
