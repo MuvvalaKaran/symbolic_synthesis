@@ -7,3 +7,6 @@
 [submodule "src/gridworld_visualizer"]
 	path = src/gridworld_visualizer
 	url = git@github.com:MuvvalaKaran/gridworld_visualizer.git
+[submodule "src/LTLf2DFA"]
+	path = src/LTLf2DFA
+	url = https://github.com/whitemech/LTLf2DFA.git
