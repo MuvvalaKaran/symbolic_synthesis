@@ -17,6 +17,7 @@ from src.symbolic_graphs import SymbolicTransitionSystem, SymbolicWeightedTransi
 from src.algorithms.blind_search import SymbolicSearch, MultipleFormulaBFS
 from src.algorithms.weighted_search import SymbolicDijkstraSearch, MultipleFormulaDijkstra
 from src.algorithms.weighted_search import SymbolicBDDAStar, MultipleFormulaBDDAstar
+from src.algorithms.weighted_search import PreferenceBDDAstar
 
 from src.simulate_strategy import create_gridworld, \
      convert_action_dict_to_gridworld_strategy, plot_policy, convert_action_dict_to_gridworld_strategy_nLTL
@@ -392,7 +393,7 @@ if __name__ == "__main__":
     cudd_manager = Cudd()
     
     # Build Transition with costs
-    if DIJKSTRAS or ASTAR:
+    if DIJKSTRAS or ASTAR or PREFERENCE_ASTAR:
         
         # create a weight diction fro action defined in the domain file;
         #  For grid world - moveLeft; moveRight; moveUp; moveDown
@@ -461,6 +462,19 @@ if __name__ == "__main__":
             # For A* we ignore heuristic computation time                                  
             start: float = time.time()
             action_dict = graph_search.composed_symbolic_Astar_search_nLTL(verbose=False)
+            
+        
+        elif PREFERENCE_ASTAR:
+            graph_search = PreferenceBDDAstar(ts_handle=sym_tr,
+                                               dfa_handles=dfa_tr,
+                                               ts_curr_vars=ts_curr_state,
+                                               ts_next_vars=ts_next_state,
+                                               dfa_curr_vars=dfa_curr_state,
+                                               dfa_next_vars=dfa_next_state,
+                                               ts_obs_vars=ts_lbl_states,
+                                               cudd_manager=cudd_manager)
+            graph_search.preference_based_symbolic_Astar_search(mu_max=0, verbose=False)
+
 
         else:
             graph_search = MultipleFormulaBFS(ts_handle=sym_tr,

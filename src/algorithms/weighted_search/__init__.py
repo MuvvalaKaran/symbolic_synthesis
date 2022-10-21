@@ -2,3 +2,4 @@ from .symbolic_quantitative_search import SymbolicDijkstraSearch
 from .multiple_formula_dijkstras import MultipleFormulaDijkstra
 from .symbolic_BDDAstar import SymbolicBDDAStar
 from .multiple_formula_BDDAstar import MultipleFormulaBDDAstar
+from .preference_BDDAstar import PreferenceBDDAstar

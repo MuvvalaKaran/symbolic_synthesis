@@ -1,6 +1,7 @@
 import re
 import sys
 
+from copy import deepcopy
 from math import inf
 from functools import reduce
 from typing import List, Union, Tuple
@@ -12,13 +13,11 @@ from src.algorithms.weighted_search.symbolic_BDDAstar import SymbolicBDDAStar
 from src.symbolic_graphs import SymbolicMultipleDFA, SymbolicWeightedTransitionSystem
 
 
-class MultipleFormulaBDDAstar(BaseSymbolicSearch):
+class PreferenceBDDAstar(BaseSymbolicSearch):
     """
     Given a Transition systenm, and n DFAs associated with different Formulas, this class computes the minimum cost path
-    by searching over the composed graph using the BDDA* algorithm.
+     that  also satisfies user's preference accordingly to Peter algorithm from ICRA23 paper using the BDDA* algorithm.
 
-    Algorithm inspired from Peter Kissmann's PhD thesis on - Symbolic Search in Planning and General Game Playing.
-     Link - https://media.suub.uni-bremen.de/handle/elib/405
     """
 
     def __init__(self,
@@ -86,7 +85,7 @@ class MultipleFormulaBDDAstar(BaseSymbolicSearch):
         # compute indv. product state h values
         self.estimate_list, self.estimate_max = self._compute_heurstic_functions(verbose=verbose, print_h_vals=print_h_vals)
 
-    
+
     def _create_dfa_cubes(self):
         """
         A helper function that create cubses of each DFA and store them in a list in the same order as the DFA handles. These cubes are used
@@ -187,7 +186,6 @@ class MultipleFormulaBDDAstar(BaseSymbolicSearch):
                 print(f"*****************States with h value {layer}****************************")
                 self.get_prod_states_from_dd(dd_func=prod_states, obs_flag=False, dfa_xcube_list=self.dfa_xcube_list)
 
-    
 
     def _get_state_estimate(self, dd_func: ADD, verbose: bool = False) -> ADD:
         """
@@ -215,11 +213,81 @@ class MultipleFormulaBDDAstar(BaseSymbolicSearch):
         return state_vals
     
 
-    def __add_state_to_ind_buckets(self,
-                                   state_vals: ADD,
-                                   g_val: int, action_c: int,
-                                   f_max: int, open_list: dict,
-                                   accp_flag: bool = False) -> int:
+    def _compute_preference_value(curr_pcv_vec: Tuple[int], accp_idx: List[int], mu_max: int) -> Tuple[int]:
+        """
+        A helper function that compute the new PCV vector associated with each state, sort it and check if it below the 
+        """
+
+
+    # def __preference_function(self,
+    #                           mu_max: int,
+    #                           state_vals: ADD,
+    #                           g_val: int, action_c: int,
+    #                           f_max: int, open_list: dict,
+    #                           pcv_open: dict, curr_pcv_vec: Tuple[int]) -> int:
+    #     """
+    #     A function that compute the preference cost vector for each state in the ADD,
+    #      then compute the preference value and either prune or it keep it. 
+    #     """
+    #     def __indices(lst, item):
+    #         return [i for i, x in enumerate(lst) if x == item]
+
+    #     # create the pcv vector 
+    #     max_val = max(curr_pcv_vec)
+    #     # get the index associated with those max elements
+    #     idxs = __indices(curr_pcv_vec, max_val)
+
+    #     for literal_list, tmp_h_val in list(state_vals.generate_cubes()):
+    #         cube = self.manager.fromLiteralList(literal_list).toADD()  # convert cube to 0-1 ADD
+    #         # if there exists no accepting state in the product state
+    #         preference_accp_flag: bool = False
+    #         accp_idx_list = []
+    #         for accp_idx, target_dfa in enumerate(self.target_DFA_list):
+    #             if not cube.restrict(target_dfa).isZero():
+    #                 # there exisits atleast one accepting state
+    #                 preference_accp_flag = True
+
+    #                 # keep track of their indices.
+    #                 accp_idx_list.append(accp_idx)
+            
+                
+    #         if preference_accp_flag is False:    
+    #             inttmp_h_val = 0
+    #             pcv_open[cube.__hash__()] = (0, 0)
+    #         else:
+    #             for accp_pcv_idx in accp_idx_list:
+    #                 new_pcv_idx = deepcopy(curr_pcv_vec)
+    #                 if 
+    #                 new_pcv_idx[accp_pcv_idx] = g_val
+                
+
+    #             inttmp_h_val = int(tmp_h_val)
+    #         if g_val + action_c in open_list:
+    #             if inttmp_h_val in open_list[g_val + action_c]:
+    #                 open_list[g_val + action_c][inttmp_h_val] |= cube
+    #             else:
+    #                 open_list[g_val + action_c].update({inttmp_h_val : cube})
+    #         else:
+    #             open_list[g_val + action_c] = {inttmp_h_val : cube}
+
+
+    #         # Update maximal f value
+    #         if g_val + action_c + inttmp_h_val > f_max:
+    #             f_max = g_val + action_c + inttmp_h_val
+
+    #     return f_max
+
+            
+
+    
+
+
+    def __preference_add_state_to_ind_buckets(self,
+                                              state_vals: ADD,
+                                              g_val: int, action_c: int,
+                                              f_max: int, open_list: dict,
+                                              pcv_open: dict, pref_accp_flag: bool = False, 
+                                              accp_flag: bool = False) -> int:
         """
         A helper called by the _add_states_to_buckets() to identify the right bucket and add the states to it.  
 
@@ -231,7 +299,13 @@ class MultipleFormulaBDDAstar(BaseSymbolicSearch):
         if accp_flag:
             assert state_vals.restrict(~self.monolithic_dfa_target).isZero() is True, "Error Adding the accepting states to its respective bucket."
 
-        for cube, tmp_h_val in list(state_vals.generate_cubes()):
+        for literal_list, tmp_h_val in list(state_vals.generate_cubes()):
+            cube = self.manager.fromLiteralList(literal_list).toADD()  # convert cube to 0-1 ADD
+            #  if there exists no accepting state in the state
+            if pref_accp_flag is False: # all cubes have (0, 0) pcv value
+                # if cube.__hash__() in pcv_open.keys():
+                pcv_open[cube.__hash__()] = (0, 0)
+
             if not accp_flag:
                 inttmp_h_val = int(tmp_h_val)
             else:
@@ -239,11 +313,11 @@ class MultipleFormulaBDDAstar(BaseSymbolicSearch):
 
             if g_val + action_c in open_list:
                 if inttmp_h_val in open_list[g_val + action_c]:
-                    open_list[g_val + action_c][inttmp_h_val] |= self.manager.fromLiteralList(cube).toADD()  # convert cube to 0-1 ADD
+                    open_list[g_val + action_c][inttmp_h_val] |= cube
                 else:
-                    open_list[g_val + action_c].update({inttmp_h_val : self.manager.fromLiteralList(cube).toADD()})
+                    open_list[g_val + action_c].update({inttmp_h_val : cube})
             else:
-                open_list[g_val + action_c] = {inttmp_h_val : self.manager.fromLiteralList(cube).toADD()}
+                open_list[g_val + action_c] = {inttmp_h_val : cube}
 
 
             # Update maximal f value
@@ -253,45 +327,75 @@ class MultipleFormulaBDDAstar(BaseSymbolicSearch):
         return f_max
     
 
-    def _add_states_to_bucket(self, prod_image: ADD, g_val: int, action_c: int, f_max: int, open_list: dict) -> int:
+    def _preference_add_states_to_bucket(self,
+                                         prod_image: ADD,
+                                         g_val: int, action_c: int,
+                                         f_max: int, open_list: dict,
+                                         pcv_open: dict) -> int:
         """
         A helper function that s used to compute the state's h value and add it to the bucket.
         """
         # Note: ADD `&` operation implies product. Since Image return 0-1 ADD, the `&` projects the state and its corresponding h value
         # get their corresponding h values 
         # if accepting states exists. . .
-        if not prod_image.restrict(self.monolithic_dfa_target).isZero():
-            accp_states = prod_image.restrict(self.monolithic_dfa_target)
-            accp_state_vals = accp_states & self.monolithic_dfa_target
-            f_max = self.__add_state_to_ind_buckets(state_vals=accp_state_vals,
-                                                    g_val=g_val,
-                                                    action_c=action_c,
-                                                    f_max=f_max,
-                                                    open_list=open_list,
-                                                    accp_flag=True)
+        # check if the current states have atleast one accepting state
+        preference_accp_flag: bool = False
+        accp_idx_list = []
+        for accp_idx, target_dfa in enumerate(self.target_DFA_list):
+            if not prod_image.restrict(target_dfa).isZero():
+                preference_accp_flag = True
+                accp_idx_list.append(accp_idx)
 
-        state_vals = self._get_state_estimate(dd_func=prod_image, verbose=False)
-    
-        # Check all possible h values and Insert successors into correct bucket
-        if not state_vals.isZero():
-            f_max = self.__add_state_to_ind_buckets(state_vals=state_vals,
-                                                    g_val=g_val,
-                                                    action_c=action_c,
-                                                    f_max=f_max,
-                                                    open_list=open_list)
+        # if none of the tasks have been satisfied then do the normal computation
+        if preference_accp_flag is False:
+            if not prod_image.restrict(self.monolithic_dfa_target).isZero():
+                accp_states = prod_image.restrict(self.monolithic_dfa_target)
+                accp_state_vals = accp_states & self.monolithic_dfa_target
+                f_max = self.__preference_add_state_to_ind_buckets(state_vals=accp_state_vals,
+                                                                   g_val=g_val,
+                                                                   action_c=action_c,
+                                                                   f_max=f_max,
+                                                                   open_list=open_list,
+                                                                   pcv_open=pcv_open,
+                                                                   pref_accp_flag=False,
+                                                                   accp_flag=True)
+
+            state_vals = self._get_state_estimate(dd_func=prod_image, verbose=False)
+        
+            # Check all possible h values and Insert successors into correct bucket
+            if not state_vals.isZero():
+                f_max = self.__preference_add_state_to_ind_buckets(state_vals=state_vals,
+                                                                   g_val=g_val,
+                                                                   action_c=action_c,
+                                                                   f_max=f_max,
+                                                                   pcv_open=pcv_open,
+                                                                   pref_accp_flag=False,
+                                                                   open_list=open_list)
+        else:
+            # add state
+            raise NotImplementedError()
 
         return f_max
+    
 
-
-    def composed_symbolic_Astar_search_nLTL(self, verbose: bool = False) -> dict:
+    
+    def preference_based_symbolic_Astar_search(self, mu_max: int, verbose: bool = False) -> dict:
         """
-        This function implements a BDDA* algorithm for n LTL formulas 
+        A function that implements Peter's Preference based A* planning algorithm using the
+         herusitc function implemented in this class.
         """
 
         open_list = {}
         closed = {}
 
+        # store the preference cost vector for each state as key value pair.
+        pcv_open = {}
+        pcv_closed = {}
+
         composed_init = self.init_TS & self.monolithic_dfa_init
+
+        # initialize the init state with (0, 0) tuple
+        pcv_open[composed_init.__hash__()] = (0, 0)
 
         # Find f value for the initial state.
         f_dd: ADD = self._get_state_estimate(dd_func=composed_init, verbose=verbose)
@@ -327,11 +431,17 @@ class MultipleFormulaBDDAstar(BaseSymbolicSearch):
                 if h_val > self.estimate_max:
                     continue
                 
-                 # Remove all states already expanded with same h value
+                 
                 if open_list.get(g_val, {}).get(h_val) is None:
                     continue 
-
+                
+                # Remove all states already expanded with same h value
                 open_list[g_val][h_val] = open_list[g_val][h_val] & ~closed.get(h_val, self.manager.addZero())
+
+                # remove all states already expanded 
+                for key, val in pcv_closed.items():
+                    if (key, val) in pcv_open.items():
+                        pcv_open.pop(key)
 
                 # If current bucket not empty. . .
                 if not open_list[g_val][h_val].isZero():
@@ -346,7 +456,7 @@ class MultipleFormulaBDDAstar(BaseSymbolicSearch):
                         # if the bucket exists then take the union else initialize the bucket
                         closed[h_val] |= open_list[g_val][h_val]
                     else:
-                        closed[h_val] = open_list[g_val][h_val]
+                        closed[h_val] = open_list[g_val][h_val]      
                     
                     if verbose:
                         # self.get_prod_states_from_dd(dd_func=image_prod_add, obs_flag=False)
@@ -354,119 +464,56 @@ class MultipleFormulaBDDAstar(BaseSymbolicSearch):
                         self.get_prod_states_from_dd(open_list[g_val][h_val], obs_flag=False, dfa_xcube_list=self.dfa_xcube_list)
                         print("\n")
                     
-                    # Calculate successors. . .
-                    for prod_tr_action in self.composed_tr_list:
-                        # first get the corresponding transition action cost (constant at the terminal node)
-                        action_cost: ADD = prod_tr_action.findMax()
-                        assert action_cost.isConstant() is True, "Error computing action cost during A* search algorithm"
-                        intaction_cost: int = int(list(action_cost.generate_cubes())[0][1])
+                    for literal_ls, _ in list(open_list[g_val][h_val].generate_cubes()):
+                        # get the current pcv value from the open bucket 
+                        cube = self.manager.fromLiteralList(literal_ls).toADD()
+                        hash_val: int = cube.__hash__()
+                        pcv_vec = pcv_open[hash_val]
+                        if (hash_val, pcv_vec) not in pcv_closed.items():
+                            pcv_closed[hash_val] = pcv_vec
 
-                        # compute the image of the TS states 
-                        image_prod_add: ADD = self.image_per_action(trans_action=prod_tr_action,
-                                                                    From=open_list[g_val][h_val],
-                                                                    xcube=self.prod_xcube,
-                                                                    x_list=self.prod_xlist,
-                                                                    y_list=self.prod_ylist)
-                        
-                        if image_prod_add.isZero():
-                            continue
+                        ts_image_add: ADD = self.manager.addZero()
+                        # Calculate successors. . .
+                        for prod_tr_action in self.composed_tr_list:
+                            # first get the corresponding transition action cost (constant at the terminal node)
+                            action_cost: ADD = prod_tr_action.findMax()
+                            assert action_cost.isConstant() is True, "Error computing action cost during A* search algorithm"
+                            intaction_cost: int = int(list(action_cost.generate_cubes())[0][1])
+                            # compute the image of the TS states 
+                            image_prod_add: ADD = self.image_per_action(trans_action=prod_tr_action,
+                                                                        From=cube,
+                                                                        xcube=self.prod_xcube,
+                                                                        x_list=self.prod_xlist,
+                                                                        y_list=self.prod_ylist)
                             
-                        prod_image_restricted: ADD = image_prod_add.existAbstract(self.ts_obs_cube)
+                            ts_image_add |= image_prod_add
 
-                        # if verbose:
-                        #     self.get_prod_states_from_dd(dd_func=image_prod_add, obs_flag=False, dfa_xcube_list=self.dfa_xcube_list)
-                        #     print(f"********************Expanding States with g: {g_val} h:{h_val}********************")
                         
+                            if ts_image_add.isZero():
+                                continue
+                                
+                            prod_image_restricted: ADD = ts_image_add.existAbstract(self.ts_obs_cube)
 
-                        f_max = self._add_states_to_bucket(prod_image=prod_image_restricted,
-                                                           g_val=g_val,
-                                                           action_c=intaction_cost,
-                                                           f_max=f_max,
-                                                           open_list=open_list)
+                            # if verbose:
+                            #     self.get_prod_states_from_dd(dd_func=image_prod_add, obs_flag=False, dfa_xcube_list=self.dfa_xcube_list)
+                            #     print(f"********************Expanding States with g: {g_val} h:{h_val}********************")
+                            
+
+                            f_max = self._preference_add_states_to_bucket(prod_image=prod_image_restricted,
+                                                                          g_val=g_val,
+                                                                          action_c=intaction_cost,
+                                                                          f_max=f_max,
+                                                                          open_list=open_list,
+                                                                          pcv_open=pcv_open,
+                                                                          curr_pcv_vec=pcv_vec)
+                            # f_max = self.__preference_function(mu_max=mu_max,
+                            #                                    state_vals=,
+                            #                                    g_val=g_val,
+                            #                                    action_c=intaction_cost,
+                            #                                    f_max=f_max,
+                            #                                    open_list=open_list,
+                            #                                    pcv_open=pcv_open,
+                            #                                    curr_pcv_vecpcv_vec)
         
             # Go over the next f diagonal 
             f_val += 1
-    
-
-    def retrieve_composed_symbolic_Astar_nLTL(self,  g_val: int, freach_list: dict, verbose: bool = False) -> dict:
-        """
-        A function to retrieve the policy from the A* algorithm for n LTL formulas. 
-        """
-        # Initial f diagonal has value g
-        f_max = g_val
-
-        # start with the final bucket
-        current_prod = freach_list[f_max][0]
-        composed_prod_state = self.init_TS & self.monolithic_dfa_init
-
-        # Initialize empty plan
-        parent_plan = {}
-
-        while not composed_prod_state <= current_prod:
-            # Compute the predecessors using action prod_tr_action
-            breaker: bool = False
-
-            for tr_num, prod_tr_action in enumerate(self.composed_tr_list):
-                pred_prod= self.pre_per_action(trans_action=prod_tr_action,
-                                               From=current_prod,
-                                               ycube=self.prod_ycube,
-                                               x_list=self.prod_xlist,
-                                               y_list=self.prod_ylist)
-                
-                if pred_prod.isZero():
-                    continue
-
-                # first get the corresponding transition action cost (constant at the terminal node)
-                action_cost_cnst: ADD = prod_tr_action.findMax()
-                assert action_cost_cnst.isConstant() is True, "Error computing action cost during A* search algorithm"
-                intaction_cost: int = int(list(action_cost_cnst.generate_cubes())[0][1])
-
-                step = f_max - (g_val - intaction_cost)
-
-                if (g_val - intaction_cost) < 0 or (g_val - intaction_cost) not in freach_list:
-                    continue
-
-                # Search for instance containing pred
-                for h_val in range(step + 1):
-                    # If some predecessors are in bucket freach_list[g−c][h]. . . 
-                    if not (h_val in freach_list[g_val - intaction_cost]):
-                        continue
-                        
-                    if pred_prod & freach_list[g_val - intaction_cost][h_val] != self.manager.addZero():
-                        # Take those predecessors as current states
-                        tmp_current_prod = pred_prod & freach_list[g_val - intaction_cost][h_val]
-
-                        tmp_current_prod_res = (tmp_current_prod).existAbstract(self.ts_obs_cube)
-
-                        # Extend plan by found action
-                        self._append_dict_value_composed(parent_plan,
-                                                         key_prod=tmp_current_prod_res,
-                                                         action=self.tr_action_idx_map.inv[tr_num])
-                        
-                        current_prod = tmp_current_prod_res
-
-                        # Update cost for next iteration
-                        g_val = g_val - intaction_cost
-
-                        # Store value of new f diagonal 
-                        f_max = g_val + h_val
-                        breaker = True 
-                        break
-                
-                # hacky way to break the composed TR for loop
-                if breaker:
-                    break
-            
-            assert  g_val >= 0, "Error Retrieving A* plan. FIX THIS!!"
-
-            if verbose:
-                print(f"********************Layer: {g_val}**************************")
-                self.get_prod_states_from_dd(dd_func=tmp_current_prod, obs_flag=False, dfa_xcube_list=self.dfa_xcube_list)
-        
-        return parent_plan
-
-
-
-
-
-
