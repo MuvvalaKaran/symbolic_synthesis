@@ -10,6 +10,7 @@ from itertools import product
 from src.explicit_graphs import CausalGraph
 from src.explicit_graphs import TwoPlayerGame
 from src.explicit_graphs import FiniteTransitionSystem
+from src.explicit_graphs import Ltlf2MonaDFA
 
 from src.symbolic_graphs import SymbolicDFA, SymbolicAddDFA
 from src.symbolic_graphs import SymbolicTransitionSystem, SymbolicWeightedTransitionSystem
@@ -161,13 +162,22 @@ def create_symbolic_vars(num_of_facts: int,
 def create_symbolic_dfa_graph(cudd_manager,
                               formula: str,
                               dfa_num: int,
+                              ltlf_flag: bool = False,
                               add_flag: bool = False):
-    _two_player_instance = TwoPlayerGame(None, None)
-    _dfa = _two_player_instance.build_LTL_automaton(formula=formula, plot=False)
-    _state = _dfa.get_states()
+    # Construct DFA from ltlf
+    if ltlf_flag:
+        _dfa = Ltlf2MonaDFA(formula=formula)
+        _num_of_states = _dfa.num_of_states
+        
+    # Construct DFA from ltl using SPOT
+    else:
+        _two_player_instance = TwoPlayerGame(None, None)
+        _dfa = _two_player_instance.build_LTL_automaton(formula=formula, plot=False)
+        _state = _dfa.get_states()
+        _num_of_states = len(_state)
 
     # the number of boolean variables (|a|) = log⌈|DFA states|⌉
-    curr_state, next_state = create_symbolic_vars(num_of_facts=len(_state),
+    curr_state, next_state = create_symbolic_vars(num_of_facts=_num_of_states,
                                                   manager=cudd_manager,
                                                   curr_state_var_name=f'a{dfa_num}_',
                                                   next_state_var_name=f'b{dfa_num}_',
@@ -219,6 +229,7 @@ def create_symbolic_causal_graph(cudd_manager,
 def build_add_symbolic_dfa(formulas: List[str],
                            sym_tr_handle: SymbolicWeightedTransitionSystem,
                            manager: Cudd,
+                           ltlf_flag: bool = False,
                            verbose: bool = False,
                            plot: bool = False) -> Tuple[List[SymbolicDFA], List[ADD], List[ADD]]:
     """
@@ -235,6 +246,7 @@ def build_add_symbolic_dfa(formulas: List[str],
         add_dfa_curr_state, add_dfa_next_state, _dfa = create_symbolic_dfa_graph(cudd_manager=cudd_manager,
                                                                                  formula= fmla,
                                                                                  dfa_num=_idx,
+                                                                                 ltlf_flag=ltlf_flag,
                                                                                  add_flag=True)
 
         # create TR corresponding to each DFA - dfa name is only used dumping graph 
@@ -244,11 +256,15 @@ def build_add_symbolic_dfa(formulas: List[str],
                                 predicate_sym_map_lbl=sym_tr_handle.predicate_sym_map_lbl,
                                 manager=manager,
                                 dfa=_dfa,
+                                ltlf_flag=ltlf_flag,
                                 dfa_name=f'dfa_{_idx}')
-
-        dfa_tr.create_dfa_transition_system(verbose=verbose,
-                                            plot=plot,
-                                            valid_dfa_edge_formula_size=len(_dfa.get_symbols()))
+        
+        if ltlf_flag:
+            dfa_tr.create_symbolic_ltlf_transition_system(verbose=verbose, plot=plot)
+        else:
+            dfa_tr.create_dfa_transition_system(verbose=verbose,
+                                                plot=plot,
+                                                valid_dfa_edge_formula_size=len(_dfa.get_symbols()))
 
         # We extend DFA vars list as we dont need them in stored in separate lists
         DFA_handles.append(dfa_tr)
@@ -262,6 +278,7 @@ def build_add_symbolic_dfa(formulas: List[str],
 def build_bdd_symbolic_dfa(formulas: List[str],
                            sym_tr_handle: SymbolicTransitionSystem,
                            manager: Cudd,
+                           ltlf_flag: bool = False,
                            verbose: bool = False,
                            plot: bool = False) -> Tuple[List[SymbolicDFA], List[BDD], List[BDD]]:
     """
@@ -277,6 +294,7 @@ def build_bdd_symbolic_dfa(formulas: List[str],
         # create different boolean variables for different DFAs - [a0_i for ith DFA]
         dfa_curr_state, dfa_next_state, _dfa = create_symbolic_dfa_graph(cudd_manager=cudd_manager,
                                                                          formula= fmla,
+                                                                         ltlf_flag=ltlf_flag,
                                                                          dfa_num=_idx)
 
         # create TR corresponding to each DFA - dfa name is only used dumping graph 
@@ -285,11 +303,14 @@ def build_bdd_symbolic_dfa(formulas: List[str],
                              predicate_sym_map_lbl=sym_tr_handle.predicate_sym_map_lbl,
                              manager=manager,
                              dfa=_dfa,
+                             ltlf_flag=ltlf_flag,
                              dfa_name=f'dfa_{_idx}')
-
-        dfa_tr.create_dfa_transition_system(verbose=verbose,
-                                            plot=plot,
-                                            valid_dfa_edge_formula_size=len(_dfa.get_symbols()))
+        if ltlf_flag:
+            dfa_tr.create_symbolic_ltlf_transition_system(verbose=verbose, plot=plot)
+        else:
+            dfa_tr.create_dfa_transition_system(verbose=verbose,
+                                                plot=plot,
+                                                valid_dfa_edge_formula_size=len(_dfa.get_symbols()))
 
          # We extend DFA vars list as we dont need them in stored in separate lists
         DFA_handles.append(dfa_tr)
@@ -333,14 +354,11 @@ def build_bdd_abstraction(cudd_manager, problem_file_path, domain_file_path) -> 
                                             domain=domain,
                                             manager=cudd_manager)
 
-
-        
-        ts_total_state = len(task.facts)
         sym_tr.create_transition_system(verbose=False, plot=False)
 
         sym_tr.create_state_obs_bdd(verbose=False, plot=False)  
 
-    return  sym_tr, ts_curr_state, ts_next_state, ts_lbl_states, ts_total_state
+    return  sym_tr, ts_curr_state, ts_next_state, ts_lbl_states
 
 
 
@@ -395,7 +413,7 @@ if __name__ == "__main__":
     if DIJKSTRAS or ASTAR:
         
         # create a weight diction fro action defined in the domain file;
-        #  For grid world - moveLeft; moveRight; moveUp; moveDown
+        # For grid world - moveLeft; moveRight; moveUp; moveDown
         # NOTE: PyPerplan lowercases all the action names for some reason
         wgt_dict = {
         "moveleft"  : 1,
@@ -413,6 +431,7 @@ if __name__ == "__main__":
         dfa_tr, dfa_curr_state, dfa_next_state = build_add_symbolic_dfa(formulas=formulas,
                                                                         sym_tr_handle=sym_tr,
                                                                         manager=cudd_manager,
+                                                                        ltlf_flag=USE_LTLF,
                                                                         verbose=False,
                                                                         plot=False)
     # Build Transition with no costs
@@ -424,6 +443,7 @@ if __name__ == "__main__":
         dfa_tr, dfa_curr_state, dfa_next_state = build_bdd_symbolic_dfa(formulas=formulas,
                                                                         sym_tr_handle=sym_tr,
                                                                         manager=cudd_manager,
+                                                                        ltlf_flag=USE_LTLF,
                                                                         verbose=False,
                                                                         plot=False)
 

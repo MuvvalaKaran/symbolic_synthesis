@@ -247,8 +247,11 @@ def convert_action_dict_to_gridworld_strategy(ts_handle: Union[SymbolicWeightedT
 
     while not target_DFA == curr_dfa_state:
         # get the strategy
-        # _a = action_map[dfa_sym_to_curr_map[curr_dfa_state]][ts_sym_to_curr_map[curr_ts_state]]
-        _a = action_map[curr_dfa_state.bddPattern() & curr_ts_state.bddPattern()]
+        if ADD_flag:
+            _a = action_map[curr_dfa_state.bddPattern() & curr_ts_state.bddPattern()]
+        else:
+            _a = action_map[curr_dfa_state & curr_ts_state]
+
         if isinstance(_a, list):
             # randomly select an action from a list of actions
             _a = random.choice(_a)

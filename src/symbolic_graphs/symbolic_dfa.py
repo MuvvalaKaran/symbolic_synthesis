@@ -28,13 +28,12 @@ class SymbolicDFA(object):
                  predicate_sym_map_lbl: dict,
                  dfa: DFAGraph,
                  manager: Cudd,
-                 dfa_name):
+                 dfa_name,
+                 ltlf_flag: bool = False):
         self.sym_vars_curr: List[BDD] = curr_states
         self.sym_vars_next: List[BDD] = next_states
         self.manager: Cudd = manager
         self.dfa = dfa
-        self.init: str = dfa.get_initial_states()[0][0]
-        self.goal: str = dfa.get_accepting_states()[0]
         self.sym_init_state: BDD = manager.bddZero()
         self.sym_goal_state: BDD = manager.bddZero()
         self.dfa_name: str = dfa_name
@@ -42,15 +41,31 @@ class SymbolicDFA(object):
         self.dfa_predicate_sym_map_curr: bidict = {}
         self.dfa_predicate_sym_map_nxt: bidict = {}
         self.predicate_sym_map_lbl = predicate_sym_map_lbl
+
+        if ltlf_flag:
+            self.init: List[int] = dfa.init_state
+            self.goal: List[int] = dfa.accp_states
+        else:
+            self.init: str = dfa.get_initial_states()[0][0]
+            self.goal: str = dfa.get_accepting_states()[0]
+
         self._create_sym_var_map()
-        self._initialize_dfa_init_and_goal()
+        self._initialize_dfa_init_and_goal(ltlf_flag=ltlf_flag)
     
-    def _initialize_dfa_init_and_goal(self):
+    def _initialize_dfa_init_and_goal(self, ltlf_flag: bool = False):
         """
         Initialize symbolic init and goal states associated with DFA 
         """
-        self.sym_init_state |= self.dfa_predicate_sym_map_curr.get(self.init)
-        self.sym_goal_state |= self.dfa_predicate_sym_map_curr.get(self.goal)
+        # ltlf formulas can have multiple accepting states
+        if ltlf_flag:
+            for i_st in self.init:
+                self.sym_init_state |= self.dfa_predicate_sym_map_curr.get(i_st)
+
+            for g_st in self.goal:
+                self.sym_goal_state |= self.dfa_predicate_sym_map_curr.get(g_st)
+        else:
+            self.sym_init_state |= self.dfa_predicate_sym_map_curr.get(self.init)
+            self.sym_goal_state |= self.dfa_predicate_sym_map_curr.get(self.goal)
 
         assert self.sym_init_state.isZero() is False and self.sym_goal_state.isZero() is False, \
         "Couldn't build the symbolic init and goal states of DFA. FIX THIS!!!"
@@ -178,6 +193,62 @@ class SymbolicDFA(object):
                 file_name = PROJECT_ROOT + f'/plots/{self.dfa_name}_trans_func.pdf'
                 self.manager.dumpDot([self.dfa_bdd_tr], file_path=file_path)
                 gv.render(engine='dot', format='pdf', filepath=file_path, outfile=file_name)
+    
+
+    def get_ltlf_edge_boolean_formula(self, labels: List, guard: str) -> BDD:
+        """
+        A function that parse the guard and constructs its correpsonding symbolic edge for symbolic LTLf DFA construction
+        """
+        expr = self.manager.bddOne()
+
+        for idx, value in enumerate(guard):
+            if value == "1":
+                expr = expr & self.predicate_sym_map_lbl.get(str(labels[idx]) if isinstance(labels, tuple) else str(labels))
+            elif value == "0":
+                expr = expr & ~self.predicate_sym_map_lbl.get(str(labels[idx]) if isinstance(labels, tuple) else str(labels))
+            else:
+                assert value == "X", "Error while constructing symbolic LTLF DAF edge. FIX THIS!!!"
+        
+        return expr
+    
+
+    def create_symbolic_ltlf_transition_system(self, verbose: bool = False, plot: bool = False):
+        """
+        This function parses the Mona DFA output and construct the symbolic TR associated with DFA.
+        """
+
+        mona_output: str = self.dfa.mona_dfa
+
+        for line in mona_output.splitlines():
+            if line.startswith("State "):
+                # extract the original state
+                orig_state = self.dfa.get_value(line, r".*State[\s]*(\d+):\s.*", int)
+                
+                # extract string guard
+                guard = self.dfa.get_value(line, r".*:[\s](.*?)[\s]->.*", str)
+                
+                # convert it into boolean formula
+                if self.dfa.task_labels:
+                    _edge_sym = self.get_ltlf_edge_boolean_formula(self.dfa.task_labels, guard)
+                else:
+                    _edge_sym = self.get_ltlf_edge_boolean_formula(self.dfa.task_labels, "X")
+                
+                dest_state = self.dfa.get_value(line, r".*state[\s]*(\d+)[\s]*.*", int)
+
+                # ignore the superficial state 0
+                if orig_state:
+                    _curr_sym = self.dfa_predicate_sym_map_curr.get(orig_state) 
+                    _nxt_sym = self.dfa_predicate_sym_map_nxt.get(dest_state)
+                    self.dfa_bdd_tr |= _curr_sym & _nxt_sym & _edge_sym
+        
+        if verbose:
+            print(f"Charateristic Function for DFA  is \n")
+            print(self.dfa_bdd_tr, " \n")
+            if plot:
+                file_path = PROJECT_ROOT + f'/plots/{self.dfa_name}_ADD_ltlf_trans_func.dot'
+                file_name = PROJECT_ROOT + f'/plots/{self.dfa_name}_ADD_ltlf_trans_func.pdf'
+                self.manager.dumpDot([self.dfa_bdd_tr], file_path=file_path)
+                gv.render(engine='dot', format='pdf', filepath=file_path, outfile=file_name)       
 
 
 
@@ -395,11 +466,9 @@ class SymbolicAddDFA(object):
 
         mona_output: str = self.dfa.mona_dfa
 
-        dot_trans = dict()  # maps each couple (src, dst) to a list of guards
         for line in mona_output.splitlines():
             if line.startswith("State "):
                 # extract the original state
-
                 orig_state = self.dfa.get_value(line, r".*State[\s]*(\d+):\s.*", int)
                 
                 # extract string guard
@@ -407,10 +476,8 @@ class SymbolicAddDFA(object):
                 
                 # convert it into boolean formula
                 if self.dfa.task_labels:
-                    # guard = self.dfa.ter2symb(self.dfa.task_labels, guard)
                     _edge_sym = self.get_ltlf_edge_boolean_formula(self.dfa.task_labels, guard)
                 else:
-                    # guard = self.dfa.ter2symb(self.dfa.task_labels, "X")
                     _edge_sym = self.get_ltlf_edge_boolean_formula(self.dfa.task_labels, "X")
                 
                 dest_state = self.dfa.get_value(line, r".*state[\s]*(\d+)[\s]*.*", int)
@@ -420,11 +487,6 @@ class SymbolicAddDFA(object):
                     _curr_sym = self.dfa_predicate_add_sym_map_curr.get(orig_state) 
                     _nxt_sym = self.dfa_predicate_add_sym_map_nxt.get(dest_state)
                     self.dfa_bdd_tr |= _curr_sym & _nxt_sym & _edge_sym
-
-                    # if (orig_state, dest_state) in dot_trans.keys():
-                    #     dot_trans[(orig_state, dest_state)].append(guard)
-                    # else:
-                    #     dot_trans[(orig_state, dest_state)] = [guard]
         
         if verbose:
             print(f"Charateristic Function for DFA  is \n")
@@ -433,25 +495,7 @@ class SymbolicAddDFA(object):
                 file_path = PROJECT_ROOT + f'/plots/{self.dfa_name}_ADD_ltlf_trans_func.dot'
                 file_name = PROJECT_ROOT + f'/plots/{self.dfa_name}_ADD_ltlf_trans_func.pdf'
                 self.manager.dumpDot([self.dfa_bdd_tr], file_path=file_path)
-                gv.render(engine='dot', format='pdf', filepath=file_path, outfile=file_name)
-
-        # for c, guards in dot_trans.items():
-        #     # get the boolean formula for the corresponding edge - simplified formulas is always of form disjunction  
-        #     simplified_guard = self.dfa.simplify_guard(guards)
-        
-
-        #     if 'True' in guards:
-        #         _edge_sym = self.manager.addOne()
-            
-        #     else:
-        #         _edge_sym = self.manager.addZero()
-        #         for ap in simplified_guard.args:
-        #             if '~' in str(ap):
-        #                 _edge_sym |= self.predicate_add_sym_map_lbl.get(str(ap)[1:])  # exclude the negation
-                    
-        #             else:
-        #                 _edge_sym |= self.predicate_add_sym_map_lbl.get(str(ap)) 
-        
+                gv.render(engine='dot', format='pdf', filepath=file_path, outfile=file_name)        
 
 
 @deprecated

@@ -38,31 +38,6 @@ class Ltlf2MonaDFA:
             return value_type(0.0)
 
 
-    def ter2symb(self, ap, ternary):
-        """
-        Translate ternary output to symbolic.
-        """
-        expr = And()
-        i = 0
-        for value in ternary:
-            if value == "1":
-                expr = And(expr, ap[i] if isinstance(ap, tuple) else ap)
-            elif value == "0":
-                assert value == "0"
-                expr = And(expr, Not(ap[i] if isinstance(ap, tuple) else ap))
-            else:
-                assert value == "X", "[ERROR]: the guard is not X"
-            i += 1
-        return expr
-
-
-    def simplify_guard(self, guards):
-        """
-        Make a big OR among guards and simplify them.
-        """
-        return simplify(Or(*guards))    
-
-
     def parse_mona(self, mona_output):
         """
         Parse mona output and construct a dot.
@@ -95,33 +70,6 @@ class Ltlf2MonaDFA:
 
         # create graph
         self._graph.add_nodes_from([s for s in range(1, self.num_of_states + 1)])
-
-        # dot_trans = dict()  # maps each couple (src, dst) to a list of guards
-        # for line in mona_output.splitlines():
-        #     if line.startswith("State "):
-        #         orig_state = self.get_value(line, r".*State[\s]*(\d+):\s.*", int)
-        #         guard = self.get_value(line, r".*:[\s](.*?)[\s]->.*", str)
-        #         if free_variables:
-        #             guard = self.ter2symb(free_variables, guard)
-        #         else:
-        #             guard = self.ter2symb(free_variables, "X")
-        #         dest_state = self.get_value(line, r".*state[\s]*(\d+)[\s]*.*", int)
-        #         if orig_state:
-        #             if (orig_state, dest_state) in dot_trans.keys():
-        #                 dot_trans[(orig_state, dest_state)].append(guard)
-        #             else:
-        #                 dot_trans[(orig_state, dest_state)] = [guard]
-        
-        # self.transition = dot_trans
-
-    #     for c, guards in dot_trans.items():
-    #         simplified_guard = self.__simplify_guard(guards)
-    #         dot += ' {} -> {} [label="{}"];\n'.format(
-    #             c[0], c[1], str(simplified_guard).lower()
-    #         )
-
-    #     dot += "}"
-    #     return dot
     
 
     def construct_dfa(self,
@@ -152,7 +100,7 @@ class Ltlf2MonaDFA:
 
 
 if __name__ == "__main__":
-    # formulas 
+    # formula
     formula = 'F(a & F(b))'
 
     dfa_handle = Ltlf2MonaDFA(formula=formula)
