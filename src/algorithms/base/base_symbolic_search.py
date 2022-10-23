@@ -15,17 +15,7 @@ class BaseSymbolicSearch(object):
                  cudd_manager: Cudd):
         self.ts_obs_list = ts_obs_vars
         self.manager = cudd_manager
-        
-    
-    @deprecated
-    def pre(self, From, ycube, x_list: list, y_list: list, transition_fun) -> BDD:
-        """
-        Compute the predecessors of 'From'.
-        
-        andAbstract: Conjoin to another BDD and existentially quantify variables.
-        """
-        fromY = From.swapVariables(x_list, y_list)
-        return transition_fun.andAbstract(fromY, ycube)
+
     
     def pre_per_action(self, trans_action, From, ycube, x_list: list, y_list: list) -> Union[BDD, ADD]:
         """
@@ -39,23 +29,6 @@ class BaseSymbolicSearch(object):
             return _conjoin.existAbstract(ycube.bddPattern()).toADD()
         else:
             return trans_action.andAbstract(fromY, ycube)
-    
-
-    @deprecated
-    def image(self, From, xcube, x_list: list, y_list: list, transition_fun) -> Union[BDD, ADD]:
-        """
-        Compute the set of possible state reachable from 'From' state.
-
-        andAbstract: Conjoin to another BDD and existentially quantify variables.
-        """
-        # check if its add or bdd
-        if type(From) == type(self.manager.addZero()):
-            _conjoin = transition_fun & From
-            ImgY = _conjoin.existAbstract(xcube)
-        else:
-            ImgY = transition_fun.andAbstract(From, xcube)
-
-        return ImgY.swapVariables(y_list, x_list)
     
     
     def image_per_action(self, trans_action, From, xcube, x_list: list, y_list: list) -> Union[BDD, ADD]:
@@ -282,12 +255,12 @@ class BaseSymbolicSearch(object):
             for idx, _dfa_dict in enumerate(dfa_dict):
                 # create a cube of the rest of the dfa vars
                 if ADD_flag:
-                    exit_dfa_cube = self.manager.addOne()
+                    exist_dfa_cube = self.manager.addOne()
                 else:
-                    exit_dfa_cube = self.manager.bddOne()
+                    exist_dfa_cube = self.manager.bddOne()
                 for cube_idx, cube in enumerate(kwargs['dfa_xcube_list']):
                     if cube_idx != idx:
-                        exist_dfa_cube = exit_dfa_cube & cube
+                        exist_dfa_cube = exist_dfa_cube & cube
 
                 _dfa_dd = prod_dd.existAbstract(self.ts_xcube & self.ts_obs_cube & exist_dfa_cube)
                 if ADD_flag:  

@@ -11,7 +11,7 @@ from cudd import Cudd, BDD, ADD
 from functools import reduce
 
 from src.algorithms.base.base_symbolic_search import BaseSymbolicSearch
-from src.symbolic_graphs import SymbolicDFA, SymbolicAddDFA, SymbolicMultipleDFA, SymbolicMultipleAddDFA
+from src.symbolic_graphs import SymbolicDFA, SymbolicAddDFA
 from src.symbolic_graphs import SymbolicTransitionSystem, SymbolicWeightedTransitionSystem
 
 
@@ -144,7 +144,7 @@ def map_dfa_tuple_to_sym_states(dfa_tuple: tuple, dfa_sym_to_curr_state_map: dic
 
 
 def convert_action_dict_to_gridworld_strategy_nLTL(ts_handle: Union[SymbolicWeightedTransitionSystem, SymbolicTransitionSystem],
-                                                   dfa_handles: Union[SymbolicMultipleAddDFA, SymbolicMultipleDFA],
+                                                   dfa_handles: Union[List[SymbolicAddDFA], List[ SymbolicDFA]],
                                                    action_map: dict,
                                                    init_state_ts_sym,
                                                    state_obs_dd,

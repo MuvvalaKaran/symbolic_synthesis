@@ -6,7 +6,7 @@ from functools import reduce
 
 from cudd import Cudd, BDD, ADD
 from src.algorithms.base import BaseSymbolicSearch
-from src.symbolic_graphs import SymbolicMultipleDFA, SymbolicTransitionSystem
+from src.symbolic_graphs import SymbolicTransitionSystem, SymbolicDFA
 
 
 class MultipleFormulaBFS(BaseSymbolicSearch):
@@ -19,7 +19,7 @@ class MultipleFormulaBFS(BaseSymbolicSearch):
 
     def __init__(self,
                  ts_handle: SymbolicTransitionSystem,
-                 dfa_handles: SymbolicMultipleDFA,
+                 dfa_handles: List[SymbolicDFA],
                  ts_curr_vars: List[BDD],
                  ts_next_vars: List[BDD],
                  dfa_curr_vars: List[BDD],

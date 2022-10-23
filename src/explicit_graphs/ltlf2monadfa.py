@@ -1,8 +1,7 @@
 import re
 import networkx as nx
 
-from typing import Union
-from sympy import And, Not, Or, simplify, symbols
+from sympy import symbols
 
 from ltlf2dfa.parser.ltlf import LTLfParser
 
@@ -10,6 +9,17 @@ from ltlf2dfa.parser.ltlf import LTLfParser
 class Ltlf2MonaDFA:
     """
     A class that call the LTLF2DFA python package and constructs DFA.
+
+    Implementation: LTL2DFA package calls the Mona packages to construct a
+     minimal DFA.
+     
+     Link: https://whitemech.github.io/LTLf2DFA/
+     Link: https://www.brics.dk/mona/
+      
+     Syft is another toolbox that follows a symbolic approach. 
+      1) It first converts the LTLf fomrula into a First-order Formula (FOF)
+      2) Then, calls Mona to convert to Convert FOF to a minimal DFA.
+      3) Finally, Syft uses BDD based symbolic representation to construct a 
     """
 
     def __init__(self, formula: str, verbose: bool = False, plot: bool = False):
@@ -40,7 +50,8 @@ class Ltlf2MonaDFA:
 
     def parse_mona(self, mona_output):
         """
-        Parse mona output and construct a dot.
+        Parse mona output and extract the initial, accpeting and other states. The edges are constructed
+         by create_symbolic_ltlf_transition_system() method in SymbolicDFA() and SymbolicAddDFA() classes. 
         """
         free_variables = self.get_value(
             mona_output, r".*DFA for formula with free variables:[\s]*(.*?)\n.*", str
@@ -100,8 +111,6 @@ class Ltlf2MonaDFA:
 
 
 if __name__ == "__main__":
-    # formula
     formula = 'F(a & F(b))'
 
     dfa_handle = Ltlf2MonaDFA(formula=formula)
-    dfa_handle.construct_dfa()

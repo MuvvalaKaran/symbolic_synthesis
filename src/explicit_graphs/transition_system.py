@@ -383,7 +383,7 @@ class FiniteTransitionSystem:
         [0, 0, 0, ..., free] : The 0s are placeholder for box locations and the last element in the list indicates the
         state of the manipulator. Initially, the robot end effector is free.
 
-        reuturns: A list of the form ["l1", "l2", ..., "free"], The robot's intial conf
+        returns: A list of the form ["l1", "l2", ..., "free"], The robot's intial conf
         """
 
         # get the init state of the world

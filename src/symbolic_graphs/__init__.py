@@ -1,2 +1,3 @@
 from .symbolic_abstraction import SymbolicTransitionSystem, SymbolicWeightedTransitionSystem
-from .symbolic_dfa import SymbolicDFA, SymbolicAddDFA, SymbolicMultipleDFA, SymbolicMultipleAddDFA
+from .symbolic_dfa import SymbolicDFA, SymbolicAddDFA
+from .gridworld_main import SimpleGridWorld

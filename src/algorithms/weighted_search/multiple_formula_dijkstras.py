@@ -5,7 +5,7 @@ from functools import reduce
 from typing import List, Union
 
 from cudd import Cudd, BDD, ADD
-from src.symbolic_graphs import SymbolicMultipleDFA, SymbolicWeightedTransitionSystem
+from src.symbolic_graphs import SymbolicAddDFA, SymbolicWeightedTransitionSystem
 from src.algorithms.base import BaseSymbolicSearch
 
 
@@ -19,7 +19,7 @@ class MultipleFormulaDijkstra(BaseSymbolicSearch):
     """
     def __init__(self,
                  ts_handle: SymbolicWeightedTransitionSystem,
-                 dfa_handles: SymbolicMultipleDFA,
+                 dfa_handles: List[SymbolicAddDFA],
                  ts_curr_vars: List[ADD],
                  ts_next_vars: List[ADD],
                  dfa_curr_vars: List[ADD],
@@ -172,8 +172,8 @@ class MultipleFormulaDijkstra(BaseSymbolicSearch):
                     
                     if verbose:
                         self.get_prod_states_from_dd(dd_func=image_prod_add,
-                                                    obs_flag=False,
-                                                    dfa_xcube_list=dfa_xcube_list)
+                                                     obs_flag=False,
+                                                     dfa_xcube_list=dfa_xcube_list)
                 
                     # if the bucket exists then take the union else initialize the bucket
                     if step_val in open_list:

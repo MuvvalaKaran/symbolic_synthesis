@@ -9,7 +9,7 @@ from cudd import Cudd, BDD, ADD
 
 from src.algorithms.base import BaseSymbolicSearch
 from src.algorithms.weighted_search.symbolic_BDDAstar import SymbolicBDDAStar
-from src.symbolic_graphs import SymbolicMultipleDFA, SymbolicWeightedTransitionSystem
+from src.symbolic_graphs import SymbolicWeightedTransitionSystem, SymbolicAddDFA
 
 
 class MultipleFormulaBDDAstar(BaseSymbolicSearch):
@@ -23,7 +23,7 @@ class MultipleFormulaBDDAstar(BaseSymbolicSearch):
 
     def __init__(self,
                  ts_handle: SymbolicWeightedTransitionSystem,
-                 dfa_handles: SymbolicMultipleDFA,
+                 dfa_handles: List[SymbolicAddDFA],
                  ts_curr_vars: List[ADD],
                  ts_next_vars: List[ADD],
                  dfa_curr_vars: List[ADD],
