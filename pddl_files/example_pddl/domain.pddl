@@ -13,10 +13,9 @@
     general_loc - location
     robo_loc - general_loc
     box_loc - general_loc
-    ee_loc - location
 )
 
-(:constants ee - ee_loc free - status)
+(:constants free - status)
 
 (:predicates
     (holding ?b - box ?l - box_loc)
@@ -68,7 +67,6 @@
     )
     :effect (and 
         (holding ?b ?l)
-        (on ?b ee)
         (not (to-obj ?b ?l))
         (not (on ?b ?l))
         (not (gripper free))
@@ -99,13 +97,12 @@
     :parameters (?b - box ?l - box_loc)
     :precondition (and
         (to-loc ?b ?l)
-        (holding ?b ?l)
+        ;(holding ?b ?l)
     )
     :effect (and
         (ready ?l)
         (not (holding ?b ?l))
         (on ?b ?l)
-        (not (on ?b ee))
         (not (to-loc ?b ?l))
     )
 )

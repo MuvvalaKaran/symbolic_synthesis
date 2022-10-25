@@ -137,22 +137,26 @@ class FrankaWorld(BaseSymMain):
 
          1) all gripper predicates - we do not need to create prime version for these
          2) all on predicates - we do need to create prime version for these
-         2) rest of the predicates - holding, ready, to-obj, and to-loc predicates. We do create prime version for these. 
+         3) all holding predicates 
+         4) rest of the predicates - holding, ready, to-obj, and to-loc predicates. We do create prime version for these. 
         """
         on_list = []
         gripper_list = []
+        holding_list = []
         others_list = []
         for pred in predicates:
             if 'on' in pred:
                 on_list.append(pred)
             elif 'gripper' in pred:
                 gripper_list.append(pred)
+            # elif 'holding' in pred:
+            #     holding_list.append(pred)
             else:
                 others_list.append(pred)
         
         assert len(gripper_list) == 1, "Error segregating predicates before creating sym boolean vars. FIX THIS!!!"
 
-        return on_list, gripper_list, others_list
+        return on_list, gripper_list, holding_list, others_list
 
 
     def create_symbolic_causal_graph(self, draw_causal_graph: bool = False, add_flag: bool = False):
@@ -176,11 +180,12 @@ class FrankaWorld(BaseSymMain):
         task_facts = _causal_graph_instance.task.facts
 
         # segregate grounded predicates into thre categories, 1) gripper predicates, 2) on predicates, 3) all other prdicates
-        on_list, gripper_list, others_list = self._segregate_predicates(predicates=task_facts)
+        on_list, gripper_list, holding_list, others_list = self._segregate_predicates(predicates=task_facts)
 
         # for book keeping purposed
         seg_preds = {'gripper': gripper_list,
                      'on': on_list,
+                    #  'holding': holding_list,
                      'others': others_list
                       }
 
@@ -194,6 +199,7 @@ class FrankaWorld(BaseSymMain):
 
         gripper_var = self._create_symbolic_lbl_vars(domain_facts=gripper_list, state_var_name='f', add_flag=False)
         on_vars = self._create_symbolic_lbl_vars(domain_facts=on_list, state_var_name='b', add_flag=False)
+        # holding_vars = self._create_symbolic_lbl_vars(domain_facts=holding_list, state_var_name='h', add_flag=False)
 
         
         # lbl_vars = self.create_symbolic_lbl_vars(causal_graph_instance=_causal_graph_instance,
@@ -202,7 +208,7 @@ class FrankaWorld(BaseSymMain):
         # _boxes: list = _causal_graph_instance.task_objects  # boxes 
         # _locs: list = _causal_graph_instance.task_locations  # locs
 
-        return _causal_graph_instance.task, _causal_graph_instance.problem.domain, curr_state, next_state, gripper_var, on_vars, seg_preds
+        return _causal_graph_instance.task, _causal_graph_instance.problem.domain, curr_state, next_state, gripper_var, on_vars, None, seg_preds
         #  lbl_vars, _boxes, _locs
     
 
@@ -212,12 +218,13 @@ class FrankaWorld(BaseSymMain):
         """
         # task, domain, ts_curr_state, ts_next_state, ts_lbl_vars, ts_boxes, ts_locs  = self.create_symbolic_causal_graph(draw_causal_graph=False)
 
-        task, domain, ts_curr_state, ts_next_state, ts_gripper_var, ts_on_vars, seg_preds  = self.create_symbolic_causal_graph(draw_causal_graph=False)
+        task, domain, ts_curr_state, ts_next_state, ts_gripper_var, ts_on_vars, ts_holding_vars, seg_preds  = self.create_symbolic_causal_graph(draw_causal_graph=False)
 
         sym_tr = SymbolicFrankaTransitionSystem(curr_states=ts_curr_state,
                                                 next_states=ts_next_state,
                                                 gripper_var=ts_gripper_var,
                                                 on_vars=ts_on_vars,
+                                                holding_vars=ts_holding_vars,
                                                 task=task,
                                                 domain=domain,
                                                 manager=self.manager,

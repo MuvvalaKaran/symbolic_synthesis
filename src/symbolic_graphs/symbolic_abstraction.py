@@ -14,6 +14,7 @@ from itertools import product
 from bidict import bidict
 
 from config import *
+from utls import *
 
 
 class SymbolicTransitionSystem(object):
@@ -538,12 +539,13 @@ class SymbolicFrankaTransitionSystem():
      A class to construct the symblic transition system for the Robotic manipulator example.
     """
 
-    def __init__(self, curr_states: list , next_states: list, gripper_var, on_vars, task, domain, manager, seg_facts: dict) -> None:
+    def __init__(self, curr_states: list , next_states: list, gripper_var, on_vars, holding_vars, task, domain, manager, seg_facts: dict) -> None:
         self.sym_vars_curr = curr_states
         self.sym_vars_next = next_states
         # self.sym_vars_lbl = lbl_states
         self.sym_gripper_var = gripper_var
         self.sym_on_vars = on_vars
+        # self.sym_holding_vars = holding_vars
         self.seg_facts_dict: dict = seg_facts 
 
         self.init: frozenset = task.initial_state
@@ -614,6 +616,9 @@ class SymbolicFrankaTransitionSystem():
         elif 'gripper' == pred_type:
             boolean_str = list(product([1, 0], repeat=1))
             sym_vars = self.sym_gripper_var
+        # elif 'holding' == pred_type:
+        #     boolean_str = list(product([1, 0], repeat=len(self.sym_holding_vars)))
+        #     sym_vars = self.sym_holding_vars
         else:
             boolean_str = list(product([1, 0], repeat=len(self.sym_vars_curr)))
             sym_vars = self.sym_vars_curr
@@ -659,7 +664,7 @@ class SymbolicFrankaTransitionSystem():
         # self.predicate_sym_map_curr = _node_int_map_curr
         # self.predicate_sym_map_nxt = _node_int_map_next
     
-
+    @deprecated
     def _get_box_location(self, box_location_state_str: str) -> Tuple[int, str]:
         """
         A function that returns the location of the box and the box id in the given world from a given string.
@@ -757,7 +762,7 @@ class SymbolicFrankaTransitionSystem():
         # combine all the dctionary and return 
         return _manp_lbl_map
     
-
+    @deprecated
     def _get_succ_sym_lbl(self, box_loc_dict: dict, curr_states: BDD, succ_state: BDD, ts_x_cube: BDD) -> BDD:
         """
         A helper function to compute the successor label' states given the successor state and current state's label.  
@@ -792,18 +797,13 @@ class SymbolicFrankaTransitionSystem():
         # get the preconditions and check is any of the current state satisfies the pre conditions
         pre_conds = tuple(action.preconditions)
         pre_list: List[BDD] = [self.predicate_sym_map_curr.get(pre_cond) for pre_cond in pre_conds]
+        # if release take the union of pre conds as they are of same var type
+        # if 'release' in action.name: 
+        #     return pre_list
+            # pre_sym: BDD = reduce(lambda a,b : a | b, pre_list)
+        # else:
         pre_sym: BDD = reduce(lambda a,b : a & b, pre_list)
-        
-        # # if precondition has on b# l# condition then look up the sym labl dict
-        # pre_sym = self.manager.bddOne()
-        # for _idx, cond in enumerate(pre_conds):
-        #     if 'on' in cond:
-        #         # get the box id and its corresponding location
-        #         b_id, loc = self._get_box_location(box_location_state_str=cond)
-        #         tmp_lbl = box_loc_dict[f'b{b_id}'] & box_loc_dict[loc]
-        #         pre_sym = pre_sym & tmp_lbl
-        #     else:
-        #         pre_sym = pre_sym & pre_list[_idx]
+
         return pre_sym
     
     def _get_sym_add_conds(self, action) -> BDD:
@@ -822,8 +822,15 @@ class SymbolicFrankaTransitionSystem():
          A helper function that returns the symbolic version of the add consitions given the current action.
         """
         del_effects = tuple(action.del_effects)
+        if len(del_effects) == 0:
+            return None
+
         del_list = [self.predicate_sym_map_curr.get(del_effect) for del_effect in del_effects]
-        del_sym = reduce(lambda a, b: a | b, del_list)
+        # if release take the union of pre conds as they are of same var type
+        if 'release' in action.name:
+            del_sym = reduce(lambda a, b: a | b, del_list)
+        else:
+            del_sym = reduce(lambda a, b: a & b, del_list)
 
         # return del_sym.swapVariables(self.sym_vars_curr, self.sym_vars_next)
         return del_sym
@@ -841,9 +848,6 @@ class SymbolicFrankaTransitionSystem():
           we unroll the graph by taking all valid actions, compute the image, and their corresponding labels and
           keep iterating until we reach a fix point. 
         """
-        # initialize box and location symbolic maping
-        # box_loc_dict: dict = self._create_frankaworld_sym_var_map(task_objs=task_objs, task_locs=task_locs)
-
         # initialize 
         if verbose:
             print(f"Creating TR for Actions {self.domain.actions}")
@@ -856,22 +860,6 @@ class SymbolicFrankaTransitionSystem():
         # composed_init_state = self.manager.bddZero()
         init_state = self.sym_init_states
 
-        # init_lbl = box_loc_dict['free']    # initially the manopulator hand is free
-        # for s in self.task.initial_state:
-        #     if 'on' in s:
-        #         # get the box id and its corresponding location
-        #         b_id, loc = self._get_box_location(box_location_state_str=s)
-        #         tmp_lbl = box_loc_dict[f'b{b_id}'] & box_loc_dict[loc]
-        #         init_lbl |= tmp_lbl
-        #     else:
-        #         composed_init_state  |= self.predicate_sym_map_curr[s] 
-        
-        # create the corresponding lbl cube
-        # lbl_cube = reduce(lambda a, b: a & b, self.sym_vars_lbl)
-        # ts_x_cube = reduce(lambda a, b: a & b, self.sym_vars_curr)
-
-        # add the init state to the open list
-        # open_list = composed_init_state & tmp_lbl
         layer = 0
         open_list[layer] = init_state
         
@@ -881,68 +869,36 @@ class SymbolicFrankaTransitionSystem():
             open_list[layer] = open_list[layer] & ~closed
 
             # If unexpanded states exist ... 
-            if not open_list.isZero():
+            if not open_list[layer].isZero():
                 # Add states to be expanded next to already expanded states
-                closed |= open_list
+                closed |= open_list[layer]
 
                 # compute the image of the TS states 
                 for action in self.task.operators:
-                    # get the preconditions and check is any of the current state satisfies the pre conditions
-                    # pre_conds = tuple(action.preconditions)
-                    # pre_list = [self.predicate_sym_map_curr.get(pre_cond) for pre_cond in pre_conds]
-                    # # if len(pre_list) != 0:
-                    # # if precondition has on b# l# condition then look up the sym labl dict
-                    # pre_sym = self.manager.bddOne()
-                    # for _idx, cond in enumerate(pre_conds):
-                    #     if 'on' in cond:
-                    #         # get the box id and its corresponding location
-                    #         b_id, loc = self._get_box_location(box_location_state_str=cond)
-                    #         tmp_lbl = box_loc_dict[f'b{b_id}'] & box_loc_dict[loc]
-                    #         pre_sym = pre_sym & tmp_lbl
-                    #     else:
-                    #         pre_sym = pre_sym & pre_list[_idx]
                     pre_sym: BDD = self._get_sym_pre_conds(action)
 
-                    # _states = open_list.existAbstract(lbl_cube).restrict(pre_sym)
-                    _valid_states = open_list & pre_sym
+                    # if isinstance(pre_sym, list):
+                    #     # all the precondtions should be met
+                    #     _test = self.manager.bddZero() 
+                    #     for p_sym in pre_sym:
+                    #         _test |= open_list[layer] & p_sym
+                    
+                    _valid_states = open_list[layer] & pre_sym
                     if not _valid_states.isZero():
                         # compute the successor state and their label
-                        # add_effects = tuple(action.add_effects)
-                        # del_effects = tuple(action.del_effects)
-
-                        # add_list = [self.predicate_sym_map_nxt.get(add_effect) for add_effect in add_effects]
-                        # del_list = [self.predicate_sym_map_nxt.get(del_effect) for del_effect in del_effects]
-
-                        # if len(add_list) != 0:
-                        #     add_sym = reduce(lambda a, b: a | b, add_list)
-                        # else:
-                        #     add_sym = self.manager.bddOne()
-                        # if len(del_list) != 0:
-                        #     del_sym = reduce(lambda a, b: a | b, del_list)
-                        # else:
-                        #     del_sym = self.manager.bddZero()
                         add_sym = self._get_sym_add_conds(action)
                         del_sym = self._get_sym_delete_conds(action)
                         
                         # successor states 
-                        # succ_state = add_sym & ~del_sym
-                        succ_state = _valid_states.restrict(del_sym) & add_sym
-                        
-                        # for cube in _valid_states.generate_cubes():
-                        #     # convert literal to string
-                        #     dd = self.manager.fromLiteralList(cube)
-                        #     # TODO: FIX THIS iIN FUTURE
-                        #     composed_succ_state_lbls = self._get_succ_sym_lbl(box_loc_dict=box_loc_dict,
-                        #                                                       curr_states=dd,
-                        #                                                       succ_state=succ_state,
-                        #                                                       ts_x_cube=ts_x_cube)
-                        
-                        # add them to the open list
-
-                        # open_list |= composed_succ_state_lbls.swapVariables(self.sym_vars_curr, self.sym_vars_next)
-                        if layer in open_list:
-                            open_list[layer] |= succ_state
+                        if del_sym is None:
+                            # not deleting anything, just adding
+                            succ_state = _valid_states | add_sym
                         else:
-                            open_list = succ_state
+                            succ_state = _valid_states.restrict(del_sym) & add_sym
+                        
+                        if layer + 1 in open_list:
+                            open_list[layer + 1] |= succ_state
+                        else:
+                            open_list[layer + 1] = succ_state
                 
                 layer += 1
