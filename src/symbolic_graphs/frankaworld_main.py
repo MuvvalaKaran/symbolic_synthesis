@@ -140,23 +140,46 @@ class FrankaWorld(BaseSymMain):
          3) all holding predicates 
          4) rest of the predicates - holding, ready, to-obj, and to-loc predicates. We do create prime version for these. 
         """
-        on_list = []
-        gripper_list = []
-        holding_list = []
-        others_list = []
+        # on_list = []
+        # gripper_list = []
+        # holding_list = []
+        # others_list = []
+
+        predicate_dict = {
+            'ready': [],
+            'on': [],
+            'gripper': [],
+            'to_obj': [],
+            'holding': [],
+            'to_loc': [],
+            
+        }
+
         for pred in predicates:
             if 'on' in pred:
-                on_list.append(pred)
+                predicate_dict['on'].append(pred)
+                # on_list.append(pred)
             elif 'gripper' in pred:
-                gripper_list.append(pred)
-            # elif 'holding' in pred:
-            #     holding_list.append(pred)
+                # gripper_list.append(pred)
+                predicate_dict['gripper'].append(pred)
+            elif 'holding' in pred:
+                # holding_list.append(pred)
+                predicate_dict['holding'].append(pred)
+            elif 'ready' in pred:
+                predicate_dict['ready'].append(pred)
+            elif 'to-obj' in pred:
+                predicate_dict['to_obj'].append(pred)
+            elif 'to-loc' in pred:
+                predicate_dict['to_loc'].append(pred)
             else:
+                warnings.warn("Encountered an unexpected action in the Domain file actions. FIX THIS!!!")
+                sys.exit()
                 others_list.append(pred)
         
-        assert len(gripper_list) == 1, "Error segregating predicates before creating sym boolean vars. FIX THIS!!!"
+        assert len(predicate_dict['gripper']) == 1, "Error segregating predicates before creating sym boolean vars. FIX THIS!!!"
 
-        return on_list, gripper_list, holding_list, others_list
+        # return on_list, gripper_list, holding_list, others_list
+        return predicate_dict
 
 
     def create_symbolic_causal_graph(self, draw_causal_graph: bool = False, add_flag: bool = False):
@@ -180,26 +203,37 @@ class FrankaWorld(BaseSymMain):
         task_facts = _causal_graph_instance.task.facts
 
         # segregate grounded predicates into thre categories, 1) gripper predicates, 2) on predicates, 3) all other prdicates
-        on_list, gripper_list, holding_list, others_list = self._segregate_predicates(predicates=task_facts)
+        # on_list, gripper_list, holding_list, others_list = self._segregate_predicates(predicates=task_facts)
+        seg_preds = self._segregate_predicates(predicates=task_facts)
 
-        # for book keeping purposed
-        seg_preds = {'gripper': gripper_list,
-                     'on': on_list,
-                    #  'holding': holding_list,
-                     'others': others_list
-                      }
+        # # for book keeping purposed
+        # seg_preds = {'gripper': gripper_list,
+        #              'on': on_list,
+        #             #  'holding': holding_list,
+        #              'others': others_list
+        #               }
 
-        curr_state, next_state = self.create_symbolic_vars(num_of_facts=len(others_list),
-                                                           add_flag=add_flag)
+        sym_vars = dict(seg_preds)  # shallow copy to avoid chaing the org content
+
+
+        # pass the predicates in this specific order - ready, on, gripper, to-obj, holding, to-loc
+        sym_vars['ready'] = self._create_symbolic_lbl_vars(domain_facts=seg_preds['ready'], state_var_name='r', add_flag=False)
+        sym_vars['on'] = self._create_symbolic_lbl_vars(domain_facts=seg_preds['on'], state_var_name='b', add_flag=False)
+        sym_vars['gripper'] = self._create_symbolic_lbl_vars(domain_facts=seg_preds['gripper'], state_var_name='f', add_flag=False)
+        sym_vars['to_obj'] = self._create_symbolic_lbl_vars(domain_facts=seg_preds['to_obj'], state_var_name='t', add_flag=False)
+        sym_vars['holding'] = self._create_symbolic_lbl_vars(domain_facts=seg_preds['holding'], state_var_name='h', add_flag=False)
+        sym_vars['to_loc'] = self._create_symbolic_lbl_vars(domain_facts=seg_preds['to_loc'], state_var_name='l', add_flag=False)
+
+
+        # curr_state, next_state = self.create_symbolic_vars(num_of_facts=len(others_list),
+        #                                                    add_flag=add_flag)
         
         
         # the number of boolean variables (|x|) = log⌈|facts|⌉ - Because facts represent all possible predicates in our causal graph 
         # curr_state, next_state = self.create_symbolic_vars(num_of_facts=len(task_facts),
         #                                                    add_flag=add_flag)
 
-        gripper_var = self._create_symbolic_lbl_vars(domain_facts=gripper_list, state_var_name='f', add_flag=False)
-        on_vars = self._create_symbolic_lbl_vars(domain_facts=on_list, state_var_name='b', add_flag=False)
-        # holding_vars = self._create_symbolic_lbl_vars(domain_facts=holding_list, state_var_name='h', add_flag=False)
+        
 
         
         # lbl_vars = self.create_symbolic_lbl_vars(causal_graph_instance=_causal_graph_instance,
@@ -208,7 +242,8 @@ class FrankaWorld(BaseSymMain):
         # _boxes: list = _causal_graph_instance.task_objects  # boxes 
         # _locs: list = _causal_graph_instance.task_locations  # locs
 
-        return _causal_graph_instance.task, _causal_graph_instance.problem.domain, curr_state, next_state, gripper_var, on_vars, None, seg_preds
+        # return _causal_graph_instance.task, _causal_graph_instance.problem.domain, curr_state, next_state, gripper_var, on_vars, None, seg_preds
+        return _causal_graph_instance.task, _causal_graph_instance.problem.domain, sym_vars, seg_preds
         #  lbl_vars, _boxes, _locs
     
 
@@ -218,13 +253,16 @@ class FrankaWorld(BaseSymMain):
         """
         # task, domain, ts_curr_state, ts_next_state, ts_lbl_vars, ts_boxes, ts_locs  = self.create_symbolic_causal_graph(draw_causal_graph=False)
 
-        task, domain, ts_curr_state, ts_next_state, ts_gripper_var, ts_on_vars, ts_holding_vars, seg_preds  = self.create_symbolic_causal_graph(draw_causal_graph=False)
+        # task, domain, ts_curr_state, ts_next_state, ts_gripper_var, ts_on_vars, ts_holding_vars, seg_preds  = self.create_symbolic_causal_graph(draw_causal_graph=False)
 
-        sym_tr = SymbolicFrankaTransitionSystem(curr_states=ts_curr_state,
-                                                next_states=ts_next_state,
-                                                gripper_var=ts_gripper_var,
-                                                on_vars=ts_on_vars,
-                                                holding_vars=ts_holding_vars,
+        task, domain, ts_sym_vars, seg_preds = self.create_symbolic_causal_graph(draw_causal_graph=False)
+
+        sym_tr = SymbolicFrankaTransitionSystem( sym_vars_dict=ts_sym_vars,
+            # curr_states=ts_curr_state,
+            #                                     next_states=ts_next_state,
+            #                                     gripper_var=ts_gripper_var,
+            #                                     on_vars=ts_on_vars,
+            #                                     holding_vars=ts_holding_vars,
                                                 task=task,
                                                 domain=domain,
                                                 manager=self.manager,

@@ -539,13 +539,15 @@ class SymbolicFrankaTransitionSystem():
      A class to construct the symblic transition system for the Robotic manipulator example.
     """
 
-    def __init__(self, curr_states: list , next_states: list, gripper_var, on_vars, holding_vars, task, domain, manager, seg_facts: dict) -> None:
-        self.sym_vars_curr = curr_states
-        self.sym_vars_next = next_states
+    # def __init__(self, curr_states: list , next_states: list, gripper_var, on_vars, holding_vars, task, domain, manager, seg_facts: dict):
+    def __init__(self, sym_vars_dict: dict, task, domain, manager, seg_facts: dict):
+        # self.sym_vars_curr = curr_states
+        # self.sym_vars_next = next_states
         # self.sym_vars_lbl = lbl_states
-        self.sym_gripper_var = gripper_var
-        self.sym_on_vars = on_vars
+        # self.sym_gripper_var = gripper_var
+        # self.sym_on_vars = on_vars
         # self.sym_holding_vars = holding_vars
+        self.sym_vars_dict: dict = sym_vars_dict
         self.seg_facts_dict: dict = seg_facts 
 
         self.init: frozenset = task.initial_state
@@ -610,18 +612,19 @@ class SymbolicFrankaTransitionSystem():
         # nxt_flag: bool = False
 
         # create all combinations of 1-true and 0-false; choose the appropriate length of the boolean formula based on the caterogy of predicate
-        if 'on' == pred_type:
-            boolean_str = list(product([1, 0], repeat=len(self.sym_on_vars)))
-            sym_vars = self.sym_on_vars
-        elif 'gripper' == pred_type:
-            boolean_str = list(product([1, 0], repeat=1))
-            sym_vars = self.sym_gripper_var
+        # if 'on' == pred_type:
+        # boolean_str = list(product([1, 0], repeat=len(self.sym_on_vars)))
+        boolean_str = list(product([1, 0], repeat=len(self.sym_vars_dict[pred_type])))
+        sym_vars = self.sym_vars_dict[pred_type]
+        # elif 'gripper' == pred_type:
+        #     boolean_str = list(product([1, 0], repeat=1))
+        #     sym_vars = self.sym_gripper_var
         # elif 'holding' == pred_type:
         #     boolean_str = list(product([1, 0], repeat=len(self.sym_holding_vars)))
         #     sym_vars = self.sym_holding_vars
-        else:
-            boolean_str = list(product([1, 0], repeat=len(self.sym_vars_curr)))
-            sym_vars = self.sym_vars_curr
+        # else:
+        #     boolean_str = list(product([1, 0], repeat=len(self.sym_vars_curr)))
+        #     sym_vars = self.sym_vars_curr
             # nxt_flag = True
 
         _node_int_map_curr = bidict({state: boolean_str[index] for index, state in enumerate(facts)})
@@ -827,10 +830,10 @@ class SymbolicFrankaTransitionSystem():
 
         del_list = [self.predicate_sym_map_curr.get(del_effect) for del_effect in del_effects]
         # if release take the union of pre conds as they are of same var type
-        if 'release' in action.name:
-            del_sym = reduce(lambda a, b: a | b, del_list)
-        else:
-            del_sym = reduce(lambda a, b: a & b, del_list)
+        # if 'release' in action.name:
+        #     del_sym = reduce(lambda a, b: a | b, del_list)
+        # else:
+        del_sym = reduce(lambda a, b: a & b, del_list)
 
         # return del_sym.swapVariables(self.sym_vars_curr, self.sym_vars_next)
         return del_sym
@@ -883,9 +886,19 @@ class SymbolicFrankaTransitionSystem():
                     #     for p_sym in pre_sym:
                     #         _test |= open_list[layer] & p_sym
                     
-                    _valid_states = open_list[layer] & pre_sym
-                    if not _valid_states.isZero():
+                    # _valid_states = open_list[layer] & pre_sym
+                    # _valid_states = pre_sym <= open_list[layer]
+                    
+                    # check if pre_sym is in support
+                    in_support : bool = not (open_list[layer].restrict(pre_sym) == open_list[layer])
+
+                    #if yes, check if there is an intersection 
+                    _intersect = not (pre_sym & open_list[layer]).isZero()
+
+                    # if not (open_list[layer].restrict(pre_sym)) and (open_list[layer].restrict(pre_sym) == open_list[layer]):
+                    if in_support and _intersect:
                         # compute the successor state and their label
+                        _valid_states = open_list[layer] & pre_sym
                         add_sym = self._get_sym_add_conds(action)
                         del_sym = self._get_sym_delete_conds(action)
                         
