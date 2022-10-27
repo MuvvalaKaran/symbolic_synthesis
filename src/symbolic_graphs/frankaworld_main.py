@@ -1,7 +1,8 @@
-from multiprocessing import managers
 import sys
 import math
 import warnings
+from itertools import product
+from itertools import combinations
 
 from typing import Tuple, List, Dict, Union
 from cudd import Cudd, BDD, ADD
@@ -45,13 +46,13 @@ class FrankaWorld(BaseSymMain):
         self.create_lbls: bool = create_lbls
     
 
-    def build_abstraction(self):
+    def build_abstraction(self, draw_causal_graph: bool = False):
         """
         A main function that construct a symbolic Franka World TS and its corresponsing DFA
         """
         print("*****************Creating Boolean variables for Frankaworld!*****************")
 
-        sym_tr, ts_curr_state, ts_next_state, ts_lbl_states = self.build_bdd_abstraction()
+        sym_tr, ts_curr_state, ts_next_state, ts_lbl_states = self.build_bdd_abstraction(draw_causal_graph=draw_causal_graph)
 
         dfa_tr, dfa_curr_state, dfa_next_state = self.build_bdd_symbolic_dfa(sym_tr_handle=sym_tr)
     
@@ -131,7 +132,46 @@ class FrankaWorld(BaseSymMain):
         return state_lbl_vars
     
 
-    def _segregate_predicates(self, predicates: List[str]) -> Tuple[List[str], List[str], List[str]]:
+    def __get_all_box_combos(self, boxes_dict: dict) -> List:
+        """
+        The franka world has the world configuration (on b# l#) embedded into it's state defination. 
+        Also, we could all n but 1 boxes ground with that single box (not grounded) being currentl manipulated.
+
+        Thus, a valid set of state labels be
+
+        1) all boxes grounded - (on b0 l0)(on b1 l1)...
+        2) all but 1 grounded - (on b0 l0)(~(on b1 l1))(on b2 l2)
+
+        Thus, we need to create enough bool variables to accomodate all these possible configurations
+        """
+        parent_combo_list = []
+
+        # create all ground configurations
+        all_preds = [val for _, val in boxes_dict.items()]
+        all_combos = list(product(*all_preds, repeat=1))
+
+        parent_combo_list.extend(all_combos)
+
+        # create n-1 combos
+        num_of_boxes = len(boxes_dict)
+
+        # create all possible n-1 combinations all boxes
+        combos = combinations([*boxes_dict.keys()], num_of_boxes - 1)
+
+        if num_of_boxes - 1 == 1:
+            return parent_combo_list
+
+        # iterate through every possible combo
+        for combo in combos:
+            # iterate through the tuple of boxes and create their combos
+            box_loc_list = [boxes_dict[box] for box in combo]
+            parent_combo_list.extend(list(product(*box_loc_list, repeat=1)))
+
+        return parent_combo_list
+
+    
+
+    def _segregate_predicates(self, predicates: List[str], boxes: List[str]) -> Tuple[List[str], List[str], List[str]]:
         """
         A helper function that segretaes the predicates as required by the symbolic transition relation. We separate them based on
 
@@ -140,41 +180,48 @@ class FrankaWorld(BaseSymMain):
          3) all holding predicates 
          4) rest of the predicates - holding, ready, to-obj, and to-loc predicates. We do create prime version for these. 
         """
-        # on_list = []
-        # gripper_list = []
-        # holding_list = []
-        # others_list = []
 
         predicate_dict = {
-            'ready': [],
+            # 'ready': [],
             'on': [],
             'gripper': [],
-            'to_obj': [],
+            # 'to_obj': [],
             'holding': [],
             'to_loc': [],
-            
+            'others': []
         }
+
+        # dictionary where we segreate on predicates based on boxes - all b0, b1 ,... into seperate list 
+        boxes_dict = {box: [] for box in boxes} 
 
         for pred in predicates:
             if 'on' in pred:
                 predicate_dict['on'].append(pred)
-                # on_list.append(pred)
+                for b in boxes:
+                    if b in pred:
+                        boxes_dict[b].append(pred)
+                        break
+                        
             elif 'gripper' in pred:
-                # gripper_list.append(pred)
                 predicate_dict['gripper'].append(pred)
-            elif 'holding' in pred:
-                # holding_list.append(pred)
-                predicate_dict['holding'].append(pred)
-            elif 'ready' in pred:
-                predicate_dict['ready'].append(pred)
-            elif 'to-obj' in pred:
-                predicate_dict['to_obj'].append(pred)
-            elif 'to-loc' in pred:
-                predicate_dict['to_loc'].append(pred)
+            
             else:
-                warnings.warn("Encountered an unexpected action in the Domain file actions. FIX THIS!!!")
-                sys.exit()
-                others_list.append(pred)
+                predicate_dict['others'].append(pred)
+                # stored separately so that we can then take =create all possible combos        
+                if 'holding' in pred:
+                    predicate_dict['holding'].append(pred)
+                elif 'to-loc' in pred:
+                    predicate_dict['to_loc'].append(pred)
+        
+        # we create single, n and n-1 combos - n all bozes are grounded and n-1 when one of the boxes is being manipulated
+        aug_on_state = self.__get_all_box_combos(boxes_dict=boxes_dict)
+        predicate_dict['on'].extend(aug_on_state)
+            
+        # augment the predicate list with all prermutations of holding and to-loc states 
+        aug_states = list(product(predicate_dict['holding'], predicate_dict['to_loc'], repeat=1))
+
+        # add them to the others list 
+        predicate_dict['others'].extend(aug_states)
         
         assert len(predicate_dict['gripper']) == 1, "Error segregating predicates before creating sym boolean vars. FIX THIS!!!"
 
@@ -198,56 +245,38 @@ class FrankaWorld(BaseSymMain):
                                              draw=draw_causal_graph)
 
         _causal_graph_instance.build_causal_graph(add_cooccuring_edges=False, relabel=False)
-        # print("No. of edges in the graph:", len(_causal_graph_instance.causal_graph._graph.edges()))
 
         task_facts = _causal_graph_instance.task.facts
+        task_boxes = _causal_graph_instance.task_objects  # boxes
 
         # segregate grounded predicates into thre categories, 1) gripper predicates, 2) on predicates, 3) all other prdicates
-        # on_list, gripper_list, holding_list, others_list = self._segregate_predicates(predicates=task_facts)
-        seg_preds = self._segregate_predicates(predicates=task_facts)
+        seg_preds = self._segregate_predicates(boxes=task_boxes, predicates=task_facts)
 
-        # # for book keeping purposed
-        # seg_preds = {'gripper': gripper_list,
-        #              'on': on_list,
-        #             #  'holding': holding_list,
-        #              'others': others_list
-        #               }
+        sym_vars = dict(seg_preds)  # shallow copy to avoid changing the org content
 
-        sym_vars = dict(seg_preds)  # shallow copy to avoid chaing the org content
+        # removing redundant predicates and copy predicates in others for next state look up dictionary
+        del seg_preds['holding']
+        del seg_preds['to_loc']
 
+        seg_preds['curr_state'] = seg_preds['others']
+        seg_preds['next_state'] = seg_preds['others']
+
+        del seg_preds['others']
 
         # pass the predicates in this specific order - ready, on, gripper, to-obj, holding, to-loc
-        sym_vars['ready'] = self._create_symbolic_lbl_vars(domain_facts=seg_preds['ready'], state_var_name='r', add_flag=False)
-        sym_vars['on'] = self._create_symbolic_lbl_vars(domain_facts=seg_preds['on'], state_var_name='b', add_flag=False)
-        sym_vars['gripper'] = self._create_symbolic_lbl_vars(domain_facts=seg_preds['gripper'], state_var_name='f', add_flag=False)
-        sym_vars['to_obj'] = self._create_symbolic_lbl_vars(domain_facts=seg_preds['to_obj'], state_var_name='t', add_flag=False)
-        sym_vars['holding'] = self._create_symbolic_lbl_vars(domain_facts=seg_preds['holding'], state_var_name='h', add_flag=False)
-        sym_vars['to_loc'] = self._create_symbolic_lbl_vars(domain_facts=seg_preds['to_loc'], state_var_name='l', add_flag=False)
+        sym_vars['on'] = self._create_symbolic_lbl_vars(domain_facts=seg_preds['on'], state_var_name='b', add_flag=add_flag)
+        sym_vars['gripper'] = self._create_symbolic_lbl_vars(domain_facts=seg_preds['gripper'], state_var_name='f', add_flag=add_flag)
 
+        curr_state, next_state = self.create_symbolic_vars(num_of_facts=len(sym_vars['others']),
+                                                           add_flag=add_flag)
 
-        # curr_state, next_state = self.create_symbolic_vars(num_of_facts=len(others_list),
-        #                                                    add_flag=add_flag)
+        sym_vars['curr_state'] = curr_state
+        sym_vars['next_state'] = next_state
         
-        
-        # the number of boolean variables (|x|) = log⌈|facts|⌉ - Because facts represent all possible predicates in our causal graph 
-        # curr_state, next_state = self.create_symbolic_vars(num_of_facts=len(task_facts),
-        #                                                    add_flag=add_flag)
-
-        
-
-        
-        # lbl_vars = self.create_symbolic_lbl_vars(causal_graph_instance=_causal_graph_instance,
-        #                                          add_flag=add_flag)
-        
-        # _boxes: list = _causal_graph_instance.task_objects  # boxes 
-        # _locs: list = _causal_graph_instance.task_locations  # locs
-
-        # return _causal_graph_instance.task, _causal_graph_instance.problem.domain, curr_state, next_state, gripper_var, on_vars, None, seg_preds
         return _causal_graph_instance.task, _causal_graph_instance.problem.domain, sym_vars, seg_preds
-        #  lbl_vars, _boxes, _locs
-    
+        
 
-    def build_bdd_abstraction(self):
+    def build_bdd_abstraction(self, draw_causal_graph: bool = False):
         """
          Main Function to Build Transition System that only represent valid edges without any weights
         """
@@ -255,14 +284,9 @@ class FrankaWorld(BaseSymMain):
 
         # task, domain, ts_curr_state, ts_next_state, ts_gripper_var, ts_on_vars, ts_holding_vars, seg_preds  = self.create_symbolic_causal_graph(draw_causal_graph=False)
 
-        task, domain, ts_sym_vars, seg_preds = self.create_symbolic_causal_graph(draw_causal_graph=False)
+        task, domain, ts_sym_vars, seg_preds = self.create_symbolic_causal_graph(draw_causal_graph=draw_causal_graph)
 
-        sym_tr = SymbolicFrankaTransitionSystem( sym_vars_dict=ts_sym_vars,
-            # curr_states=ts_curr_state,
-            #                                     next_states=ts_next_state,
-            #                                     gripper_var=ts_gripper_var,
-            #                                     on_vars=ts_on_vars,
-            #                                     holding_vars=ts_holding_vars,
+        sym_tr = SymbolicFrankaTransitionSystem(sym_vars_dict=ts_sym_vars,
                                                 task=task,
                                                 domain=domain,
                                                 manager=self.manager,

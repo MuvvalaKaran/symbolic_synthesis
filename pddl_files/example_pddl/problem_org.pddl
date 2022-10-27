@@ -9,24 +9,24 @@
 
     b0 - box
     b1 - box
-    ;b2 - box
-
+    b2 - box
 
 )
 
 ;todo: put the initial state's facts and numeric values here
 (:init
     (ready else)
-    (gripper free)
     
     (on b0 l0)
     (on b1 l1)
-    ;(on b2 l2)
+    (on b2 l2)
 )
 
 (:goal 
 (and
     (on b0 l0)
+    (on b1 l1)
+    (on b2 l2)
 )
 
 )
