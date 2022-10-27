@@ -184,46 +184,46 @@ class FrankaWorld(BaseSymMain):
         predicate_dict = {
             # 'ready': [],
             'on': [],
-            'gripper': [],
+            # 'gripper': [],
             # 'to_obj': [],
-            'holding': [],
-            'to_loc': [],
+            # 'holding': [],
+            # 'to_loc': [],
             'others': []
         }
 
         # dictionary where we segreate on predicates based on boxes - all b0, b1 ,... into seperate list 
-        boxes_dict = {box: [] for box in boxes} 
+        # boxes_dict = {box: [] for box in boxes} 
 
         for pred in predicates:
-            if 'on' in pred:
+            if 'on' in pred or 'gripper' in pred:
                 predicate_dict['on'].append(pred)
-                for b in boxes:
-                    if b in pred:
-                        boxes_dict[b].append(pred)
-                        break
+                # for b in boxes:
+                #     if b in pred:
+                #         boxes_dict[b].append(pred)
+                #         break
                         
-            elif 'gripper' in pred:
-                predicate_dict['gripper'].append(pred)
+            # elif 'gripper' in pred:
+            #     predicate_dict['gripper'].append(pred)
             
             else:
                 predicate_dict['others'].append(pred)
                 # stored separately so that we can then take =create all possible combos        
-                if 'holding' in pred:
-                    predicate_dict['holding'].append(pred)
-                elif 'to-loc' in pred:
-                    predicate_dict['to_loc'].append(pred)
+                # if 'holding' in pred:
+                #     predicate_dict['holding'].append(pred)
+                # elif 'to-loc' in pred:
+                #     predicate_dict['to_loc'].append(pred)
         
         # we create single, n and n-1 combos - n all bozes are grounded and n-1 when one of the boxes is being manipulated
-        aug_on_state = self.__get_all_box_combos(boxes_dict=boxes_dict)
-        predicate_dict['on'].extend(aug_on_state)
+        # aug_on_state = self.__get_all_box_combos(boxes_dict=boxes_dict)
+        # predicate_dict['on'].extend(aug_on_state)
             
         # augment the predicate list with all prermutations of holding and to-loc states 
-        aug_states = list(product(predicate_dict['holding'], predicate_dict['to_loc'], repeat=1))
+        # aug_states = list(product(predicate_dict['holding'], predicate_dict['to_loc'], repeat=1))
 
         # add them to the others list 
-        predicate_dict['others'].extend(aug_states)
+        # predicate_dict['others'].extend(aug_states)
         
-        assert len(predicate_dict['gripper']) == 1, "Error segregating predicates before creating sym boolean vars. FIX THIS!!!"
+        # assert len(predicate_dict['gripper']) == 1, "Error segregating predicates before creating sym boolean vars. FIX THIS!!!"
 
         # return on_list, gripper_list, holding_list, others_list
         return predicate_dict
@@ -255,8 +255,8 @@ class FrankaWorld(BaseSymMain):
         sym_vars = dict(seg_preds)  # shallow copy to avoid changing the org content
 
         # removing redundant predicates and copy predicates in others for next state look up dictionary
-        del seg_preds['holding']
-        del seg_preds['to_loc']
+        # del seg_preds['holding']
+        # del seg_preds['to_loc']
 
         seg_preds['curr_state'] = seg_preds['others']
         seg_preds['next_state'] = seg_preds['others']
@@ -265,7 +265,7 @@ class FrankaWorld(BaseSymMain):
 
         # pass the predicates in this specific order - ready, on, gripper, to-obj, holding, to-loc
         sym_vars['on'] = self._create_symbolic_lbl_vars(domain_facts=seg_preds['on'], state_var_name='b', add_flag=add_flag)
-        sym_vars['gripper'] = self._create_symbolic_lbl_vars(domain_facts=seg_preds['gripper'], state_var_name='f', add_flag=add_flag)
+        # sym_vars['gripper'] = self._create_symbolic_lbl_vars(domain_facts=seg_preds['gripper'], state_var_name='f', add_flag=add_flag)
 
         curr_state, next_state = self.create_symbolic_vars(num_of_facts=len(sym_vars['others']),
                                                            add_flag=add_flag)
@@ -280,10 +280,6 @@ class FrankaWorld(BaseSymMain):
         """
          Main Function to Build Transition System that only represent valid edges without any weights
         """
-        # task, domain, ts_curr_state, ts_next_state, ts_lbl_vars, ts_boxes, ts_locs  = self.create_symbolic_causal_graph(draw_causal_graph=False)
-
-        # task, domain, ts_curr_state, ts_next_state, ts_gripper_var, ts_on_vars, ts_holding_vars, seg_preds  = self.create_symbolic_causal_graph(draw_causal_graph=False)
-
         task, domain, ts_sym_vars, seg_preds = self.create_symbolic_causal_graph(draw_causal_graph=draw_causal_graph)
 
         sym_tr = SymbolicFrankaTransitionSystem(sym_vars_dict=ts_sym_vars,
