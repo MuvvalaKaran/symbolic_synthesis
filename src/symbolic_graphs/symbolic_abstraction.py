@@ -10,6 +10,7 @@ from functools import reduce
 from cudd import Cudd, BDD, ADD
 from itertools import product, zip_longest
 
+from src.explicit_graphs import CausalGraph, FiniteTransitionSystem
 
 from bidict import bidict
 
@@ -540,7 +541,7 @@ class SymbolicFrankaTransitionSystem():
     """
 
     # def __init__(self, curr_states: list , next_states: list, gripper_var, on_vars, holding_vars, task, domain, manager, seg_facts: dict):
-    def __init__(self, sym_vars_dict: dict, task, domain, manager, seg_facts: dict):
+    def __init__(self, sym_vars_dict: dict, task, domain, boxes: List[str], manager: Cudd, seg_facts: dict):
         # self.sym_vars_curr = curr_states
         # self.sym_vars_next = next_states
         # self.sym_vars_lbl = lbl_states
@@ -552,7 +553,8 @@ class SymbolicFrankaTransitionSystem():
 
         self.init: frozenset = task.initial_state
         self.goal: frozenset = task.goals
-        self.facts:dict = task.facts
+        self.facts: dict = task.facts
+        self.boxes: List[str] = boxes 
         self.task: dict = task
         self.domain: dict = domain
         self.manager = manager
@@ -664,6 +666,7 @@ class SymbolicFrankaTransitionSystem():
 
         
         return _node_int_map_curr
+
     
     def print_state_lbl_dd(self, dd_func: BDD, ts_x_cube: BDD, lbl_cube: BDD) -> Tuple[List[str], List[str]]:
         """
@@ -671,18 +674,28 @@ class SymbolicFrankaTransitionSystem():
          looks up their correpsonding state name and prints it.  
         """
         only_states: BDD = dd_func.existAbstract(lbl_cube)
-        only_lbls: BDD = dd_func.existAbstract(ts_x_cube)
+        # only_lbls: BDD = dd_func.existAbstract(ts_x_cube)
+
+        # testing 
+        prod_cube = self._convert_state_lbl_cube_to_func(dd_func=dd_func, prod_curr_list=self.sym_vars_dict['curr_state'] + self.sym_vars_dict['on'])
+
+        state_cube_string: List[BDD] = self._convert_state_lbl_cube_to_func(dd_func=only_states, prod_curr_list=self.sym_vars_dict['curr_state'])
         
-        state_cube_string: List[BDD] = self.__convert_state_lbl_cube_to_func(dd_func=only_states, prod_curr_list=self.sym_vars_dict['curr_state'])
-        lbl_cube_string: List[BDD] = self.__convert_state_lbl_cube_to_func(dd_func=only_lbls, prod_curr_list=self.sym_vars_dict['on'])
+        # for each of those states, extract their corresponding labels
+        s_lbl_list = []
+        for scube in state_cube_string:
+            s_lbl_dd = dd_func.restrict(scube)
+            s_lbl_cube: List[BDD] = self._convert_state_lbl_cube_to_func(dd_func=s_lbl_dd, prod_curr_list=self.sym_vars_dict['on'])
+            s_lbl_list = [self.predicate_sym_map_lbl.inv[sym_s] for sym_s in s_lbl_cube]
+        # lbl_cube_string: List[BDD] = self._convert_state_lbl_cube_to_func(dd_func=only_lbls, prod_curr_list=self.sym_vars_dict['on'])
         states = [self.predicate_sym_map_curr.inv[sym_s] for sym_s in state_cube_string]
-        lbls = [self.predicate_sym_map_lbl.inv[sym_s] for sym_s in lbl_cube_string]
+        # lbls = [self.predicate_sym_map_lbl.inv[sym_s] for sym_s in lbl_cube_string]
+        lbls = s_lbl_list
 
         return states, lbls
 
 
-
-    def __convert_state_lbl_cube_to_func(self, dd_func: BDD, prod_curr_list = None):
+    def _convert_state_lbl_cube_to_func(self, dd_func: BDD, prod_curr_list = None):
         """
          A helper function to extract a cubes from the DD and print them in human-readable form. 
         """
@@ -762,7 +775,41 @@ class SymbolicFrankaTransitionSystem():
         return True
     
 
-    def _compute_valid_states(self, preconditions: List[str], curr_states: BDD, ts_x_cube: BDD, lbl_cube: BDD) -> BDD:
+    def _check_exist_constraint(self, curr_state_lbl: BDD, action_name: str) -> bool:
+        """
+        A helper function that take as input the state label (on b0 l0)(on b1 l1) and the action name,
+         extracts the destination location from action name and its corresponding symbolic formula.
+         We then take the intersection of the  sym_state_lbl & not(exist_constraint).
+         
+        Return True if intersection is non-empty else False
+        """
+        finite_ts = FiniteTransitionSystem(None)
+        exist_constr = self.manager.bddZero()
+        if 'transfer' in action_name: 
+            box_id, locs = finite_ts._get_multiple_box_location(multiple_box_location_str=action_name)
+            dloc = locs[1]
+        elif 'release' in action_name:
+            box_id, locs = finite_ts._get_box_location(box_location_state_str=action_name)
+            dloc = locs
+        
+        # if box1 is being manipulated, get the list of rest of boxes (that have to be grounded) at this instance
+        tmp_copy = copy.deepcopy(self.boxes)
+        tmp_copy.remove(f'b{box_id}')
+
+        # create predicates that say on b0 l1 (l1 is the destination in the action)
+        on_preds = [self.predicate_sym_map_lbl[f'(on {bid} {dloc})'] for bid in tmp_copy]
+        sym_constr = reduce(lambda a, b: a | b, on_preds)
+
+        _is_valid = curr_state_lbl & ~sym_constr
+
+        if _is_valid.isZero():
+            return False
+        
+        return True
+
+    
+
+    def _compute_valid_states(self, preconditions: List[str], curr_states: BDD, lbl_cube: BDD) -> BDD:
         """
         A function that compute the set of states that strictly satify the preconditions. 
 
@@ -775,62 +822,33 @@ class SymbolicFrankaTransitionSystem():
         Given a set of states S, to compute the set of states S' that satisfy preconditions  of release action, we take the
          intersection of each precondition and take the intersection of the intersections to compute S'. 
         """
-
-        # intr_lbl = []
         intr_state = []
-
-        # only_lbls = curr_states.existAbstract(ts_x_cube)
-        # only_state = curr_states.existAbstract(lbl_cube)
-        # for idx, state in enumerate(preconditions):
-        #     if 'gripper' in state or 'on' in state:
-        #         # intr_list.append(self.predicate_sym_map_lbl[state] & only_lbls)
-        #         intr_lbl.append(self.predicate_sym_map_lbl[state] & only_lbls)
-        #     else:
-        #         # intr_list.append(self.predicate_sym_map_curr[state] & only_state)
-        #         intr_state.append(self.predicate_sym_map_curr[state] & only_state)
-        
-        # _valid_pre = reduce(lambda x, y: x | y, intr_lbl) & reduce(lambda x, y: x | y, intr_state)
-
-        # _valid_pre_lbl = self.manager.bddZero()
-        # _valid_pre_state = self.manager.bddZero()
-        for idx, state in enumerate(preconditions):
+       
+        for state in preconditions:
             # state that satisfies a state conf pre configuration
             if 'gripper' in state or 'on' in state:
                 intr_state.append((self.predicate_sym_map_lbl[state] & curr_states).existAbstract(lbl_cube))
             # state that satistfies the pre conditions of the conf. of the  robot 
             else:
                 intr_state.append((self.predicate_sym_map_curr[state] & curr_states).existAbstract(lbl_cube))
-                # _valid_pre_state = _valid_pre_state & self.predicate_sym_map_curr[state] & curr_states
+    
+        _valid_pre_state = reduce(lambda x, y: x & y, intr_state)
         
-        # _valid_pre = _valid_pre_lbl & _valid_pre_state
-        try:
-            _valid_pre_state = reduce(lambda x, y: x & y, intr_state)
-            _valid_conf = curr_states.restrict(_valid_pre_state)
-            _valid_composed_state = _valid_pre_state & _valid_conf
-
-
-        # _valid_pre_lbl = self.manager.bddZero()
-        # _valid_pre_state = self.manager.bddZero()
-        # for idx, state in enumerate(preconditions):
-        #     if 'gripper' in state or 'on' in state:
-        #         _valid_pre_lbl = _valid_pre_lbl & self.predicate_sym_map_lbl[state] & curr_states
-        #     else:
-        #         _valid_pre_state = _valid_pre_state & self.predicate_sym_map_curr[state] & curr_states
-        
-        # _valid_pre = _valid_pre_lbl & _valid_pre_state
-
-            assert not _valid_composed_state.isZero(), \
-                "Error computing the set of valid pre states from which any kind of tranistion during Franka abstraction construction. FIX THIS!!!"
-        
-        except:
+        if _valid_pre_state.isZero():
+            # when only state conf are in the preconditions, intersection will give us those preconditions individually,
+            #  this we take the union
             _valid_pre_state = reduce(lambda x, y: x | y, intr_state)
-            _valid_conf = curr_states.restrict(_valid_pre_state)
-            _valid_composed_state = _valid_pre_state & _valid_conf
+
+        _valid_conf = curr_states.restrict(_valid_pre_state)
+        _valid_composed_state = _valid_pre_state & _valid_conf
+        
+        assert not _valid_composed_state.isZero(), \
+                "Error computing the set of valid pre states from which any kind of tranistion during Franka abstraction construction. FIX THIS!!!"
         
         return _valid_composed_state
 
 
-    def create_transition_system_franka(self, verbose:bool = False, plot: bool = False):
+    def create_transition_system_franka(self, add_exist_constr: bool = True, verbose:bool = False, plot: bool = False):
         """
          The construction of TR for the franka world is a bit different than the gridworld. In gridworld the
           complete information of the world, i.e., the agent current location is embedded and thus
@@ -840,6 +858,10 @@ class SymbolicFrankaTransitionSystem():
           explicitly mentioned in problem file. From here, we create the state (pre) and its corresponding labels,
           we unroll the graph by taking all valid actions, compute the image, and their corresponding labels and
           keep iterating until we reach a fix point. 
+        
+        @param add_exist_constr: Adds the existential constraint that
+            1) no other box should exist at the destination while performing Transfer action - transfer b# l# l#
+            2) no other box should exist at the drop location while performing Relase action - release b# l# 
         """
         if verbose:
             print(f"Creating TR for Actions {self.domain.actions}")
@@ -878,6 +900,8 @@ class SymbolicFrankaTransitionSystem():
 
                 # compute the image of the TS states 
                 for action in self.task.operators:
+                    # set action feasbility flag to True - used during transfer and release action to check the des loc is empty
+                    action_feas: bool = True
                     pre_sym = self._get_sym_conds(list(action.preconditions))
                     pre_sym_state = pre_sym.existAbstract(lbl_cube).swapVariables(self.sym_vars_dict['curr_state'], self.sym_vars_dict['next_state'])
 
@@ -888,13 +912,19 @@ class SymbolicFrankaTransitionSystem():
                         # compute the successor state and their label
                         _valid_pre = self._compute_valid_states(list(action.preconditions),
                                                                 curr_states=open_list[layer],
-                                                                ts_x_cube=ts_x_cube,
                                                                 lbl_cube=lbl_cube)
 
                         # extract the labels out 
                         state_lbls = _valid_pre.restrict(pre_sym)
                         if state_lbls.isOne():
                             state_lbls = open_list[layer].existAbstract(ts_x_cube)
+                        
+                        # add existential constraints to transfer and relase action
+                        if add_exist_constr and (('transfer' in action.name) or ('release' in action.name)):
+                            action_feas = self._check_exist_constraint(curr_state_lbl=state_lbls, action_name=action.name)
+                        
+                        if not action_feas:
+                            continue
 
                         add_sym = self._get_sym_conds(list(action.add_effects), nxt_state_flag=True)
                         del_sym = self._get_sym_conds(list(action.del_effects), nxt_state_flag=True)
@@ -906,7 +936,8 @@ class SymbolicFrankaTransitionSystem():
                             del_sym = del_sym.negate()
 
                         # check if there is anything to remove from pre -maybe all or none
-                        _del_pre_intr = del_sym & pre_sym_state
+                        _del_sym_state_only = del_sym.existAbstract(lbl_cube)
+                        _del_pre_intr = _del_sym_state_only & pre_sym_state
                         _pre_sym_state = pre_sym_state & ~(_del_pre_intr)
 
                         if del_nxt_state_lbls.isOne() and add_nxt_state_lbls.isOne():
@@ -941,7 +972,7 @@ class SymbolicFrankaTransitionSystem():
                             nstate, nlbl = self.print_state_lbl_dd(dd_func=nxt_state.swapVariables(self.sym_vars_dict['curr_state'], self.sym_vars_dict['next_state']),
                                                                    ts_x_cube=ts_x_cube,
                                                                    lbl_cube=lbl_cube)
-                            print(f"Adding edge: {cstate},{clbl} -------{action.name}------> {nstate}{nlbl}")
+                            print(f"Adding edge: {cstate}{clbl} -------{action.name}------> {nstate}{nlbl}")
 
                         # swap variables 
                         nxt_state = nxt_state.swapVariables(self.sym_vars_dict['curr_state'], self.sym_vars_dict['next_state'])

@@ -330,8 +330,6 @@ class SymbolicSearch(object):
         return bddVars
     
 
-   
-
     def composed_symbolic_bfs_wLTL(self, verbose: bool = False):
         """
         A function that compose the TR function from the Transition system and DFA and search symbolically over the product graph.
