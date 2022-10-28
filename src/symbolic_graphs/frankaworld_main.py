@@ -288,9 +288,7 @@ class FrankaWorld(BaseSymMain):
                                                 manager=self.manager,
                                                 seg_facts=seg_preds) 
 
-        sym_tr.create_transition_system_franka(task_objs=None,
-                                               task_locs=None,
-                                               verbose=self.verbose,
+        sym_tr.create_transition_system_franka(verbose=True,
                                                plot=self.plot_ts)
 
         return sym_tr, ts_curr_state, ts_next_state, None

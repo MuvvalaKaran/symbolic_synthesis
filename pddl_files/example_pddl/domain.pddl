@@ -50,8 +50,8 @@
     )
     :effect (and 
         (to-obj ?b ?l2)
+        (ready ?l2)
         (not (ready ?l1))
-        ;(not (on ?b ?l2))
     )
 )
 
@@ -64,9 +64,11 @@
     :parameters (?b - box ?l - box_loc)
     :precondition (and 
         (to-obj ?b ?l)
+        (ready ?l)
     )
     :effect (and 
         (holding ?b ?l)
+        (not (ready ?l))
         (not (to-obj ?b ?l))
         (not (on ?b ?l))
         (not (gripper free))
@@ -85,6 +87,8 @@
     )
     :effect (and 
         (to-loc ?b ?l2)
+        (not (holding ?b ?l1))
+        (holding ?b ?l2)
     )
 )
 
@@ -97,7 +101,7 @@
     :parameters (?b - box ?l - box_loc)
     :precondition (and
         (to-loc ?b ?l)
-        ;(holding ?b ?l)
+        (holding ?b ?l)
     )
     :effect (and
         (ready ?l)
