@@ -65,6 +65,7 @@
     :precondition (and 
         (to-obj ?b ?l)
         (ready ?l)
+        (on ?b ?l)
     )
     :effect (and 
         (holding ?b ?l)

@@ -124,8 +124,9 @@ class FrankaWorld(BaseSymMain):
 
         _causal_graph_instance.build_causal_graph(add_cooccuring_edges=False, relabel=False)
 
-        task_facts = _causal_graph_instance.task.facts
-        boxes = _causal_graph_instance.task_objects
+        task_facts: Lis[str] = _causal_graph_instance.task.facts
+        boxes: Lis[str] = _causal_graph_instance.task_objects
+        valid_locs: Lis[str] = _causal_graph_instance.task_locations
 
         # segregate grounded predicates into thre categories, 1) gripper predicates, 2) on predicates, 3) all other prdicates
         seg_preds = self._segregate_predicates(predicates=task_facts)
@@ -160,24 +161,25 @@ class FrankaWorld(BaseSymMain):
         sym_vars['curr_state'] = curr_state
         sym_vars['next_state'] = next_state
         
-        return _causal_graph_instance.task, _causal_graph_instance.problem.domain, sym_vars, seg_preds, boxes
+        return _causal_graph_instance.task, _causal_graph_instance.problem.domain, sym_vars, seg_preds, boxes, valid_locs
         
 
     def build_bdd_abstraction(self, draw_causal_graph: bool = False):
         """
          Main Function to Build Transition System that only represent valid edges without any weights
         """
-        task, domain, ts_sym_vars, seg_preds, boxes = self.create_symbolic_causal_graph(draw_causal_graph=draw_causal_graph,
+        task, domain, ts_sym_vars, seg_preds, boxes, locs = self.create_symbolic_causal_graph(draw_causal_graph=draw_causal_graph,
                                                                                  remove_flag=True)
 
         sym_tr = SymbolicFrankaTransitionSystem(sym_vars_dict=ts_sym_vars,
                                                 task=task,
                                                 domain=domain,
-                                                boxes=boxes,
                                                 manager=self.manager,
                                                 seg_facts=seg_preds) 
 
-        sym_tr.create_transition_system_franka(add_exist_constr=True,
+        sym_tr.create_transition_system_franka(boxes=boxes,
+                                               locs=locs,
+                                               add_exist_constr=True,
                                                verbose=True,
                                                plot=self.plot_ts)
 
