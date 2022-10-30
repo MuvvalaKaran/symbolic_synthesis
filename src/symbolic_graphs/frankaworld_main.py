@@ -169,19 +169,21 @@ class FrankaWorld(BaseSymMain):
          Main Function to Build Transition System that only represent valid edges without any weights
         """
         task, domain, ts_sym_vars, seg_preds, boxes, locs = self.create_symbolic_causal_graph(draw_causal_graph=draw_causal_graph,
-                                                                                 remove_flag=True)
+                                                                                              remove_flag=False)
 
         sym_tr = SymbolicFrankaTransitionSystem(sym_vars_dict=ts_sym_vars,
                                                 task=task,
                                                 domain=domain,
                                                 manager=self.manager,
-                                                seg_facts=seg_preds) 
+                                                seg_facts=seg_preds)
 
         sym_tr.create_transition_system_franka(boxes=boxes,
                                                locs=locs,
                                                add_exist_constr=True,
-                                               verbose=True,
+                                               verbose=False,
                                                plot=self.plot_ts)
+        
+        sys.exit(-1) 
 
         return sym_tr, ts_curr_state, ts_next_state, None
 

@@ -6,9 +6,10 @@ import warnings
 import graphviz as gv
 
 from typing import Tuple, List, Dict
+from collections import defaultdict
 from functools import reduce
 from cudd import Cudd, BDD, ADD
-from itertools import product, zip_longest
+from itertools import product
 
 from src.explicit_graphs import CausalGraph, FiniteTransitionSystem
 
@@ -675,7 +676,7 @@ class SymbolicFrankaTransitionSystem():
         # only_lbls: BDD = dd_func.existAbstract(ts_x_cube)
 
         # testing 
-        prod_cube = self._convert_state_lbl_cube_to_func(dd_func=dd_func, prod_curr_list=self.sym_vars_dict['curr_state'] + self.sym_vars_dict['on'])
+        # prod_cube = self._convert_state_lbl_cube_to_func(dd_func=dd_func, prod_curr_list=self.sym_vars_dict['curr_state'] + self.sym_vars_dict['on'])
 
         state_cube_string: List[BDD] = self._convert_state_lbl_cube_to_func(dd_func=only_states, prod_curr_list=self.sym_vars_dict['curr_state'])
         
@@ -683,8 +684,11 @@ class SymbolicFrankaTransitionSystem():
         s_lbl_list = []
         for scube in state_cube_string:
             s_lbl_dd = dd_func.restrict(scube)
+            if s_lbl_dd.isOne():
+                # print("WARNING: Got a state where none of the boxes are grounded. This should only happen when you have one object!")
+                continue
             s_lbl_cube: List[BDD] = self._convert_state_lbl_cube_to_func(dd_func=s_lbl_dd, prod_curr_list=self.sym_vars_dict['on'])
-            s_lbl_list = [self.predicate_sym_map_lbl.inv[sym_s] for sym_s in s_lbl_cube]
+            s_lbl_list = [self.predicate_sym_map_lbl.inv.get(sym_s, None) for sym_s in s_lbl_cube]
         # lbl_cube_string: List[BDD] = self._convert_state_lbl_cube_to_func(dd_func=only_lbls, prod_curr_list=self.sym_vars_dict['on'])
         states = [self.predicate_sym_map_curr.inv[sym_s] for sym_s in state_cube_string]
         # lbls = [self.predicate_sym_map_lbl.inv[sym_s] for sym_s in lbl_cube_string]
@@ -693,7 +697,7 @@ class SymbolicFrankaTransitionSystem():
         return states, lbls
 
 
-    def _convert_state_lbl_cube_to_func(self, dd_func: BDD, prod_curr_list = None):
+    def _convert_state_lbl_cube_to_func(self, dd_func: BDD, prod_curr_list = None) ->  List[BDD]:
         """
          A helper function to extract a cubes from the DD and print them in human-readable form. 
         """
@@ -836,23 +840,16 @@ class SymbolicFrankaTransitionSystem():
         if _valid_pre_state.isZero():
             # when only state conf are in the preconditions, intersection will give us those preconditions individually,
             # thus we take the union
-            # _single_state_list = []
-            # _multi_state_list = []
             _single_state_sym = self.manager.bddZero() 
             _multi_state_sym = self.manager.bddOne()
             for _s in intr_state:
                 # hacky way to check is it one single state or multiple
-                # if _s.iterConjDecomp()[1].isOne():
                 if self.predicate_sym_map_curr.inv.get(_s, None):
-                    # _single_state_list.append(_s)
                     _single_state_sym |= _s
                 else:
                     _multi_state_sym = _multi_state_sym & _s
-                    # _multi_state_list.append(_s)
+                    
 
-                # _single_sym: BDD = reduce(lambda x, y: x | y, _single_state_list)
-                # _multi_state_list: BDD = reduce(lambda x, y: x | y, _multi_state_list)
-                # _valid_pre_state = reduce(lambda x, y: x | y, intr_state)
             _valid_pre_state = _single_state_sym & _multi_state_sym
 
         # get all the assocated world conf
@@ -876,12 +873,6 @@ class SymbolicFrankaTransitionSystem():
             # get the neg of current gripper status and for invalid box conf. 
             # say precond is (on b0 l1); then invalid conf. is (on b0 l2),(on b0 l0)... etc
             _del_lbl: List[BDD] = []
-            # swap gripper status
-            # if 'free' in _pre_lbl:
-            #     _del_lbl.append(~self.predicate_sym_map_lbl['(gripper free)'])
-            # else:
-            #     _del_lbl.append(self.predicate_sym_map_lbl['(gripper free)'])
-
             _del_loc = copy.deepcopy(locations)
             for _lbl in _pre_lbl:
                 if isinstance(_lbl, tuple):
@@ -904,7 +895,35 @@ class SymbolicFrankaTransitionSystem():
                 "Error computing the set of valid pre states from which any kind of tranistion during Franka abstraction construction. FIX THIS!!!"
         
         return _valid_composed_state
+    
 
+    def _update_open_list(self, closed: Dict, open_list: Dict, layer: int, conf: BDD, lbl_cube: BDD) -> Dict:
+        """
+         A helper function to update the closed list. For actions Grasp and Release, we have a union of state conf. are preconditions. 
+
+         Thus, we check if both the both the state preconditions have met or not. If yes, then return empty else return the entire union.
+        """
+        # if action.name in ['grasp', 'release']:
+        # check if all the state conf exists in the closed list or not
+        only_states: BDD = open_list[layer][conf].existAbstract(lbl_cube)
+        state_cube_string: List[BDD] = self._convert_state_lbl_cube_to_func(dd_func=only_states, prod_curr_list=self.sym_vars_dict['curr_state'])
+        if len(state_cube_string) == 1:
+            open_list[layer][conf] = open_list[layer][conf] & ~closed.get(conf, self.manager.bddZero())
+            return 
+        
+        # remove_curr_state: bool = False
+        for scube in state_cube_string:
+            if not (scube & closed.get(conf, self.manager.bddZero())).isZero():
+                # nothing to remove from the open_list
+                remove_curr_state = True
+            else:
+                remove_curr_state = False
+                break
+
+        if remove_curr_state:
+            open_list[layer][conf] = open_list[layer][conf] & ~closed.get(conf, self.manager.bddZero())
+        
+        return 
 
     def create_transition_system_franka(self,
                                         boxes: List[str],
@@ -932,7 +951,8 @@ class SymbolicFrankaTransitionSystem():
         action_list = list(self.actions.keys())
 
         open_list = {}
-        closed = self.manager.bddZero()
+        # closed = self.manager.bddZero()
+        closed = defaultdict(lambda: self.manager.bddZero())
 
         init_state = self.sym_init_states
  
@@ -941,114 +961,138 @@ class SymbolicFrankaTransitionSystem():
         lbl_cube = reduce(lambda x, y: x & y, self.sym_vars_dict['on'])
 
         # extract the labels out 
-        # state_lbls = init_state.existAbstract(ts_x_cube)
+        state_lbls = init_state.existAbstract(ts_x_cube)
 
         layer = 0
-        # open_list[layer] = {state_lbls: init_state}
-        open_list[layer] = init_state
-        
+        open_list[layer] = {state_lbls: init_state}
+        # open_list[layer] = init_state
+
+        # no need to check if other boxes are placed at the destination loc during transfer and release as there is only one object
+        if len(boxes) == 1:
+            add_exist_constr = False
+
         # start from the initial conditions
-        while not open_list[layer].isZero():
-            # remove all states that have been explored
-            open_list[layer] = open_list[layer] & ~closed
+        # while not open_list[layer].isZero():
+        while True:
+            if not layer in open_list:
+                print("******************************* Reached a Fixed Point *******************************")
+                break
+            
+            if verbose:
+                print(f"******************************* Layer: {layer}*******************************")
+            for conf in open_list[layer].keys():
+                # remove all states that have been explored
+                # open_list[layer] = open_list[layer] & ~closed
+                # open_list[layer][conf] = open_list[layer][conf] & ~closed.get(conf, self.manager.bddZero())
+                self._update_open_list(closed=closed,
+                                       open_list=open_list,
+                                       layer=layer,
+                                       conf=conf,
+                                       lbl_cube=lbl_cube)
 
-            # If unexpanded states exist ... 
-            # for conf, sym_state in open_list[layer]:
-            if not open_list[layer].isZero():
-                # Add states to be expanded next to already expanded states
-                closed |= open_list[layer]
+                # If unexpanded states exist ... 
+                # for conf, sym_state in open_list[layer]:
+                if not open_list[layer][conf].isZero():
+                    # Add states to be expanded next to already expanded states
+                    closed[conf] |= open_list[layer][conf]
 
-                if verbose:
-                    print(f"******************************* Layer: {layer}*******************************")
-
-                # compute the image of the TS states 
-                for action in self.task.operators:
-                    # set action feasbility flag to True - used during transfer and release action to check the des loc is empty
-                    action_feas: bool = True
-                    pre_sym = self._get_sym_conds(list(action.preconditions))
-                   
-                    # check if there is an intersection 
-                    _intersect: bool = self.__pre_in_state(list(action.preconditions), curr_states=open_list[layer])
+                    # compute the image of the TS states 
+                    for action in self.task.operators:
+                        # set action feasbility flag to True - used during transfer and release action to check the des loc is empty
+                        action_feas: bool = True
+                        pre_sym = self._get_sym_conds(list(action.preconditions))
                     
-                    if _intersect:
-                        # compute the successor state and their label
-                        _valid_pre = self._compute_valid_states(preconditions=list(action.preconditions),
-                                                                curr_states=open_list[layer],
-                                                                locations=locs,
-                                                                lbl_cube=lbl_cube)
+                        # check if there is an intersection 
+                        _intersect: bool = self.__pre_in_state(list(action.preconditions), curr_states=open_list[layer][conf])
                         
-                        pre_sym_state = _valid_pre.existAbstract(lbl_cube).swapVariables(self.sym_vars_dict['curr_state'], self.sym_vars_dict['next_state'])
+                        if _intersect:
+                            # compute the successor state and their label
+                            _valid_pre = self._compute_valid_states(preconditions=list(action.preconditions),
+                                                                    curr_states=open_list[layer][conf],
+                                                                    locations=locs,
+                                                                    lbl_cube=lbl_cube)
+                            
+                            pre_sym_state = _valid_pre.existAbstract(lbl_cube).swapVariables(self.sym_vars_dict['curr_state'], self.sym_vars_dict['next_state'])
 
-                        # extract the labels out 
-                        # state_lbls = _valid_pre.restrict(pre_sym)
-                        state_lbls = _valid_pre.existAbstract(ts_x_cube)
-                        if state_lbls.isOne():
-                            state_lbls = open_list[layer].existAbstract(ts_x_cube)
+                            # extract the labels out 
+                            state_lbls = _valid_pre.existAbstract(ts_x_cube)
+                            if state_lbls.isOne():
+                                state_lbls = open_list[layer][conf].existAbstract(ts_x_cube)
+                            
+                            # add existential constraints to transfer and relase action
+                            if add_exist_constr and (('transfer' in action.name) or ('release' in action.name)):
+                                action_feas = self._check_exist_constraint(boxes=boxes,
+                                                                            curr_state_lbl=state_lbls,
+                                                                            action_name=action.name)
+                            
+                            if not action_feas:
+                                continue
+
+                            add_sym = self._get_sym_conds(list(action.add_effects), nxt_state_flag=True)
+                            del_sym = self._get_sym_conds(list(action.del_effects), nxt_state_flag=True)
+
+                            del_nxt_state_lbls = del_sym.existAbstract(ts_y_cube) #& add_sym.existAbstract(ts_y_cube)
+                            add_nxt_state_lbls = add_sym.existAbstract(ts_y_cube)
+
+                            if del_sym.isOne():
+                                del_sym = del_sym.negate()
+
+                            # check if there is anything to remove from pre -maybe all or none
+                            _del_sym_state_only = del_sym.existAbstract(lbl_cube)
+                            _del_pre_intr = _del_sym_state_only & pre_sym_state
+                            _pre_sym_state = pre_sym_state & ~(_del_pre_intr)
+
+                            if del_nxt_state_lbls.isOne() and add_nxt_state_lbls.isOne():
+                                # nothing to add or delete in the world box conf.
+                                next_state_lbls = state_lbls
+                                nxt_state = ~del_sym & (add_sym | _pre_sym_state) & next_state_lbls
+                            
+                            elif add_nxt_state_lbls.isOne():
+                                # nothing to add
+                                next_state_lbls = state_lbls & ~del_nxt_state_lbls
+                                if next_state_lbls.isZero():
+                                    print("******************************* None of the objects are grounded!******************************* ")
+                                    nxt_state = ~del_sym & (add_sym | _pre_sym_state)
+                                else:
+                                    nxt_state = ~del_sym & (add_sym | _pre_sym_state) & next_state_lbls
+                            # nothing to delete only adding state lables
+                            elif del_nxt_state_lbls.isOne():
+                                # if the previous state had on boxes grounded then take the intersection
+                                if state_lbls.isOne():
+                                    next_state_lbls = state_lbls & add_nxt_state_lbls
+                                else:
+                                    next_state_lbls = state_lbls | add_nxt_state_lbls
+
+                                # extract labels from add as they already exist in next_state_lbls
+                                add_sym_state_only = add_sym.existAbstract(lbl_cube)
+                                nxt_state = ~del_sym & (add_sym_state_only | _pre_sym_state) & next_state_lbls
+
+                            else:
+                                warnings.warn("Error computing the world configurtion during abstraction construction. FIX THIS!!!")
+                                sys.exit(-1)
+                            
+                            if verbose:
+                                cstate, clbl = self.print_state_lbl_dd(dd_func=_valid_pre,
+                                                                        ts_x_cube=ts_x_cube,
+                                                                        lbl_cube=lbl_cube)
+                                nstate, nlbl = self.print_state_lbl_dd(dd_func=nxt_state.swapVariables(self.sym_vars_dict['curr_state'], self.sym_vars_dict['next_state']),
+                                                                        ts_x_cube=ts_x_cube,
+                                                                        lbl_cube=lbl_cube)
+                                print(f"Adding edge: {cstate}{clbl} -------{action.name}------> {nstate}{nlbl}")
+
+                            # swap variables 
+                            nxt_state = nxt_state.swapVariables(self.sym_vars_dict['curr_state'], self.sym_vars_dict['next_state'])
+                            
+                            if layer + 1 in open_list:
+                                if next_state_lbls in open_list[layer + 1]:
+                                    open_list[layer + 1][next_state_lbls] |= nxt_state
+                                else:
+                                    open_list[layer + 1].update({next_state_lbls: nxt_state})   
+                                # store the state in the correct worlf conf bucket
+                                # open_list[layer + 1] |= nxt_state
+                            else:
+                                open_list[layer + 1] = {next_state_lbls: nxt_state}
                         
-                        # add existential constraints to transfer and relase action
-                        if add_exist_constr and (('transfer' in action.name) or ('release' in action.name)):
-                            action_feas = self._check_exist_constraint(boxes=boxes,
-                                                                       curr_state_lbl=state_lbls,
-                                                                       action_name=action.name)
-                        
-                        if not action_feas:
-                            continue
-
-                        add_sym = self._get_sym_conds(list(action.add_effects), nxt_state_flag=True)
-                        del_sym = self._get_sym_conds(list(action.del_effects), nxt_state_flag=True)
-
-                        del_nxt_state_lbls = del_sym.existAbstract(ts_y_cube) #& add_sym.existAbstract(ts_y_cube)
-                        add_nxt_state_lbls = add_sym.existAbstract(ts_y_cube)
-
-                        if del_sym.isOne():
-                            del_sym = del_sym.negate()
-
-                        # check if there is anything to remove from pre -maybe all or none
-                        _del_sym_state_only = del_sym.existAbstract(lbl_cube)
-                        _del_pre_intr = _del_sym_state_only & pre_sym_state
-                        _pre_sym_state = pre_sym_state & ~(_del_pre_intr)
-
-                        if del_nxt_state_lbls.isOne() and add_nxt_state_lbls.isOne():
-                            # nothing to add or delete in the world box conf. 
-                            # nxt_state = ~del_sym & add_sym & state_lbls
-                            nxt_state = ~del_sym & (add_sym | _pre_sym_state) & state_lbls
-                        
-                        elif add_nxt_state_lbls.isOne():
-                            # nothing to add
-                            next_state_lbls = state_lbls & ~del_nxt_state_lbls
-                            # nxt_state = ~del_sym & add_sym & next_state_lbls
-                            nxt_state = ~del_sym & (add_sym | _pre_sym_state) & next_state_lbls
-
-
-                        elif del_nxt_state_lbls.isOne():
-                            # nothing to delete only adding state lables 
-                            next_state_lbls = state_lbls | add_nxt_state_lbls
-
-                            # extract labels from add as they already exist in next_state_lbls
-                            add_sym_state_only = add_sym.existAbstract(lbl_cube)
-                            # nxt_state = ~del_sym & add_sym_state_only & next_state_lbls
-                            nxt_state = ~del_sym & (add_sym_state_only | _pre_sym_state) & next_state_lbls
-
-                        else:
-                            warnings.warn("Error computing the world configurtion during abstraction construction. FIX THIS!!!")
-                            sys.exit(-1)
-                        
-                        if verbose:
-                            cstate, clbl = self.print_state_lbl_dd(dd_func=_valid_pre,
-                                                                   ts_x_cube=ts_x_cube,
-                                                                   lbl_cube=lbl_cube)
-                            nstate, nlbl = self.print_state_lbl_dd(dd_func=nxt_state.swapVariables(self.sym_vars_dict['curr_state'], self.sym_vars_dict['next_state']),
-                                                                   ts_x_cube=ts_x_cube,
-                                                                   lbl_cube=lbl_cube)
-                            print(f"Adding edge: {cstate}{clbl} -------{action.name}------> {nstate}{nlbl}")
-
-                        # swap variables 
-                        nxt_state = nxt_state.swapVariables(self.sym_vars_dict['curr_state'], self.sym_vars_dict['next_state'])
-                        
-                        if layer + 1 in open_list:
-                            # store the state in the correct worlf conf bucket
-                            open_list[layer + 1] |= nxt_state
-                        else:
-                            open_list[layer + 1] = nxt_state
-                
-                layer += 1
+                    
+            layer += 1
+            
