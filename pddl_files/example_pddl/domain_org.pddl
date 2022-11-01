@@ -9,23 +9,18 @@
     robot - object
     box - object
     location - object
-    status - object 
-    general_loc - location
-    robo_loc - general_loc
-    box_loc - general_loc
+    robo_loc - location
+    box_loc - location
 )
-
-(:constants free - status)
 
 (:predicates
     (holding ?b - box ?l - box_loc)
-    (ready ?l - general_loc)
+    (ready ?l - location)
 
     (to-obj ?b - box ?l - box_loc)
     (to-loc ?b - box ?l - box_loc)
 
     (on ?b - box ?l - box_loc)
-    (gripper ?g - status)
 )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -42,16 +37,14 @@
 ; Precondition: The robot 'r' should be free and ready to move initially and the box 'b' should be at location 'l'  
 ; Effect: The roboy 'r' should not be ready to move (as it assumed grasp position) and has already moved to object's location 'l' and the box is not at location 'l'
 (:action transit
-    :parameters (?b - box ?l1 - general_loc ?l2 - box_loc)
+    :parameters (?b - box ?l1 - location ?l2 - box_loc)
     :precondition (and 
         (ready ?l1)
-        (on ?b ?l2)
-        (gripper free)
     )
     :effect (and 
         (to-obj ?b ?l2)
-        (ready ?l2)
         (not (ready ?l1))
+        (not (on ?b ?l2))
     )
 )
 
@@ -64,15 +57,10 @@
     :parameters (?b - box ?l - box_loc)
     :precondition (and 
         (to-obj ?b ?l)
-        (ready ?l)
-        (on ?b ?l)
     )
     :effect (and 
         (holding ?b ?l)
-        (not (ready ?l))
         (not (to-obj ?b ?l))
-        (not (on ?b ?l))
-        (not (gripper free))
     )
 )
 
@@ -88,8 +76,6 @@
     )
     :effect (and 
         (to-loc ?b ?l2)
-        (not (holding ?b ?l1))
-        (holding ?b ?l2)
     )
 )
 
@@ -102,11 +88,9 @@
     :parameters (?b - box ?l - box_loc)
     :precondition (and
         (to-loc ?b ?l)
-        (holding ?b ?l)
     )
     :effect (and
         (ready ?l)
-        (gripper free)
         (not (holding ?b ?l))
         (on ?b ?l)
         (not (to-loc ?b ?l))

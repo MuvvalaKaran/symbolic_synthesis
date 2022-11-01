@@ -1,6 +1,8 @@
 '''
 Base class used by different problem instances like gridworld, frankworld to construct a symbolic TS, DFA(s)
 '''
+import math
+
 from cudd import Cudd, BDD, ADD
 from typing import Tuple, List, Dict, Union
 
@@ -80,6 +82,37 @@ class BaseSymMain():
                                                            next_state_var_name=f'b{dfa_num}_',
                                                            add_flag=add_flag)
         return curr_state, next_state, _dfa
+    
+
+    def create_symbolic_vars(self,
+                             num_of_facts: int,
+                             curr_state_var_name: str = 'x',
+                             next_state_var_name: str = 'y',
+                             add_flag: bool = False) -> Tuple[list, list]:
+        """
+        A helper function to create log⌈num_of_facts⌉ boolean variables. 
+
+        If the ADD flag is set to True, then create ADD Variables else create BDD Variables. 
+        """
+        curr_state_vars: list = []
+        next_state_vars: list = []
+
+        cur_state = curr_state_var_name
+        nxt_state = next_state_var_name
+
+        # get the number of variables in the manager. We will assign the next idex to the next lbl variables
+        _num_of_sym_vars = self.manager.size()
+
+        for num_var in range(math.ceil(math.log2(num_of_facts))):
+                if add_flag:
+                    curr_state_vars.append(self.manager.addVar(_num_of_sym_vars + (2*num_var), f'{cur_state}{num_var}'))
+                    next_state_vars.append(self.manager.addVar(_num_of_sym_vars + (2*num_var + 1), f'{nxt_state}{num_var}'))
+                else:
+                    curr_state_vars.append(self.manager.bddVar(_num_of_sym_vars + (2*num_var), f'{cur_state}{num_var}'))
+                    next_state_vars.append(self.manager.bddVar(_num_of_sym_vars + (2*num_var + 1), f'{nxt_state}{num_var}'))
+
+        return (curr_state_vars, next_state_vars)
+
 
 
     def build_bdd_symbolic_dfa(self,  sym_tr_handle: SymbolicTransitionSystem)  -> Tuple[List[SymbolicDFA], List[BDD], List[BDD]]:

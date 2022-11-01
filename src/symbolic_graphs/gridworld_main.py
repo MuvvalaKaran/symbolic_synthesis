@@ -105,10 +105,10 @@ class SimpleGridWorld(BaseSymMain):
 
     
     def build_abstraction(self):
-
+        print("*****************Creating Boolean variables for Gridworld!*****************")
         if self.algorithm in ['dijkstras','astar']:
             
-            if len(weight_dict.keys()) == 0:
+            if len(self.weight_dict.keys()) == 0:
                 warnings.warn("Please enter the weights associated with gridworld transitions. The actions for Gridworld are 'moveleft', 'moveright', 'moveup', 'movedown'")
                 sys.exit(-1)
 
@@ -386,34 +386,6 @@ class SimpleGridWorld(BaseSymMain):
                 state_lbl_vars.append(self.manager.bddVar(_var_index, f'{lbl_state}{num_var}'))
 
         return state_lbl_vars, possible_obs
-
-    
-    def create_symbolic_vars(self,
-                             num_of_facts: int,
-                             curr_state_var_name: str = 'x',
-                             next_state_var_name: str = 'y',
-                             add_flag: bool = False) -> Tuple[list, list]:
-        """
-        A helper function to create log⌈num_of_facts⌉
-        """
-        curr_state_vars: list = []
-        next_state_vars: list = []
-
-        cur_state = curr_state_var_name
-        nxt_state = next_state_var_name
-
-        # get the number of variables in the manager. We will assign the next idex to the next lbl variables
-        _num_of_sym_vars = self.manager.size()
-
-        for num_var in range(math.ceil(math.log2(num_of_facts))):
-                if add_flag:
-                    curr_state_vars.append(self.manager.addVar(_num_of_sym_vars + (2*num_var), f'{cur_state}{num_var}'))
-                    next_state_vars.append(self.manager.addVar(_num_of_sym_vars + (2*num_var + 1), f'{nxt_state}{num_var}'))
-                else:
-                    curr_state_vars.append(self.manager.bddVar(_num_of_sym_vars + (2*num_var), f'{cur_state}{num_var}'))
-                    next_state_vars.append(self.manager.bddVar(_num_of_sym_vars + (2*num_var + 1), f'{nxt_state}{num_var}'))
-
-        return (curr_state_vars, next_state_vars)
     
 
     def build_bdd_abstraction(self) -> Tuple[SymbolicTransitionSystem, list, list, list, int]:
@@ -440,13 +412,13 @@ class SimpleGridWorld(BaseSymMain):
             sym_tr = SymbolicTransitionSystem(curr_states=ts_curr_state,
                                               next_states=ts_next_state,
                                               lbl_states=ts_lbl_states,
-                                              observations=possible_obs,
+                                            #   observations=possible_obs,
                                               task=task,
                                               domain=domain,
                                               manager=self.manager)
 
             sym_tr.create_transition_system(verbose=self.verbose, plot=self.plot_ts)
-            sym_tr.create_state_obs_bdd(verbose=self.verbose, plot=self.plot_obs)  
+            sym_tr.create_state_obs_bdd(domain_lbls=possible_obs, verbose=self.verbose, plot=self.plot_obs)  
 
         return  sym_tr, ts_curr_state, ts_next_state, ts_lbl_states
     
@@ -474,7 +446,6 @@ class SimpleGridWorld(BaseSymMain):
                                                            add_flag=add_flag)
                                                             
         if create_lbl_vars:
-            print("*****************Creating Boolean variables for Labels as well! This functionality only works for grid world!*****************")
             objs = _causal_graph_instance.problem.objects
             
             lbl_state, possible_obs = self.create_symbolic_lbl_vars(lbls=objs,
@@ -506,13 +477,13 @@ class SimpleGridWorld(BaseSymMain):
         sym_tr = SymbolicWeightedTransitionSystem(curr_states=add_ts_curr_state,
                                                   next_states=add_ts_next_state,
                                                   lbl_states=add_ts_lbl_states,
-                                                  observations=possible_obs,
+                                                #   observations=possible_obs,
                                                   weight_dict=weight_dict,
                                                   task=task,
                                                   domain=domain,
                                                   manager=self.manager)
 
         sym_tr.create_weighted_transition_system(verbose=self.verbose, plot=self.plot_ts)
-        sym_tr.create_state_obs_add(verbose=self.verbose, plot=self.plot_obs)
+        sym_tr.create_state_obs_add(domain_lbls=possible_obs, verbose=self.verbose, plot=self.plot_obs)
 
         return  sym_tr, add_ts_curr_state, add_ts_next_state, add_ts_lbl_states
