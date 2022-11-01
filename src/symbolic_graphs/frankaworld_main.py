@@ -102,7 +102,7 @@ class FrankaWorld(BaseSymMain):
         return predicate_dict
 
 
-    def create_symbolic_causal_graph(self, draw_causal_graph: bool = False, remove_flag: bool = False, add_flag: bool = False):
+    def create_symbolic_causal_graph(self, draw_causal_graph: bool = False, add_flag: bool = False):
         """
         A function to create an instance of causal graph which call pyperplan. We access the task related properties pyperplan
         and create symbolic TR related to action.   
@@ -131,20 +131,6 @@ class FrankaWorld(BaseSymMain):
         # segregate grounded predicates into thre categories, 1) gripper predicates, 2) on predicates, 3) all other prdicates
         seg_preds = self._segregate_predicates(predicates=task_facts)
 
-        if remove_flag:
-            # if transit action, remove redundant transit to same loc
-            finite_ts = FiniteTransitionSystem(_causal_graph_instance)
-            # deepcopy as list is a mutuable object
-            tmp_opr_list = copy.deepcopy(_causal_graph_instance.task.operators)
-            for action in _causal_graph_instance.task.operators:
-                if 'transit' in action.name and 'else' not in action.name:
-                    _, locs = finite_ts._get_multiple_box_location(multiple_box_location_str=action.name)
-                    if locs[0] == locs[1]:
-                        tmp_opr_list.remove(action)
-            
-            # deleting from an interable that we are interating over is a bad practice and is not foolproof
-            _causal_graph_instance.task.operators = tmp_opr_list
-
         sym_vars = dict(seg_preds)  # shallow copy to avoid changing the org content
 
         seg_preds['curr_state'] = seg_preds['others']
@@ -168,8 +154,7 @@ class FrankaWorld(BaseSymMain):
         """
          Main Function to Build Transition System that only represent valid edges without any weights
         """
-        task, domain, ts_sym_vars, seg_preds, boxes, locs = self.create_symbolic_causal_graph(draw_causal_graph=draw_causal_graph,
-                                                                                              remove_flag=False)
+        task, domain, ts_sym_vars, seg_preds, boxes, locs = self.create_symbolic_causal_graph(draw_causal_graph=draw_causal_graph)
 
         sym_tr = SymbolicFrankaTransitionSystem(sym_vars_dict=ts_sym_vars,
                                                 task=task,

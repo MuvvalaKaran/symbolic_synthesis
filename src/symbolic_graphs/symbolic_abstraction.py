@@ -542,12 +542,6 @@ class SymbolicFrankaTransitionSystem():
     """
 
     def __init__(self, sym_vars_dict: dict, task, domain, manager: Cudd, seg_facts: dict):
-        # self.sym_vars_curr = curr_states
-        # self.sym_vars_next = next_states
-        # self.sym_vars_lbl = lbl_states
-        # self.sym_gripper_var = gripper_var
-        # self.sym_on_vars = on_vars
-        # self.sym_holding_vars = holding_vars
         self.sym_vars_dict: dict = sym_vars_dict
         self.seg_facts_dict: dict = seg_facts 
 
@@ -674,9 +668,6 @@ class SymbolicFrankaTransitionSystem():
         """
         only_states: BDD = dd_func.existAbstract(lbl_cube)
         # only_lbls: BDD = dd_func.existAbstract(ts_x_cube)
-
-        # testing 
-        # prod_cube = self._convert_state_lbl_cube_to_func(dd_func=dd_func, prod_curr_list=self.sym_vars_dict['curr_state'] + self.sym_vars_dict['on'])
 
         state_cube_string: List[BDD] = self._convert_state_lbl_cube_to_func(dd_func=only_states, prod_curr_list=self.sym_vars_dict['curr_state'])
         
@@ -903,7 +894,6 @@ class SymbolicFrankaTransitionSystem():
 
          Thus, we check if both the both the state preconditions have met or not. If yes, then return empty else return the entire union.
         """
-        # if action.name in ['grasp', 'release']:
         # check if all the state conf exists in the closed list or not
         only_states: BDD = open_list[layer][conf].existAbstract(lbl_cube)
         state_cube_string: List[BDD] = self._convert_state_lbl_cube_to_func(dd_func=only_states, prod_curr_list=self.sym_vars_dict['curr_state'])
@@ -951,7 +941,6 @@ class SymbolicFrankaTransitionSystem():
         action_list = list(self.actions.keys())
 
         open_list = {}
-        # closed = self.manager.bddZero()
         closed = defaultdict(lambda: self.manager.bddZero())
 
         init_state = self.sym_init_states
@@ -965,14 +954,12 @@ class SymbolicFrankaTransitionSystem():
 
         layer = 0
         open_list[layer] = {state_lbls: init_state}
-        # open_list[layer] = init_state
 
         # no need to check if other boxes are placed at the destination loc during transfer and release as there is only one object
         if len(boxes) == 1:
             add_exist_constr = False
 
         # start from the initial conditions
-        # while not open_list[layer].isZero():
         while True:
             if not layer in open_list:
                 print("******************************* Reached a Fixed Point *******************************")
@@ -982,8 +969,6 @@ class SymbolicFrankaTransitionSystem():
                 print(f"******************************* Layer: {layer}*******************************")
             for conf in open_list[layer].keys():
                 # remove all states that have been explored
-                # open_list[layer] = open_list[layer] & ~closed
-                # open_list[layer][conf] = open_list[layer][conf] & ~closed.get(conf, self.manager.bddZero())
                 self._update_open_list(closed=closed,
                                        open_list=open_list,
                                        layer=layer,
@@ -991,7 +976,6 @@ class SymbolicFrankaTransitionSystem():
                                        lbl_cube=lbl_cube)
 
                 # If unexpanded states exist ... 
-                # for conf, sym_state in open_list[layer]:
                 if not open_list[layer][conf].isZero():
                     # Add states to be expanded next to already expanded states
                     closed[conf] |= open_list[layer][conf]
@@ -1031,7 +1015,7 @@ class SymbolicFrankaTransitionSystem():
                             add_sym = self._get_sym_conds(list(action.add_effects), nxt_state_flag=True)
                             del_sym = self._get_sym_conds(list(action.del_effects), nxt_state_flag=True)
 
-                            del_nxt_state_lbls = del_sym.existAbstract(ts_y_cube) #& add_sym.existAbstract(ts_y_cube)
+                            del_nxt_state_lbls = del_sym.existAbstract(ts_y_cube)
                             add_nxt_state_lbls = add_sym.existAbstract(ts_y_cube)
 
                             if del_sym.isOne():
@@ -1042,13 +1026,12 @@ class SymbolicFrankaTransitionSystem():
                             _del_pre_intr = _del_sym_state_only & pre_sym_state
                             _pre_sym_state = pre_sym_state & ~(_del_pre_intr)
 
+                            # nothing to add or delete in the world box conf.
                             if del_nxt_state_lbls.isOne() and add_nxt_state_lbls.isOne():
-                                # nothing to add or delete in the world box conf.
                                 next_state_lbls = state_lbls
                                 nxt_state = ~del_sym & (add_sym | _pre_sym_state) & next_state_lbls
-                            
+                            # nothing to add
                             elif add_nxt_state_lbls.isOne():
-                                # nothing to add
                                 next_state_lbls = state_lbls & ~del_nxt_state_lbls
                                 if next_state_lbls.isZero():
                                     print("******************************* None of the objects are grounded!******************************* ")
@@ -1073,11 +1056,11 @@ class SymbolicFrankaTransitionSystem():
                             
                             if verbose:
                                 cstate, clbl = self.print_state_lbl_dd(dd_func=_valid_pre,
-                                                                        ts_x_cube=ts_x_cube,
-                                                                        lbl_cube=lbl_cube)
+                                                                       ts_x_cube=ts_x_cube,
+                                                                       lbl_cube=lbl_cube)
                                 nstate, nlbl = self.print_state_lbl_dd(dd_func=nxt_state.swapVariables(self.sym_vars_dict['curr_state'], self.sym_vars_dict['next_state']),
-                                                                        ts_x_cube=ts_x_cube,
-                                                                        lbl_cube=lbl_cube)
+                                                                       ts_x_cube=ts_x_cube,
+                                                                       lbl_cube=lbl_cube)
                                 print(f"Adding edge: {cstate}{clbl} -------{action.name}------> {nstate}{nlbl}")
 
                             # swap variables 
@@ -1088,8 +1071,6 @@ class SymbolicFrankaTransitionSystem():
                                     open_list[layer + 1][next_state_lbls] |= nxt_state
                                 else:
                                     open_list[layer + 1].update({next_state_lbls: nxt_state})   
-                                # store the state in the correct worlf conf bucket
-                                # open_list[layer + 1] |= nxt_state
                             else:
                                 open_list[layer + 1] = {next_state_lbls: nxt_state}
                         
