@@ -64,13 +64,13 @@ class FrankaWorld(BaseSymMain):
         dfa_tr, dfa_curr_state, dfa_next_state = self.build_bdd_symbolic_dfa(sym_tr_handle=sym_tr)
     
 
-    def _create_symbolic_lbl_vars(self, domain_facts, state_var_name: str, add_flag: bool = False) -> List[Union[BDD, ADD]]:
+    def _create_symbolic_lbl_vars(self, state_lbls: list, state_var_name: str, add_flag: bool = False) -> List[Union[BDD, ADD]]:
         """
          A function that create only one set of vars for the objects passed. This function does not create prime varibables. 
         """
         state_lbl_vars: list = []
         _num_of_sym_vars = self.manager.size()
-        num: int = math.ceil(math.log2(len(domain_facts)))
+        num: int = math.ceil(math.log2(len(state_lbls)))
 
         # happens when number of domain_facts passed as argument is 1
         if num == 0:
@@ -186,8 +186,9 @@ class FrankaWorld(BaseSymMain):
                 else:
                     tmp_tuple = [self.pred_int_map[pred]]
                 _state_tpl.extend(tmp_tuple) 
-        
-            _state_tuples.append(tuple(_state_tpl))
+
+            
+            _state_tuples.append(tuple(sorted(_state_tpl)))
 
         return _state_tuples
     
@@ -335,17 +336,15 @@ class FrankaWorld(BaseSymMain):
         # seg_preds['next_state'] = seg_preds['others']
 
         # del seg_preds['others']
-
-        ts_lbl_states = self._create_symbolic_lbl_vars(domain_facts=on_preds, state_var_name='b', add_flag=add_flag)
-       
-
         curr_state, next_state = self.create_symbolic_vars(num_of_facts=len(ts_state_tuples),
                                                            add_flag=add_flag)
+        
+        ts_lbl_states = self._create_symbolic_lbl_vars(state_lbls=on_preds['nb'] + on_preds['b'], state_var_name='b', add_flag=add_flag)
 
         # sym_vars['curr_state'] = curr_state
         # sym_vars['next_state'] = next_state
         
-        return _causal_graph_instance.task, _causal_graph_instance.problem.domain, curr_state, next_state, ts_state_tuples
+        return _causal_graph_instance.task, _causal_graph_instance.problem.domain, curr_state, next_state, ts_state_tuples, ts_lbl_states, boxes
         # \ boxes, valid_locs
         
 
@@ -354,21 +353,28 @@ class FrankaWorld(BaseSymMain):
          Main Function to Build Transition System that only represent valid edges without any weights
         """
         # task, domain, ts_sym_vars, seg_preds, boxes, locs = self.create_symbolic_causal_graph(draw_causal_graph=draw_causal_graph)
-        task, domain, ts_curr_vars, ts_next_vars, ts_preds  = self.create_symbolic_causal_graph(draw_causal_graph=draw_causal_graph)
+        task, domain, ts_curr_vars, ts_next_vars, ts_state_tuples, ts_lbl_states, boxes   = self.create_symbolic_causal_graph(draw_causal_graph=draw_causal_graph)
 
         sym_tr = SymbolicFrankaTransitionSystem(curr_states=ts_curr_vars,
                                                 next_states=ts_next_vars,
                                                 lbl_states=ts_lbl_states,
                                                 task=task,
                                                 domain=domain,
-                                                manager=self.manager,
-                                                seg_facts=seg_preds)
+                                                ts_states=ts_state_tuples,
+                                                ts_state_map=self.pred_int_map,
+                                                manager=self.manager)
 
-        sym_tr.create_transition_system_franka(boxes=boxes,
-                                               locs=locs,
-                                               add_exist_constr=True,
-                                               verbose=False,
-                                               plot=self.plot_ts)
+        sym_tr.new_create_transition_system_franka(boxes=boxes,
+                                                   add_exist_constr=True,
+                                                   verbose=True,
+                                                   plot=self.plot_ts)
+
+
+        # sym_tr.create_transition_system_franka(boxes=boxes,
+        #                                        locs=locs,
+        #                                        add_exist_constr=True,
+        #                                        verbose=False,
+        #                                        plot=self.plot_ts)
         
         sys.exit(-1) 
 
