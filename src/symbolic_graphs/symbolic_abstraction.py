@@ -541,13 +541,16 @@ class SymbolicFrankaTransitionSystem():
      A class to construct the symblic transition system for the Robotic manipulator example.
     """
 
-    def __init__(self, sym_vars_dict: dict, task, domain, manager: Cudd, seg_facts: dict):
-        self.sym_vars_dict: dict = sym_vars_dict
-        self.seg_facts_dict: dict = seg_facts 
+    def __init__(self, curr_states: list , next_states: list, lbl_states: list, task, domain, manager: Cudd, ts_states: list):
+        # self.sym_vars_dict: dict = sym_vars_dict
+        # self.seg_facts_dict: dict = seg_facts
+        self.sym_vars_curr = curr_states
+        self.sym_vars_next = next_states
+        self.sym_vars_lbl = lbl_states
 
         self.init: frozenset = task.initial_state
         self.goal: frozenset = task.goals
-        self.facts: dict = task.facts
+        self.ts_states: dict = ts_states
         self.task: dict = task
         self.domain: dict = domain
         self.manager = manager
@@ -604,30 +607,99 @@ class SymbolicFrankaTransitionSystem():
         _goal_list = [self.predicate_sym_map_lbl[s] for s in self.goal]
         
         # we take the union as the goal list is completely defined by all on predicates
-        self.sym_goal_states = reduce(lambda a, b: a | b, _goal_list)   
-    
+        self.sym_goal_states = reduce(lambda a, b: a | b, _goal_list)
 
+    
     def _create_sym_var_map(self):
         """
-         A function that initialize the dictionary that map every ground facts to its corresponding boolean formula.  
+        Loop through all the facts that are reachable and assign a boolean funtion to it
         """
 
-        for pred_type, pred_list in self.seg_facts_dict.items():
-            pred_dict = self._create_sym_var_map_per_fact(facts=pred_list, pred_type=pred_type)
-            if pred_type == 'curr_state':
-                self.predicate_sym_map_curr.update(pred_dict)
-                self.monolihtic_sym_map_curr.update(self.predicate_sym_map_curr)
-            elif pred_type == 'next_state':
-                self.predicate_sym_map_nxt.update(pred_dict)
-                self.monolihtic_sym_map_nxt.update(self.predicate_sym_map_nxt)
-            else:
-                self.predicate_sym_map_lbl.update(pred_dict)
-                self.monolihtic_sym_map_curr.update(self.predicate_sym_map_lbl)
-                self.monolihtic_sym_map_nxt.update(self.predicate_sym_map_lbl)
+        # create all combinations of 1-true and 0-false
+        boolean_str = list(product([1, 0], repeat=len(self.sym_vars_curr)))
+
+        _node_int_map_curr = bidict({state: boolean_str[index] for index, state in enumerate(self.ts_states)})
+        _node_int_map_next = copy.deepcopy(_node_int_map_curr)
+
+        assert len(boolean_str) >= len(_node_int_map_next), "FIX THIS: Looks like there are more Facts that boolean variables!"
+
+        # loop over all the boolean strings and convert them respective bdd vars
+        for _key, _value in _node_int_map_curr.items():
+            _curr_val_list = []
+            _next_val_list = []
+            # _bool_fun = self.manager.bddOne()
+            for _idx, _ele in enumerate(_value):
+                if _ele == 1:
+                    # _bool_func = _bool_fun & self.sym_vars_curr[_idx]
+                    _curr_val_list.append(self.sym_vars_curr[_idx])
+                    _next_val_list.append(self.sym_vars_next[_idx])
+                else:
+                    _curr_val_list.append(~self.sym_vars_curr[_idx])
+                    _next_val_list.append(~self.sym_vars_next[_idx])
+            
+            _bool_func_curr = reduce(lambda a, b: a & b, _curr_val_list)
+            _bool_func_nxt = reduce(lambda a, b: a & b, _next_val_list)
+
+            # update bidict accordingly
+            _node_int_map_curr[_key] = _bool_func_curr
+            _node_int_map_next[_key] = _bool_func_nxt    
         
-        self.predicate_sym_map_curr = bidict(self.predicate_sym_map_curr)
-        self.predicate_sym_map_lbl = bidict(self.predicate_sym_map_lbl)
-        self.predicate_sym_map_nxt = bidict(self.predicate_sym_map_nxt)
+        self.predicate_sym_map_curr = _node_int_map_curr
+        self.predicate_sym_map_nxt = _node_int_map_next
+
+    
+    def _create_sym_state_label_map(self, domain_lbls):
+        """
+        Loop through all the facts that are reachable and assign a boolean funtion to it.
+         
+         This method is called whten Gridworld state labels are created
+        """
+        # create all combinations of 1-true and 0-false
+        boolean_str = list(product([1, 0], repeat=len(self.sym_vars_lbl)))
+
+        # We will add dumy brackets around the label e.g. l4 ---> (l4) becuase promela parse names the edges in that fashion
+        _node_int_map_lbl = bidict({state: boolean_str[index] for index, state in enumerate(domain_lbls)})
+
+        assert len(boolean_str) >= len(_node_int_map_lbl), "FIX THIS: Looks like there are more lbls that boolean variables!"
+
+        # loop over all the boolean string and convert them to their respective bdd vars
+        for _key, _value in _node_int_map_lbl.items():
+            _lbl_val_list = []
+            for _idx, _ele in enumerate(_value):
+                if _ele == 1:
+                    _lbl_val_list.append(self.sym_vars_lbl[_idx])
+                else:
+                    _lbl_val_list.append(~self.sym_vars_lbl[_idx])
+            
+            _bool_func_curr = reduce(lambda a, b: a & b, _lbl_val_list)
+
+            # update bidict accordingly
+            _node_int_map_lbl[_key] = _bool_func_curr
+        
+        self.predicate_sym_map_lbl = _node_int_map_lbl
+    
+
+    # def _create_sym_var_map(self):
+    #     """
+    #      A function that initialize the dictionary that map every ground facts to its corresponding boolean formula.  
+    #     """
+
+    #     for pred_type, pred_list in self.seg_facts_dict.items():
+    #         pred_dict = self._create_sym_var_map_per_fact(facts=pred_list, pred_type=pred_type)
+    #         if pred_type == 'curr_state':
+    #             self.predicate_sym_map_curr.update(pred_dict)
+    #             self.monolihtic_sym_map_curr.update(self.predicate_sym_map_curr)
+    #         elif pred_type == 'next_state':
+    #             self.predicate_sym_map_nxt.update(pred_dict)
+    #             self.monolihtic_sym_map_nxt.update(self.predicate_sym_map_nxt)
+    #         else:
+    #             self.predicate_sym_map_lbl.update(pred_dict)
+    #             self.monolihtic_sym_map_curr.update(self.predicate_sym_map_lbl)
+    #             self.monolihtic_sym_map_nxt.update(self.predicate_sym_map_lbl)
+        
+    #     self.predicate_sym_map_curr = bidict(self.predicate_sym_map_curr)
+    #     self.predicate_sym_map_lbl = bidict(self.predicate_sym_map_lbl)
+    #     self.predicate_sym_map_nxt = bidict(self.predicate_sym_map_nxt)
         
 
     def _create_sym_var_map_per_fact(self, facts: List[str], pred_type: str):
