@@ -607,10 +607,31 @@ class SymbolicFrankaTransitionSystem():
                     _int_tuple.append(self.pred_int_map[pred])
         
         return tuple(sorted(_int_tuple))
+    
+
+    def get_sym_state_lbl_from_tuple(self, state_lbl_tuple: tuple) -> BDD:
+        """
+         A function that converts the corresponding state lbl tuple to its explicit predicate form,
+          looks up its corresponding boolean formula, and return the conjunction of all the boolean formula
+        """
+        # get the explicit preds
+        exp_lbls = self.get_state_from_tuple(state_tuple=state_lbl_tuple)
+
+        _sym_lbls_list = [self.predicate_sym_map_lbl[lbl] for lbl in exp_lbls]
+
+        # if gripper is not free then explicitly add not(gripper free) to the state lbl
+        if '(gripper free)' not in exp_lbls:
+            _sym_lbls_list.append(~self.predicate_sym_map_lbl['(gripper free)'])
 
 
+        sym_lbl = reduce(lambda x, y: x & y, _sym_lbls_list)
 
-    def get_tuple_from_state(self, preds: list, only_world_conf: bool = False, only_robot_conf: bool = False) -> Tuple[int]:
+        assert not sym_lbl.isZero(), "Error constrcuting the symbolic lbl associated with each state. FIX THIS!!!"
+
+        return sym_lbl
+
+
+    def get_tuple_from_state(self, preds: list) -> Tuple[int]:
         """
          Given, a predicate tuple, this function return the corresponding state tuple
         """
@@ -623,7 +644,10 @@ class SymbolicFrankaTransitionSystem():
         """
          Given, a predicate tuple, this function return the corresponding state tuple
         """
-        _states = [self.pred_int_map.inv[state] for state in state_tuple]
+        if isinstance(state_tuple, tuple):
+            _states = [self.pred_int_map.inv[state] for state in state_tuple]
+        else:
+            _states = self.pred_int_map.inv[state_tuple[0]]
 
         return _states
     
@@ -685,28 +709,45 @@ class SymbolicFrankaTransitionSystem():
          
          This method is called whten Gridworld state labels are created
         """
-        # create all combinations of 1-true and 0-false
-        boolean_str = list(product([1, 0], repeat=len(self.sym_vars_lbl)))
-
-        _node_int_map_lbl = bidict({state: boolean_str[index] for index, state in enumerate(domain_lbls)})
-
-        assert len(boolean_str) >= len(_node_int_map_lbl), "FIX THIS: Looks like there are more lbls that boolean variables!"
-
-        # loop over all the boolean string and convert them to their respective bdd vars
-        for _key, _value in _node_int_map_lbl.items():
-            _lbl_val_list = []
-            for _idx, _ele in enumerate(_value):
-                if _ele == 1:
-                    _lbl_val_list.append(self.sym_vars_lbl[_idx])
-                else:
-                    _lbl_val_list.append(~self.sym_vars_lbl[_idx])
-            
-            _bool_func_curr = reduce(lambda a, b: a & b, _lbl_val_list)
-
-            # update bidict accordingly
-            _node_int_map_lbl[_key] = _bool_func_curr
         
-        self.predicate_sym_map_lbl = bidict(_node_int_map_lbl)
+        # loop over each box and create its corresponding boolean formula 
+        for b_id, preds in domain_lbls.items():
+            
+
+            # get its corresponding boolean vars
+            _tmp_vars_list = []
+            if b_id == 'gripper':
+                _tmp_vars_list.append(self.sym_vars_lbl[-1])
+            else:
+                for bvar in self.sym_vars_lbl:
+                    if f'{b_id}_' in str(bvar):
+                        _tmp_vars_list.append(bvar)
+
+            # create all combinations of 1-true and 0-false
+            # boolean_str = list(product([1, 0], repeat=len(self.sym_vars_lbl)))
+            boolean_str = list(product([1, 0], repeat=len(_tmp_vars_list)))
+
+            _node_int_map_lbl = bidict({state: boolean_str[index] for index, state in enumerate(preds)})
+
+            assert len(boolean_str) >= len(_node_int_map_lbl), "FIX THIS: Looks like there are more lbls that boolean variables!"
+
+            # loop over all the boolean string and convert them to their respective bdd vars
+            for _key, _value in _node_int_map_lbl.items():
+                _lbl_val_list = []
+                for _idx, _ele in enumerate(_value):
+                    if _ele == 1:
+                        _lbl_val_list.append(_tmp_vars_list[_idx])
+                    else:
+                        _lbl_val_list.append(~_tmp_vars_list[_idx])
+                
+                _bool_func_curr = reduce(lambda a, b: a & b, _lbl_val_list)
+
+                # update bidict accordingly
+                _node_int_map_lbl[_key] = _bool_func_curr
+            
+            self.predicate_sym_map_lbl.update(_node_int_map_lbl)
+        
+        self.predicate_sym_map_lbl = bidict(self.predicate_sym_map_lbl)
 
 
     def _convert_state_lbl_cube_to_func(self, dd_func: BDD, prod_curr_list = None) ->  List[BDD]:
@@ -828,7 +869,8 @@ class SymbolicFrankaTransitionSystem():
 
         # get the state lbls and create state and state lbl mappinng
         state_lbl = self.get_conds_from_state(state_tuple=self.predicate_sym_map_curr.inv[init_state_sym], only_world_conf=True)
-        init_lbl_sym = self.predicate_sym_map_lbl[state_lbl]
+        # init_lbl_sym = self.predicate_sym_map_lbl[state_lbl]
+        init_lbl_sym = self.get_sym_state_lbl_from_tuple(state_lbl)
 
         self.sym_state_labels |= init_state_sym & init_lbl_sym
 
@@ -904,7 +946,7 @@ class SymbolicFrankaTransitionSystem():
                             next_sym_state = self.predicate_sym_map_nxt[next_tuple]
 
                             if verbose:
-                                cstate = self.get_state_from_tuple(state_tuple=_valid_pre)
+                                cstate = self.get_state_from_tuple(state_tuple=tuple(_valid_pre))
                                 nstate = self.get_state_from_tuple(state_tuple=next_tuple)
                                 print(f"Adding edge: {cstate} -------{action.name}------> {nstate}")
                             
@@ -919,7 +961,8 @@ class SymbolicFrankaTransitionSystem():
 
                             # get their corresponding lbls 
                             next_tuple_lbl = self.get_conds_from_state(state_tuple=next_tuple, only_world_conf=True)
-                            next_lbl_sym = self.predicate_sym_map_lbl[next_tuple_lbl] if len(next_tuple_lbl) > 1 else self.predicate_sym_map_lbl[next_tuple_lbl[0]]
+                            next_lbl_sym = self.get_sym_state_lbl_from_tuple(next_tuple_lbl)
+                            # next_lbl_sym = self.predicate_sym_map_lbl[next_tuple_lbl] if len(next_tuple_lbl) > 1 else self.predicate_sym_map_lbl[next_tuple_lbl[0]]
                             self.sym_state_labels |= next_sym_state & next_lbl_sym
 
                             # store the image in the next bucket
@@ -929,7 +972,9 @@ class SymbolicFrankaTransitionSystem():
                         # add them the observation bdd
                         _valid_pre_lbl = self.get_conds_from_state(state_tuple=self.predicate_sym_map_curr.inv[_val_pre_sym],
                                                                    only_world_conf=True)
-                        _valid_pre_lbl_sym = self.predicate_sym_map_lbl[_valid_pre_lbl] if len(_valid_pre_lbl) > 1 else self.predicate_sym_map_lbl[_valid_pre_lbl[0]]
+                        # _valid_pre_lbl_sym = self.predicate_sym_map_lbl[_valid_pre_lbl] if len(_valid_pre_lbl) > 1 else self.predicate_sym_map_lbl[_valid_pre_lbl[0]]
+                        _valid_pre_lbl_sym = self.get_sym_state_lbl_from_tuple(_valid_pre_lbl)
+                        
                         self.sym_state_labels |= _val_pre_sym & _valid_pre_lbl_sym
 
                         closed |= _val_pre_sym

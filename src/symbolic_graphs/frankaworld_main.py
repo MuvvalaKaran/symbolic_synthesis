@@ -22,6 +22,9 @@ from src.algorithms.blind_search import SymbolicSearch, MultipleFormulaBFS, Symb
 from src.algorithms.weighted_search import SymbolicDijkstraSearch, MultipleFormulaDijkstra
 from src.algorithms.weighted_search import SymbolicBDDAStar, MultipleFormulaBDDAstar
 
+from src.simulate_strategy import create_gridworld, \
+     convert_action_dict_to_gridworld_strategy, convert_action_dict_to_gridworld_strategy_nLTL, roll_out_franka_strategy
+
 from .base_main import BaseSymMain
 
 from utls import *
@@ -177,13 +180,13 @@ class FrankaWorld(BaseSymMain):
             if self.algorithm == 'dijkstras':
                 # shortest path graph search with Dijkstras
                 graph_search =  SymbolicDijkstraSearch(ts_handle=self.ts_handle,
-                                                        dfa_handle=self.dfa_handle_list[0],
-                                                        ts_curr_vars=self.ts_x_list,
-                                                        ts_next_vars=self.ts_y_list,
-                                                        dfa_curr_vars=self.dfa_x_list,
-                                                        dfa_next_vars=self.dfa_y_list,
-                                                        ts_obs_vars=self.ts_obs_list,
-                                                        cudd_manager=self.manager)
+                                                       dfa_handle=self.dfa_handle_list[0],
+                                                       ts_curr_vars=self.ts_x_list,
+                                                       ts_next_vars=self.ts_y_list,
+                                                       dfa_curr_vars=self.dfa_x_list,
+                                                       dfa_next_vars=self.dfa_y_list,
+                                                       ts_obs_vars=self.ts_obs_list,
+                                                       cudd_manager=self.manager)
 
                 # action_dict = graph_search.ADD_composed_symbolic_dijkstra_wLTL(verbose=False)
                 action_dict = graph_search.composed_symbolic_dijkstra_wLTL(verbose=verbose)
@@ -191,13 +194,13 @@ class FrankaWorld(BaseSymMain):
             elif self.algorithm == 'astar':
                 # shortest path graph search with Symbolic A*
                 graph_search =  SymbolicBDDAStar(ts_handle=self.ts_handle,
-                                                    dfa_handle=self.dfa_handle_list[0],
-                                                    ts_curr_vars=self.ts_x_list,
-                                                    ts_next_vars=self.ts_y_list,
-                                                    dfa_curr_vars=self.dfa_x_list,
-                                                    dfa_next_vars=self.dfa_y_list,
-                                                    ts_obs_vars=self.ts_obs_list,
-                                                    cudd_manager=self.manager)
+                                                 dfa_handle=self.dfa_handle_list[0],
+                                                 ts_curr_vars=self.ts_x_list,
+                                                 ts_next_vars=self.ts_y_list,
+                                                 dfa_curr_vars=self.dfa_x_list,
+                                                 dfa_next_vars=self.dfa_y_list,
+                                                 ts_obs_vars=self.ts_obs_list,
+                                                 cudd_manager=self.manager)
                 # For A* we ignore heuristic computation time                                  
                 start: float = time.time()
                 action_dict = graph_search.composed_symbolic_Astar_search(verbose=verbose)
@@ -205,20 +208,72 @@ class FrankaWorld(BaseSymMain):
 
             elif self.algorithm == 'bfs':
                 graph_search = SymbolicSearchFranka(ts_handle=self.ts_handle,
-                                              dfa_handle=self.dfa_handle_list[0], 
-                                              ts_curr_vars=self.ts_x_list,
-                                              ts_next_vars=self.ts_y_list,
-                                              dfa_curr_vars=self.dfa_x_list,
-                                              dfa_next_vars=self.dfa_y_list,
-                                              ts_obs_vars=self.ts_obs_list,
-                                              manager=self.manager)
+                                                    dfa_handle=self.dfa_handle_list[0], 
+                                                    ts_curr_vars=self.ts_x_list,
+                                                    ts_next_vars=self.ts_y_list,
+                                                    dfa_curr_vars=self.dfa_x_list,
+                                                    dfa_next_vars=self.dfa_y_list,
+                                                    ts_obs_vars=self.ts_obs_list,
+                                                    manager=self.manager)
 
-                action_dict = graph_search.composed_symbolic_bfs_wLTL(verbose=verbose, obs_flag=True)
+                action_dict = graph_search.composed_symbolic_bfs_wLTL(verbose=verbose, obs_flag=False)
 
             stop: float = time.time()
             print("Time took for plannig: ", stop - start)
 
         return action_dict
+    
+
+    def simulate(self, action_dict: dict, print_strategy: bool = False):
+        """
+        A function to simulate the synthesize policy for the gridworld agent.
+        """
+        ts_handle = self.ts_handle
+        
+        ts_curr_vars = self.ts_x_list
+        ts_next_vars = self.ts_y_list
+        
+        dfa_curr_vars = self.dfa_x_list
+        dfa_next_vars = self.dfa_y_list
+
+        if len(self.formulas) > 1:
+            raise NotImplementedError()
+
+        else:
+            dfa_handle = self.dfa_handle_list[0]
+
+            if self.algorithm in ['dijkstras','astar']:
+                init_state_ts = ts_handle.sym_add_init_states
+                state_obs_dd = ts_handle.sym_add_state_labels
+
+                gridworld_strategy = convert_action_dict_to_gridworld_strategy(ts_handle=ts_handle,
+                                                                               dfa_handle=dfa_handle,
+                                                                               action_map=action_dict,
+                                                                               init_state_ts=init_state_ts,
+                                                                               state_obs_dd=state_obs_dd,
+                                                                               ts_curr_vars=ts_curr_vars,
+                                                                               ts_next_vars=ts_next_vars,
+                                                                               dfa_curr_vars=dfa_curr_vars,
+                                                                               dfa_next_vars=dfa_next_vars)
+
+            else:
+                init_state_ts = ts_handle.sym_init_states
+                state_obs_dd = ts_handle.sym_state_labels
+
+                franka_strategy = roll_out_franka_strategy(ts_handle=ts_handle,
+                                                                               dfa_handle=dfa_handle,
+                                                                               action_map=action_dict,
+                                                                               init_state_ts=init_state_ts,
+                                                                               state_obs_dd=state_obs_dd,
+                                                                               ts_curr_vars=ts_curr_vars,
+                                                                               ts_next_vars=ts_next_vars,
+                                                                               dfa_curr_vars=dfa_curr_vars,
+                                                                               dfa_next_vars=dfa_next_vars)
+
+                if print_strategy:
+                    for _ts_state, _action in franka_strategy: 
+                        print(f"From State {_ts_state} take Action {_action}")
+                    
 
 
     
@@ -368,7 +423,7 @@ class FrankaWorld(BaseSymMain):
 
     
 
-    def compute_valid_predicates(self, predicates: List[str], boxes: List[str]) -> Tuple[List, List]:
+    def compute_valid_predicates(self, predicates: List[str], boxes: List[str]) -> Tuple[List, List, List]:
         """
         A helper function that segretaes the predicates as required by the symbolic transition relation. We separate them based on
 
@@ -465,8 +520,11 @@ class FrankaWorld(BaseSymMain):
            _valid_box_preds['b'].extend(predicate_dict['on'])
         
         self.pred_int_map = _pred_map
+
+        # update boxes dictionary with gripper 
+        boxes_dict.update({'gripper': ['(gripper free)']})
         
-        return _valid_robot_preds, _valid_box_preds
+        return _valid_robot_preds, _valid_box_preds, boxes_dict
 
 
     def create_symbolic_causal_graph(self, draw_causal_graph: bool = False, add_flag: bool = False) -> Tuple:
@@ -479,11 +537,6 @@ class FrankaWorld(BaseSymMain):
         _causal_graph_instance.task.goals:  Desired Final condition(s) of the world
         _causal_graph_instance.task.operators: Actions that the agent (Franka) can take from all the grounded facts
 
-        Pyperplan: Not does not natively support equality - needs to remove action like Transit b# l1 l1. More info:
-
-         Equality keyword Github issue - https://github.com/aibasel/pyperplan/issues/13
-         Eqaulity Keyword PR - https://github.com/aibasel/pyperplan/pull/15
-
         """
         _causal_graph_instance = CausalGraph(problem_file=self.problem_file,
                                              domain_file=self.domain_file,
@@ -495,7 +548,7 @@ class FrankaWorld(BaseSymMain):
         boxes: List[str] = _causal_graph_instance.task_objects
 
         # compute all valid preds of the robot conf and box conf.
-        robot_preds, on_preds = self.compute_valid_predicates(predicates=task_facts, boxes=boxes)
+        robot_preds, on_preds, box_preds = self.compute_valid_predicates(predicates=task_facts, boxes=boxes)
         
         # compute all the possible states
         ts_state_tuples = self.compute_valid_franka_state_tuples(robot_preds=robot_preds, on_preds=on_preds, verbose=True)
@@ -503,12 +556,24 @@ class FrankaWorld(BaseSymMain):
         curr_vars, next_vars = self.create_symbolic_vars(num_of_facts=len(ts_state_tuples),
                                                          add_flag=add_flag)
         
-        ts_lbl_vars = self._create_symbolic_lbl_vars(state_lbls=on_preds['nb'] + on_preds['b'], state_var_name='b', add_flag=add_flag)
+        # box_preds has predicated segregated as per boxes
+        ts_lbl_vars = []
+        for _id, b in enumerate(box_preds.keys()):
+            if b == 'gripper':
+                ts_lbl_vars.extend(self._create_symbolic_lbl_vars(state_lbls=box_preds[b],
+                                                                  state_var_name=f'g_',
+                                                                  add_flag=add_flag))
+            else:
+                ts_lbl_vars.extend(self._create_symbolic_lbl_vars(state_lbls=box_preds[b],
+                                                                  state_var_name=f'b{_id}_',
+                                                                  add_flag=add_flag))
+        
+        # ts_lbl_vars = self._create_symbolic_lbl_vars(state_lbls=on_preds['nb'] + on_preds['b'], state_var_name='b', add_flag=add_flag)
 
         possible_lbls = on_preds['nb'] + on_preds['b'] if len(on_preds['b']) > 1 else on_preds['nb']
         possible_lbl_tuples = self.compute_franka_state_lbl_tuple(on_preds=possible_lbls)
         
-        return _causal_graph_instance.task, _causal_graph_instance.problem.domain, curr_vars, next_vars, ts_state_tuples, ts_lbl_vars, boxes, possible_lbl_tuples
+        return _causal_graph_instance.task, _causal_graph_instance.problem.domain, curr_vars, next_vars, ts_state_tuples, ts_lbl_vars, boxes, box_preds
         
 
     def build_bdd_abstraction(self, draw_causal_graph: bool = False):

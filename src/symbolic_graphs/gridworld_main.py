@@ -146,7 +146,7 @@ class SimpleGridWorld(BaseSymMain):
     
     def solve(self, verbose: bool = False) -> dict:
         """
-        A function that calls the approapriate solver based on the algorithm specified and if single LTL of multiple formulas have been passed.
+        A function that calls the appropriate solver based on the algorithm specified and if single LTL of multiple formulas have been passed.
         """
         if len(self.formulas) > 1:
             start: float = time.time()

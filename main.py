@@ -78,7 +78,8 @@ if __name__ == "__main__":
 
         # build the abstraction
         frankaworld_handle.build_abstraction()
-        policy: dict = frankaworld_handle.solve(verbose=True)
+        policy: dict = frankaworld_handle.solve(verbose=False)
+        frankaworld_handle.simulate(action_dict=policy, print_strategy=True)
     
     else:
         warnings.warn("Please set atleast one flag to True - FRANKAWORLD or GRIDWORLD!")

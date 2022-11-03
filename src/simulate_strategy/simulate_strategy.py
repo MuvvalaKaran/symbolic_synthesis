@@ -11,8 +11,8 @@ from cudd import Cudd, BDD, ADD
 from functools import reduce
 
 from src.algorithms.base.base_symbolic_search import BaseSymbolicSearch
-from src.symbolic_graphs import SymbolicDFA, SymbolicAddDFA
-from src.symbolic_graphs import SymbolicTransitionSystem, SymbolicWeightedTransitionSystem
+from src.symbolic_graphs import SymbolicDFA, SymbolicAddDFA, SymbolicDFAFranka
+from src.symbolic_graphs import SymbolicTransitionSystem, SymbolicWeightedTransitionSystem, SymbolicFrankaTransitionSystem
 
 
 
@@ -271,6 +271,74 @@ def convert_action_dict_to_gridworld_strategy(ts_handle: Union[SymbolicWeightedT
 
         # get the next DFA state
         _nxt_dfa = dfa_tr.restrict(curr_dfa_state & _sym_obs)
+        
+        # finally swap variables of TS and DFA 
+        curr_ts_state = _nxt_ts_state
+        curr_dfa_state = _nxt_dfa.swapVariables(dfa_curr_vars, dfa_next_vars)
+
+    return _strategy
+
+
+def roll_out_franka_strategy(ts_handle: Union[SymbolicWeightedTransitionSystem, SymbolicFrankaTransitionSystem],
+                             dfa_handle: Union[SymbolicAddDFA, SymbolicDFA],
+                             action_map: dict,
+                             init_state_ts,
+                             state_obs_dd,
+                             ts_curr_vars: list,
+                             ts_next_vars: list,
+                             dfa_curr_vars: list,
+                             dfa_next_vars: list) -> List[str]:
+    
+    _strategy = []
+    ADD_flag: bool = False
+    transition_sys_tr = ts_handle.sym_tr_actions
+    tr_action_idx_map = ts_handle.tr_action_idx_map
+
+    dfa_tr = dfa_handle.dfa_bdd_tr
+    init_state_dfa = dfa_handle.sym_init_state
+    target_DFA = dfa_handle.sym_goal_state
+
+    
+    if isinstance(init_state_dfa, ADD):
+        ADD_flag = True
+    curr_ts_state = init_state_ts
+    curr_dfa_state = init_state_dfa
+
+    while not target_DFA == curr_dfa_state:
+        # get the strategy
+        indv_state = ts_handle._convert_state_lbl_cube_to_func(dd_func=curr_ts_state, prod_curr_list=ts_curr_vars)
+        for state in indv_state:
+            if state & curr_dfa_state in action_map:
+                if ADD_flag:
+                    _a = action_map[curr_dfa_state.bddPattern() & state.bddPattern()]
+                else:
+                    _a = action_map[curr_dfa_state & state]
+                    ts_state_tuple = ts_handle.predicate_sym_map_curr.inv[state]
+                    ts_state_name = [ts_handle.pred_int_map.inv[pred] for pred in ts_state_tuple]
+                break
+
+        curr_ts_state = state
+
+        if isinstance(_a, list):
+            # randomly select an action from a list of actions
+            _a = random.choice(_a)
+            _strategy.append((ts_state_name ,_a))
+        else:
+            _strategy.append((ts_state_name, _a))
+        
+        # get the next TS
+        _nxt_ts_state = transition_sys_tr[tr_action_idx_map[_a]].restrict(curr_ts_state)
+        _nxt_ts_state = _nxt_ts_state.swapVariables(ts_curr_vars, ts_next_vars)
+        if ADD_flag:
+            # remove the dependency on the weight by first converting it to BDD and then back to ADD.
+            _nxt_ts_state = _nxt_ts_state.bddPattern().toADD()
+        
+        # get the observation of this ts state
+        _sym_obs = state_obs_dd.restrict(_nxt_ts_state)
+
+        # get the next DFA state
+        _nxt_dfa = dfa_tr.restrict(curr_dfa_state & _sym_obs)
+        _nxt_dfa = _nxt_dfa.existAbstract(reduce(lambda x, y: x & y, ts_handle.sym_vars_lbl))
         
         # finally swap variables of TS and DFA 
         curr_ts_state = _nxt_ts_state
