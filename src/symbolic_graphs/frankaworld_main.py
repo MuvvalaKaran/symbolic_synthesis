@@ -1,5 +1,6 @@
 import re
 import sys
+import time
 import math
 import warnings
 import copy
@@ -136,7 +137,6 @@ class FrankaWorld(BaseSymMain):
         all_combos = list(product(*all_preds, repeat=1))
 
         # when all the boxes are grouded then the gripper predicate is set to free
-        # parent_combo_list.extend(list(product(all_combos, predicate_dict['gripper'])))
         parent_combo_list['nb'].extend(all_combos)
 
 
@@ -160,7 +160,7 @@ class FrankaWorld(BaseSymMain):
 
     def compute_valid_franka_state_tuples(self, robot_preds: Dict[str, list], on_preds: Dict[str, list], verbose: bool = False) -> list:
         """
-         A function that take the cartesian prodict of all possbile robot states with all possible world configrations
+         A function that take the cartesian product of all possbile robot states with all possible world configurations
 
          robot_preds: all ready, holding predicates along with valid (holding, to-loc) and (ready, to-obj) predicates
          on_preds: all possible grounded (n boxes with their location and gripper free) predicates and n-1 grounded predicates 
@@ -175,7 +175,7 @@ class FrankaWorld(BaseSymMain):
         _valid_combos = _valid_combos_free + _valid_combos_occ
 
         if verbose:
-            print(f"********************************* No. Valid States in Frank abstraction: {len(_valid_combos)} *********************************")
+            print(f"********************************* # Valid States in Frank abstraction: {len(_valid_combos)} *********************************")
 
         _state_tuples = []
         for _exp_state in _valid_combos:
@@ -191,6 +191,23 @@ class FrankaWorld(BaseSymMain):
             _state_tuples.append(tuple(sorted(_state_tpl)))
 
         return _state_tuples
+    
+
+    def compute_franka_state_lbl_tuple(self, on_preds: Dict[str, list]) -> list:
+        """
+         A function that compute tuples corresponding to possible valid state lbls by iteration through each explicit state
+          and constructing its tuple 
+        """
+        _lbls = []
+        for _exp_lbl in on_preds:
+            if isinstance(_exp_lbl, tuple):
+                _lbl_tpl = [self.pred_int_map[lbl] for lbl in _exp_lbl]
+                _lbls.append(tuple(sorted(_lbl_tpl)))
+            else:
+                _lbls.append(self.pred_int_map[_exp_lbl])
+        
+        return _lbls
+
     
 
     def compute_valid_predicates(self, predicates: List[str], boxes: List[str]) -> Tuple[List, List]:
@@ -290,13 +307,12 @@ class FrankaWorld(BaseSymMain):
         if len(_valid_box_preds['b']) == 0:
            _valid_box_preds['b'].extend(predicate_dict['on'])
         
-        # predicate_dict['on'].extend(aug_on_state)
         self.pred_int_map = _pred_map
         
         return _valid_robot_preds, _valid_box_preds
 
 
-    def create_symbolic_causal_graph(self, draw_causal_graph: bool = False, add_flag: bool = False):
+    def create_symbolic_causal_graph(self, draw_causal_graph: bool = False, add_flag: bool = False) -> Tuple:
         """
         A function to create an instance of causal graph which call pyperplan. We access the task related properties pyperplan
         and create symbolic TR related to action.   
@@ -320,62 +336,48 @@ class FrankaWorld(BaseSymMain):
 
         task_facts: List[str] = _causal_graph_instance.task.facts
         boxes: List[str] = _causal_graph_instance.task_objects
-        valid_locs: List[str] = _causal_graph_instance.task_locations
 
-        # seg_preds = self._segregate_predicates(predicates=task_facts, boxes=boxes)
         # compute all valid preds of the robot conf and box conf.
         robot_preds, on_preds = self.compute_valid_predicates(predicates=task_facts, boxes=boxes)
-
+        
+        # compute all the possible states
         ts_state_tuples = self.compute_valid_franka_state_tuples(robot_preds=robot_preds, on_preds=on_preds, verbose=True)
 
-        # compute all the possible states
-
-        # sym_vars = dict(seg_preds)  # shallow copy to avoid changing the org content
-
-        # seg_preds['curr_state'] = seg_preds['others']
-        # seg_preds['next_state'] = seg_preds['others']
-
-        # del seg_preds['others']
-        curr_state, next_state = self.create_symbolic_vars(num_of_facts=len(ts_state_tuples),
-                                                           add_flag=add_flag)
+        curr_vars, next_vars = self.create_symbolic_vars(num_of_facts=len(ts_state_tuples),
+                                                         add_flag=add_flag)
         
-        ts_lbl_states = self._create_symbolic_lbl_vars(state_lbls=on_preds['nb'] + on_preds['b'], state_var_name='b', add_flag=add_flag)
+        ts_lbl_vars = self._create_symbolic_lbl_vars(state_lbls=on_preds['nb'] + on_preds['b'], state_var_name='b', add_flag=add_flag)
 
-        # sym_vars['curr_state'] = curr_state
-        # sym_vars['next_state'] = next_state
+        possible_lbls = on_preds['nb'] + on_preds['b'] if len(on_preds['b']) > 1 else on_preds['nb']
+        possible_lbl_tuples = self.compute_franka_state_lbl_tuple(on_preds=possible_lbls)
         
-        return _causal_graph_instance.task, _causal_graph_instance.problem.domain, curr_state, next_state, ts_state_tuples, ts_lbl_states, boxes
-        # \ boxes, valid_locs
+        return _causal_graph_instance.task, _causal_graph_instance.problem.domain, curr_vars, next_vars, ts_state_tuples, ts_lbl_vars, boxes, possible_lbl_tuples
         
 
     def build_bdd_abstraction(self, draw_causal_graph: bool = False):
         """
          Main Function to Build Transition System that only represent valid edges without any weights
         """
-        # task, domain, ts_sym_vars, seg_preds, boxes, locs = self.create_symbolic_causal_graph(draw_causal_graph=draw_causal_graph)
-        task, domain, ts_curr_vars, ts_next_vars, ts_state_tuples, ts_lbl_states, boxes   = self.create_symbolic_causal_graph(draw_causal_graph=draw_causal_graph)
+        task, domain, ts_curr_vars, ts_next_vars, ts_state_tuples, ts_lbl_vars, boxes, possible_lbl_tuples = self.create_symbolic_causal_graph(draw_causal_graph=draw_causal_graph)
 
         sym_tr = SymbolicFrankaTransitionSystem(curr_states=ts_curr_vars,
                                                 next_states=ts_next_vars,
-                                                lbl_states=ts_lbl_states,
+                                                lbl_states=ts_lbl_vars,
                                                 task=task,
                                                 domain=domain,
                                                 ts_states=ts_state_tuples,
                                                 ts_state_map=self.pred_int_map,
                                                 manager=self.manager)
-
-        sym_tr.new_create_transition_system_franka(boxes=boxes,
-                                                   add_exist_constr=True,
-                                                   verbose=True,
-                                                   plot=self.plot_ts)
-
-
-        # sym_tr.create_transition_system_franka(boxes=boxes,
-        #                                        locs=locs,
-        #                                        add_exist_constr=True,
-        #                                        verbose=False,
-        #                                        plot=self.plot_ts)
+        start: float = time.time()
+        sym_tr.create_transition_system_franka(boxes=boxes,
+                                               state_lbls=possible_lbl_tuples,
+                                               add_exist_constr=True,
+                                               verbose=True,
+                                               plot=self.plot_ts)
         
+        stop: float = time.time()
+        print("Time took for plannig: ", stop - start)
+
         sys.exit(-1) 
 
         return sym_tr, ts_curr_state, ts_next_state, None
