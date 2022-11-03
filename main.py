@@ -56,20 +56,29 @@ if __name__ == "__main__":
         domain_file_path = PROJECT_ROOT + "/pddl_files/example_pddl/domain.pddl"
         problem_file_path = PROJECT_ROOT + "/pddl_files/example_pddl/problem.pddl"
 
-        # frankworld stuff
+        if DIJKSTRAS:
+            algo = 'dijkstras'
+        elif ASTAR:
+            algo = 'astar'
+        else:
+            algo = 'bfs'
+
+        # frankaworld stuff
         frankaworld_handle = FrankaWorld(domain_file=domain_file_path,
                                          problem_file=problem_file_path,
                                          formulas=formulas,
                                          manager=cudd_manager,
                                          ltlf_flag=USE_LTLF,
                                          dyn_var_ord=DYNAMIC_VAR_ORDERING,
+                                         algorithm=algo,
                                          verbose=False,
                                          plot_ts=False,
                                          plot_obs=False,
                                          plot=False)
 
-        # buidl the abstraction
+        # build the abstraction
         frankaworld_handle.build_abstraction()
+        policy: dict = frankaworld_handle.solve(verbose=True)
     
     else:
         warnings.warn("Please set atleast one flag to True - FRANKAWORLD or GRIDWORLD!")

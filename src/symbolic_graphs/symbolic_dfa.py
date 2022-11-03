@@ -495,4 +495,92 @@ class SymbolicAddDFA(object):
                 file_path = PROJECT_ROOT + f'/plots/{self.dfa_name}_ADD_ltlf_trans_func.dot'
                 file_name = PROJECT_ROOT + f'/plots/{self.dfa_name}_ADD_ltlf_trans_func.pdf'
                 self.manager.dumpDot([self.dfa_bdd_tr], file_path=file_path)
-                gv.render(engine='dot', format='pdf', filepath=file_path, outfile=file_name)        
+                gv.render(engine='dot', format='pdf', filepath=file_path, outfile=file_name)
+
+
+class SymbolicDFAFranka(SymbolicDFA):
+    """
+     Class that inherits Symbolic DFA and construct symbolic Transition Relation associated with Formulas for Franka Abstraction
+    """
+    def __init__(self,
+                 curr_states: List[BDD],
+                 next_states: List[BDD],
+                 predicate_sym_map_lbl: dict,
+                 dfa: DFAGraph,
+                 manager: Cudd,
+                 dfa_name,
+                 pred_int_map: dict,
+                 ltlf_flag: bool = False):
+
+        super().__init__(curr_states, next_states, predicate_sym_map_lbl, dfa, manager, dfa_name, ltlf_flag)
+        self.pred_int_map = pred_int_map
+
+
+    def get_ltlf_edge_boolean_formula(self, labels: List, guard: str) -> BDD:
+        """
+         This function overirdes the base function by parsing the atomic proposition of form p00 to its corresponding rodl cong.
+
+         p00 := the first int correspond to box id and the second int corresponds to box's location. 
+         Thus, this proposition says box0 should be loc l0 
+        """
+        _all_conds_x: bool = True   # flag to check if a guard is a true loop or not 
+
+        expr = self.manager.bddZero()
+        preds = []
+        for idx, value in enumerate(guard):
+            # we only keep track of the 1s and ignore the 0s
+            if value == "1":
+                _all_conds_x = False
+                if isinstance(labels, tuple):
+                    cryptic_lbl = labels[idx]
+                else:
+                    cryptic_lbl = labels
+                
+                # get the gripper free predicate if label is `free`
+                if 'free' in str(cryptic_lbl):
+                    _pred_int = self.pred_int_map[f'(gripper free)']
+                else:
+                    # extract the box id and loc as str
+                    box_loc: str = re.search(r'\d+', str(cryptic_lbl)).group()
+                    _pred_int = self.pred_int_map[f'(on b{box_loc[0]} l{box_loc[1]})']
+                
+                preds.append(_pred_int)
+            elif value == '0':
+                _all_conds_x = False
+            else:
+                assert value == "X", "Error while constructing symbolic LTLF DAF edge. FIX THIS!!!"
+        
+        # sort the tuple and get its corresponding symbolic expr
+        if len(preds) > 1:
+            expr = expr | self.predicate_sym_map_lbl.get(tuple(sorted(preds)), self.manager.bddZero())
+        elif len(preds) == 1:
+            expr = expr | self.predicate_sym_map_lbl.get(preds[0])
+        
+            # elif value == "0":
+            #     if isinstance(labels, tuple):
+            #         cryptic_lbl = labels[idx]
+            #     else:
+            #         cryptic_lbl = labels
+                
+            #      # get the gripper free predicate if label is `free`
+            #     if 'free' in str(cryptic_lbl):
+            #         _pred_int = self.pred_int_map[f'(gripper free)']
+            #     else:
+            #         # extract the box id and loc as str
+            #         box_loc: str = re.search(r'\d+', str(cryptic_lbl)).group()
+            #         _pred_int = self.pred_int_map[f'(on b{box_loc[0]} l{box_loc[1]})']
+
+            #     expr = expr & ~self.predicate_sym_map_lbl.get(_pred_int)
+            
+        if _all_conds_x:
+            return self.manager.bddOne()
+
+        return expr
+
+
+    def get_edge_boolean_formula(self, curr_state, nxt_state, valid_dfa_edge_formula_size: int = 1):
+        raise NotImplementedError()
+    
+
+    def create_dfa_transition_system(self, verbose: bool = False, plot: bool = False, valid_dfa_edge_formula_size: int = 1):
+        raise NotImplementedError()

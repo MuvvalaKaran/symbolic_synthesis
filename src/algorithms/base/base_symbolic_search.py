@@ -307,7 +307,6 @@ class BaseSymbolicSearch(object):
             prod_cube_string: List[Union[BDD, ADD]] = self.convert_prod_cube_to_func(dd_func=dd_func)
 
         # prod_cube will have S, Z, P vairables in it. We have to parse it, look the split cubes in their corresponding dictionary individually.
-        # print("Prod State(s) Reached")
         for prod_cube in prod_cube_string:
             if ADD_flag:
                 prod_cube = prod_cube.toADD()
@@ -315,17 +314,8 @@ class BaseSymbolicSearch(object):
             _ts_dd = prod_cube.existAbstract(self.dfa_xcube & self.ts_obs_cube)
             if ADD_flag:
                 _ts_dd = _ts_dd.bddPattern()
-            # # if ADD_flag:
-            #     _ts_name = self.ts_add_sym_to_curr_state_map.get(_ts_dd)
-            # else:
             _ts_name = self.ts_bdd_sym_to_curr_state_map.get(_ts_dd)
             assert _ts_name is not None, "Couldn't convert TS Cube to its corresponding State. FIX THIS!!!"
-            # Second, we extract DFA state
-            # if ADD_flag:
-            #     _dfa_name = self._look_up_dfa_name(prod_dd=prod_cube,
-            #                                        dfa_dict=self.dfa_add_sym_to_curr_state_map,
-            #                                        **kwargs)
-            # else:
             _dfa_name = self._look_up_dfa_name(prod_dd=prod_cube,
                                                dfa_dict=self.dfa_bdd_sym_to_curr_state_map,
                                                ADD_flag=ADD_flag,
@@ -335,9 +325,6 @@ class BaseSymbolicSearch(object):
                 # Finally, we extract State label
                 _pred_dd = prod_cube.existAbstract(self.prod_xcube)
                 _pred_dd = _pred_dd.bddPattern()
-                # if ADD_flag:
-                #     _pred_name = self.ts_add_sym_to_S2obs_map.get(_pred_dd)
-                # else:
                 _pred_name = self.ts_bdd_sym_to_S2obs_map.get(_pred_dd)
                 assert _pred_name is not None, "Couldn't convert Predicate Cube to its corresponding State. FIX THIS!!!"
                 print(f"({_ts_name}, {_pred_name}, {_dfa_name})")

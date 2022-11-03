@@ -929,7 +929,7 @@ class SymbolicFrankaTransitionSystem():
                         # add them the observation bdd
                         _valid_pre_lbl = self.get_conds_from_state(state_tuple=self.predicate_sym_map_curr.inv[_val_pre_sym],
                                                                    only_world_conf=True)
-                        _valid_pre_lbl_sym = self.predicate_sym_map_lbl[_valid_pre_lbl] if len(next_tuple_lbl) > 1 else self.predicate_sym_map_lbl[next_tuple_lbl[0]]
+                        _valid_pre_lbl_sym = self.predicate_sym_map_lbl[_valid_pre_lbl] if len(_valid_pre_lbl) > 1 else self.predicate_sym_map_lbl[_valid_pre_lbl[0]]
                         self.sym_state_labels |= _val_pre_sym & _valid_pre_lbl_sym
 
                         closed |= _val_pre_sym

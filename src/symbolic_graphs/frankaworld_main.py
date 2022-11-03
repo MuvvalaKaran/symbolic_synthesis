@@ -15,8 +15,12 @@ from cudd import Cudd, BDD, ADD
 
 from src.explicit_graphs import CausalGraph, FiniteTransitionSystem
 
-from src.symbolic_graphs import SymbolicDFA, SymbolicAddDFA
+from src.symbolic_graphs import SymbolicDFA, SymbolicAddDFA, SymbolicDFAFranka
 from src.symbolic_graphs import SymbolicTransitionSystem, SymbolicWeightedTransitionSystem, SymbolicFrankaTransitionSystem
+
+from src.algorithms.blind_search import SymbolicSearch, MultipleFormulaBFS, SymbolicSearchFranka
+from src.algorithms.weighted_search import SymbolicDijkstraSearch, MultipleFormulaDijkstra
+from src.algorithms.weighted_search import SymbolicBDDAStar, MultipleFormulaBDDAstar
 
 from .base_main import BaseSymMain
 
@@ -30,6 +34,7 @@ class FrankaWorld(BaseSymMain):
                  problem_file: str,
                  formulas: Union[List, str],
                  manager: Cudd,
+                 algorithm: str,
                  weight_dict: dict = {},
                  ltlf_flag: bool = True,
                  dyn_var_ord: bool = False,
@@ -40,7 +45,7 @@ class FrankaWorld(BaseSymMain):
                  plot: bool = False,
                  create_lbls: bool = True):
         super().__init__(domain_file, problem_file, formulas, manager, plot_dfa, ltlf_flag, dyn_var_ord)
-
+        self.algorithm: str = algorithm
         self.weight_dict: Dict[str, int] = weight_dict
 
         self.verbose: bool = verbose
@@ -63,6 +68,159 @@ class FrankaWorld(BaseSymMain):
         sym_tr, ts_curr_state, ts_next_state, ts_lbl_states = self.build_bdd_abstraction(draw_causal_graph=draw_causal_graph)
 
         dfa_tr, dfa_curr_state, dfa_next_state = self.build_bdd_symbolic_dfa(sym_tr_handle=sym_tr)
+
+
+        self.ts_handle: Union[SymbolicTransitionSystem, SymbolicWeightedTransitionSystem] = sym_tr
+        self.dfa_handle_list: Union[SymbolicDFA, SymbolicAddDFA] = dfa_tr
+
+        self.ts_x_list: Union[List[BDD], List[ADD]] = ts_curr_state
+        self.ts_y_list: Union[List[BDD], List[ADD]] = ts_next_state
+        self.ts_obs_list: Union[List[BDD], List[ADD]] = ts_lbl_states
+
+        self.dfa_x_list: Union[List[BDD], List[ADD]] = dfa_curr_state
+        self.dfa_y_list: Union[List[BDD], List[ADD]] = dfa_next_state
+
+
+        if self.dyn_var_ordering:
+            self.set_variable_reordering(make_tree_node=True,
+                                         ts_sym_var_len=len(ts_curr_state),
+                                         ts_obs_var_len=len(ts_lbl_states))
+    
+
+    def build_bdd_symbolic_dfa(self, sym_tr_handle: SymbolicFrankaTransitionSystem) -> Tuple[List[SymbolicDFA], List[BDD], List[BDD]]:
+        """
+         This function calls Symbolic Franka DFA to decode the edge formulas into state lbls as per the symbolic state lbl dictionary
+          and construct the symbolic TR accoridngly.
+        """
+
+        # create a list of DFAs
+        DFA_handles = []
+        DFA_curr_vars = []
+        DFA_nxt_vars = []
+
+        for _idx, fmla in enumerate(self.formulas):
+            # create different boolean variables for different DFAs - [a0_i for ith DFA]
+            dfa_curr_state, dfa_next_state, _dfa = self.create_symbolic_dfa_graph(formula= fmla,
+                                                                                  dfa_num=_idx)
+
+            # create TR corresponding to each DFA - dfa name is only used dumping graph 
+            dfa_tr = SymbolicDFAFranka(curr_states=dfa_curr_state,
+                                       next_states=dfa_next_state,
+                                       predicate_sym_map_lbl=sym_tr_handle.predicate_sym_map_lbl,
+                                       pred_int_map=sym_tr_handle.pred_int_map,
+                                       manager=self.manager,
+                                       dfa=_dfa,
+                                       ltlf_flag=self.ltlf_flag,
+                                       dfa_name=f'dfa_{_idx}')
+            if self.ltlf_flag:
+                dfa_tr.create_symbolic_ltlf_transition_system(verbose=True, plot=self.plot_dfa)
+            else:
+                dfa_tr.create_dfa_transition_system(verbose=self.verbose,
+                                                    plot=self.plot_dfa,
+                                                    valid_dfa_edge_formula_size=len(_dfa.get_symbols()))
+
+            # We extend DFA vars list as we dont need them in stored in separate lists
+            DFA_handles.append(dfa_tr)
+            DFA_curr_vars.extend(dfa_curr_state)
+            DFA_nxt_vars.extend(dfa_next_state)
+        
+        return DFA_handles, DFA_curr_vars, DFA_nxt_vars
+    
+
+    def set_variable_reordering(self, make_tree_node: bool = False, **kwargs):
+        """
+        This function is called when DYNAMIC_VAR_ORDERING is True.
+
+        Different ways to speed up the process
+        1. AutodynaEnable() - Enable Dyanmic variable reordering
+        2. ReorderingStatus() - Return the current reordering status and default method
+        3. EnablingOrderingMonitoring() - Enable monitoring of a variable order 
+        4. maxReorderings() - Read and set maximum number of variable reorderings 
+        5. EnablereorderingReport() - Enable reporting of variable reordering
+
+        MakeTreeNode() - Allows us to specify constraints over groups of variables. For example, we can constrain x, x'
+        to always be contiguous. Thus, the relative ordering within the group is left unchanged. 
+
+        MTR takes in two args -
+        low: 
+        size: 2 (grouping curr state vars and their corresponding primes together)
+
+        """
+        self.manager.autodynEnable()
+
+        if make_tree_node:
+            # Current, we follow the convention where we first build the TS variables, then the observations,
+            # and finally the dfa variables. Within the TS and DFA, we pait vars and their primes together.
+            # The observation variables are all grouped together as one.
+            var_reorder_counter = 0  
+            for i in range(self.manager.size()):
+            # for i in range(kwargs['ts_sym_var_len']):
+                if i<= kwargs['ts_sym_var_len']:
+                    self.manager.makeTreeNode(2*i, 2)
+
+        if self.verbose:
+            self.manager.enableOrderingMonitoring()
+        else:
+            self.manager.enableReorderingReporting()
+    
+
+    def solve(self, verbose: bool = False) -> dict:
+        """
+          A function that calls the appropriate solver based on the algorithm specified and if single LTL of multiple formulas have been passed.
+        """
+
+        if len(self.formulas) > 1:
+            raise NotImplementedError()
+        
+        else:
+            start: float = time.time()
+            if self.algorithm == 'dijkstras':
+                # shortest path graph search with Dijkstras
+                graph_search =  SymbolicDijkstraSearch(ts_handle=self.ts_handle,
+                                                        dfa_handle=self.dfa_handle_list[0],
+                                                        ts_curr_vars=self.ts_x_list,
+                                                        ts_next_vars=self.ts_y_list,
+                                                        dfa_curr_vars=self.dfa_x_list,
+                                                        dfa_next_vars=self.dfa_y_list,
+                                                        ts_obs_vars=self.ts_obs_list,
+                                                        cudd_manager=self.manager)
+
+                # action_dict = graph_search.ADD_composed_symbolic_dijkstra_wLTL(verbose=False)
+                action_dict = graph_search.composed_symbolic_dijkstra_wLTL(verbose=verbose)
+
+            elif self.algorithm == 'astar':
+                # shortest path graph search with Symbolic A*
+                graph_search =  SymbolicBDDAStar(ts_handle=self.ts_handle,
+                                                    dfa_handle=self.dfa_handle_list[0],
+                                                    ts_curr_vars=self.ts_x_list,
+                                                    ts_next_vars=self.ts_y_list,
+                                                    dfa_curr_vars=self.dfa_x_list,
+                                                    dfa_next_vars=self.dfa_y_list,
+                                                    ts_obs_vars=self.ts_obs_list,
+                                                    cudd_manager=self.manager)
+                # For A* we ignore heuristic computation time                                  
+                start: float = time.time()
+                action_dict = graph_search.composed_symbolic_Astar_search(verbose=verbose)
+
+
+            elif self.algorithm == 'bfs':
+                graph_search = SymbolicSearchFranka(ts_handle=self.ts_handle,
+                                              dfa_handle=self.dfa_handle_list[0], 
+                                              ts_curr_vars=self.ts_x_list,
+                                              ts_next_vars=self.ts_y_list,
+                                              dfa_curr_vars=self.dfa_x_list,
+                                              dfa_next_vars=self.dfa_y_list,
+                                              ts_obs_vars=self.ts_obs_list,
+                                              manager=self.manager)
+
+                action_dict = graph_search.composed_symbolic_bfs_wLTL(verbose=verbose, obs_flag=True)
+
+            stop: float = time.time()
+            print("Time took for plannig: ", stop - start)
+
+        return action_dict
+
+
     
 
     def _create_symbolic_lbl_vars(self, state_lbls: list, state_var_name: str, add_flag: bool = False) -> List[Union[BDD, ADD]]:
@@ -301,7 +459,6 @@ class FrankaWorld(BaseSymMain):
         # n combos when all boxes and gripper is not free are grounded 
         # and n-1 when one of the boxes is being manipulated and gripper is not free
         _valid_box_preds = self._get_all_box_combos(boxes_dict=boxes_dict, predicate_dict=predicate_dict)
-        # _valid_box_preds.extend()
         
         # when you have two objects, then individual on predicates are also valid combos 
         if len(_valid_box_preds['b']) == 0:
@@ -372,15 +529,14 @@ class FrankaWorld(BaseSymMain):
         sym_tr.create_transition_system_franka(boxes=boxes,
                                                state_lbls=possible_lbl_tuples,
                                                add_exist_constr=True,
-                                               verbose=True,
+                                               verbose=False,
                                                plot=self.plot_ts)
         
         stop: float = time.time()
         print("Time took for plannig: ", stop - start)
 
-        sys.exit(-1) 
 
-        return sym_tr, ts_curr_state, ts_next_state, None
+        return sym_tr, ts_curr_vars, ts_next_vars, ts_lbl_vars
 
 
     def build_weighted_add_abstraction(self):
