@@ -330,7 +330,7 @@ class SymbolicSearch(object):
         return bddVars
     
 
-    def composed_symbolic_bfs_wLTL(self, verbose: bool = False):
+    def composed_symbolic_bfs_wLTL(self, verbose: bool = False, obs_flag: bool = False):
         """
         A function that compose the TR function from the Transition system and DFA and search symbolically over the product graph.
 
@@ -372,7 +372,7 @@ class SymbolicSearch(object):
                 prod_image_bdd_restricted = prod_image_bdd.existAbstract(self.ts_obs_cube)
                 
                 if verbose:
-                    self.get_states_from_dd(dd_func=prod_image_bdd, obs_flag=False)
+                    self.get_states_from_dd(dd_func=prod_image_bdd, obs_flag=obs_flag)
                     
                 open_list.append(prod_image_bdd_restricted)
             
@@ -386,7 +386,7 @@ class SymbolicSearch(object):
 
         if verbose:
             print("********************The goal state encountered is***********************")
-            self.get_states_from_dd(dd_func=open_list[layer_num], obs_flag=False)
+            self.get_states_from_dd(dd_func=open_list[layer_num], obs_flag=obs_flag)
 
         print(f"Found a plan with least cost length {layer_num}, Now retireving it!")
 
@@ -433,4 +433,58 @@ class SymbolicSearch(object):
             current_prod = new_current_prod
         
         return parent_plan
+
+
+class SymbolicSearchFranka(SymbolicSearch):
+    """
+     This clas overrides the base class's printing funtionality to print predicate names
+    """
+    def __init__(self,
+                 ts_handle: SymbolicTransitionSystem,
+                 dfa_handle: SymbolicDFA,
+                 manager: Cudd,
+                 ts_curr_vars: list,
+                 ts_next_vars: list, 
+                 ts_obs_vars: list, 
+                 dfa_curr_vars: list, 
+                 dfa_next_vars: list):
+
+        super().__init__(ts_handle, dfa_handle, manager, ts_curr_vars, ts_next_vars, ts_obs_vars, dfa_curr_vars, dfa_next_vars)
+        self.pred_int_map: dict = ts_handle.pred_int_map
     
+
+    def get_state_from_tuple(self, state_tuple: tuple) -> List[str]:
+        """
+         Given, a predicate tuple, this function return the corresponding state tuple
+        """
+        if isinstance(state_tuple, tuple):
+            _states = [self.pred_int_map.inv[state] for state in state_tuple]
+        else:
+            _states = self.pred_int_map.inv[state_tuple]
+
+        return _states
+
+
+    def get_states_from_dd(self, dd_func: BDD) -> None:
+        """
+        A function thats wraps arounf convert_cube_to_func() and spits out the states in the corresponding. 
+
+        Set obs_flag to True if you want to print a state's corresponding label/predicate as well. 
+        """
+        
+        prod_cube_string = self.convert_prod_cube_to_func(bdd_func=dd_func)
+
+        # prod_cube will have S, Z, P vairables in it. We have to parse it, look the split cubes in their corresponding dictionary individually.
+        print("Prod State(s) Reached")
+        for prod_cube in prod_cube_string:
+            # first we extract TS state
+            _ts_bdd: BDD = prod_cube.existAbstract(self.dfa_xcube & self.ts_obs_cube)
+            _ts_tuple: tuple = self.ts_sym_to_curr_state_map.get(_ts_bdd)
+            assert _ts_tuple is not None, "Couldn't convert TS Cube to its corresponding State. FIX THIS!!!"
+            _ts_name: str =  self.get_state_from_tuple(state_tuple=_ts_tuple)
+
+            # Second, we extract DFA state
+            _dfa_bdd = prod_cube.existAbstract(self.ts_xcube & self.ts_obs_cube)
+            _dfa_name = self.dfa_sym_to_curr_state_map.get(_dfa_bdd)
+            assert _dfa_name is not None, "Couldn't convert DFA Cube to its corresponding State. FIX THIS!!!"
+            print(f"({_ts_name}, {_dfa_name})")

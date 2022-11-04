@@ -306,18 +306,21 @@ def roll_out_franka_strategy(ts_handle: Union[SymbolicWeightedTransitionSystem, 
 
     while not target_DFA == curr_dfa_state:
         # get the strategy
-        indv_state = ts_handle._convert_state_lbl_cube_to_func(dd_func=curr_ts_state, prod_curr_list=ts_curr_vars)
-        for state in indv_state:
-            if state & curr_dfa_state in action_map:
+        indv_state = ts_handle._convert_state_lbl_cube_to_func(dd_func=curr_ts_state & curr_dfa_state,
+                                                               prod_curr_list=ts_curr_vars + dfa_curr_vars)
+        for prod_state in indv_state:
+            if prod_state in action_map:
+                curr_ts_state = prod_state.existAbstract(reduce(lambda x, y: x & y, dfa_handle.sym_vars_curr))
                 if ADD_flag:
-                    _a = action_map[curr_dfa_state.bddPattern() & state.bddPattern()]
+                    _a = action_map[prod_state.bddPattern()]
                 else:
-                    _a = action_map[curr_dfa_state & state]
-                    ts_state_tuple = ts_handle.predicate_sym_map_curr.inv[state]
+                    _a = action_map[prod_state]
+                    ts_state_tuple = ts_handle.predicate_sym_map_curr.inv[curr_ts_state]
                     ts_state_name = [ts_handle.pred_int_map.inv[pred] for pred in ts_state_tuple]
                 break
 
-        curr_ts_state = state
+        
+        curr_dfa_state = prod_state.existAbstract(reduce(lambda x, y: x & y, ts_handle.sym_vars_curr))
 
         if isinstance(_a, list):
             # randomly select an action from a list of actions

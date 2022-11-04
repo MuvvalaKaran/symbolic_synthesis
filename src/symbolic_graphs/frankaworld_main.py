@@ -116,7 +116,7 @@ class FrankaWorld(BaseSymMain):
                                        ltlf_flag=self.ltlf_flag,
                                        dfa_name=f'dfa_{_idx}')
             if self.ltlf_flag:
-                dfa_tr.create_symbolic_ltlf_transition_system(verbose=True, plot=self.plot_dfa)
+                dfa_tr.create_symbolic_ltlf_transition_system(verbose=False, plot=self.plot_dfa)
             else:
                 dfa_tr.create_dfa_transition_system(verbose=self.verbose,
                                                     plot=self.plot_dfa,
@@ -261,18 +261,19 @@ class FrankaWorld(BaseSymMain):
                 state_obs_dd = ts_handle.sym_state_labels
 
                 franka_strategy = roll_out_franka_strategy(ts_handle=ts_handle,
-                                                                               dfa_handle=dfa_handle,
-                                                                               action_map=action_dict,
-                                                                               init_state_ts=init_state_ts,
-                                                                               state_obs_dd=state_obs_dd,
-                                                                               ts_curr_vars=ts_curr_vars,
-                                                                               ts_next_vars=ts_next_vars,
-                                                                               dfa_curr_vars=dfa_curr_vars,
-                                                                               dfa_next_vars=dfa_next_vars)
+                                                           dfa_handle=dfa_handle,
+                                                           action_map=action_dict,
+                                                           init_state_ts=init_state_ts,
+                                                           state_obs_dd=state_obs_dd,
+                                                           ts_curr_vars=ts_curr_vars,
+                                                           ts_next_vars=ts_next_vars,
+                                                           dfa_curr_vars=dfa_curr_vars,
+                                                           dfa_next_vars=dfa_next_vars)
 
                 if print_strategy:
+                    print("{:<30}".format('Action'))
                     for _ts_state, _action in franka_strategy: 
-                        print(f"From State {_ts_state} take Action {_action}")
+                        print("{:<30}".format(_action,))
                     
 
 
@@ -567,12 +568,7 @@ class FrankaWorld(BaseSymMain):
                 ts_lbl_vars.extend(self._create_symbolic_lbl_vars(state_lbls=box_preds[b],
                                                                   state_var_name=f'b{_id}_',
                                                                   add_flag=add_flag))
-        
-        # ts_lbl_vars = self._create_symbolic_lbl_vars(state_lbls=on_preds['nb'] + on_preds['b'], state_var_name='b', add_flag=add_flag)
-
-        possible_lbls = on_preds['nb'] + on_preds['b'] if len(on_preds['b']) > 1 else on_preds['nb']
-        possible_lbl_tuples = self.compute_franka_state_lbl_tuple(on_preds=possible_lbls)
-        
+                
         return _causal_graph_instance.task, _causal_graph_instance.problem.domain, curr_vars, next_vars, ts_state_tuples, ts_lbl_vars, boxes, box_preds
         
 
@@ -580,7 +576,7 @@ class FrankaWorld(BaseSymMain):
         """
          Main Function to Build Transition System that only represent valid edges without any weights
         """
-        task, domain, ts_curr_vars, ts_next_vars, ts_state_tuples, ts_lbl_vars, boxes, possible_lbl_tuples = self.create_symbolic_causal_graph(draw_causal_graph=draw_causal_graph)
+        task, domain, ts_curr_vars, ts_next_vars, ts_state_tuples, ts_lbl_vars, boxes, possible_lbls = self.create_symbolic_causal_graph(draw_causal_graph=draw_causal_graph)
 
         sym_tr = SymbolicFrankaTransitionSystem(curr_states=ts_curr_vars,
                                                 next_states=ts_next_vars,
@@ -592,13 +588,13 @@ class FrankaWorld(BaseSymMain):
                                                 manager=self.manager)
         start: float = time.time()
         sym_tr.create_transition_system_franka(boxes=boxes,
-                                               state_lbls=possible_lbl_tuples,
+                                               state_lbls=possible_lbls,
                                                add_exist_constr=True,
                                                verbose=False,
                                                plot=self.plot_ts)
         
         stop: float = time.time()
-        print("Time took for plannig: ", stop - start)
+        print("Time took for constructing the abstraction: ", stop - start)
 
 
         return sym_tr, ts_curr_vars, ts_next_vars, ts_lbl_vars

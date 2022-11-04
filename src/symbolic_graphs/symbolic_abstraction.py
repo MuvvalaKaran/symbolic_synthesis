@@ -541,7 +541,14 @@ class SymbolicFrankaTransitionSystem():
      A class to construct the symblic transition system for the Robotic manipulator example.
     """
 
-    def __init__(self, curr_states: list , next_states: list, lbl_states: list, task, domain, ts_state_map: dict, ts_states: list, manager: Cudd):
+    def __init__(self,
+                 curr_states: list,
+                 next_states: list,
+                 lbl_states: list,
+                 task, domain,
+                 ts_state_map: dict,
+                 ts_states: list,
+                 manager: Cudd):
         self.sym_vars_curr = curr_states
         self.sym_vars_next = next_states
         self.sym_vars_lbl = lbl_states
@@ -550,10 +557,11 @@ class SymbolicFrankaTransitionSystem():
         self.goal: frozenset = task.goals
         self.ts_states: dict = ts_states
         self.pred_int_map: dict = ts_state_map
+
         self.task: dict = task
         self.domain: dict = domain
         self.manager = manager
-        self.actions: dict = domain.actions
+        self.actions: dict = [action.name for action in task.operators]
         self.tr_action_idx_map: dict = {}
         self.sym_init_states = manager.bddZero()
         self.sym_goal_states = manager.bddZero()
@@ -579,7 +587,7 @@ class SymbolicFrankaTransitionSystem():
         """
         #  initiate BDDs for all the action 
         action_idx_map = bidict()
-        _actions = list(self.actions.keys())
+        _actions = self.actions
         for _idx, _action in enumerate(_actions):
             action_idx_map[_action] = _idx
         
@@ -712,8 +720,6 @@ class SymbolicFrankaTransitionSystem():
         
         # loop over each box and create its corresponding boolean formula 
         for b_id, preds in domain_lbls.items():
-            
-
             # get its corresponding boolean vars
             _tmp_vars_list = []
             if b_id == 'gripper':
@@ -724,7 +730,6 @@ class SymbolicFrankaTransitionSystem():
                         _tmp_vars_list.append(bvar)
 
             # create all combinations of 1-true and 0-false
-            # boolean_str = list(product([1, 0], repeat=len(self.sym_vars_lbl)))
             boolean_str = list(product([1, 0], repeat=len(_tmp_vars_list)))
 
             _node_int_map_lbl = bidict({state: boolean_str[index] for index, state in enumerate(preds)})
@@ -809,26 +814,20 @@ class SymbolicFrankaTransitionSystem():
         # create predicates that say on b0 l1 (l1 is the destination in the action)
         on_preds = [self.pred_int_map[f'(on {bid} {dloc})'] for bid in tmp_copy]
         
-        return not set(on_preds).issubset(curr_state_lbl)
+        if set(on_preds).intersection(set(curr_state_lbl)):
+            return False
+
+        return True
     
 
     def add_edge_to_action_tr(self, action_name: str, curr_state_tuple: tuple, next_state_tuple: tuple) -> None:
         """
          A helper function that add the edge from curr state to the next state in their respective action Transition Relations (TR)
         """
-        action_list = list(self.actions.keys())
-
         curr_state_sym: BDD = self.predicate_sym_map_curr[curr_state_tuple]
         nxt_state_sym: BDD = self.predicate_sym_map_nxt[next_state_tuple]
 
-        # instead looking for the action, extract it (action name)
-        _action = action_name.split()[0]
-        _action = _action[1:]   # remove the intial '(' braket
-
-        # assert that its a valid name
-        assert _action in action_list, "FIX THIS: Failed extracting a valid action."
-
-        _idx = self.tr_action_idx_map.get(_action)
+        _idx = self.tr_action_idx_map.get(action_name)
 
         self.sym_tr_actions[_idx] |= curr_state_sym & nxt_state_sym
 

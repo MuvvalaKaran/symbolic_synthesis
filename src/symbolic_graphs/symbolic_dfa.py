@@ -175,8 +175,8 @@ class SymbolicDFA(object):
             _curr_sym = self.dfa_predicate_sym_map_curr.get(_curr) 
             _nxt_sym = self.dfa_predicate_sym_map_nxt.get(_nxt)
             _edge_sym = self.get_edge_boolean_formula(curr_state=_curr,
-                                                       nxt_state=_nxt,
-                                                       valid_dfa_edge_formula_size=valid_dfa_edge_formula_size)
+                                                      nxt_state=_nxt,
+                                                      valid_dfa_edge_formula_size=valid_dfa_edge_formula_size)
             
             if not isinstance(_edge_sym, BDD):
                 _edge = self.dfa._graph[_curr][_nxt][0]['guard_formula']
@@ -523,14 +523,10 @@ class SymbolicDFAFranka(SymbolicDFA):
          p00 := the first int correspond to box id and the second int corresponds to box's location. 
          Thus, this proposition says box0 should be loc l0 
         """
-        # _all_conds_x: bool = True   # flag to check if a guard is a true loop or not 
-
         expr = self.manager.bddOne()
-        preds = []
         for idx, value in enumerate(guard):
             # we only keep track of the 1s and ignore the 0s
             if value == "1":
-                # _all_conds_x = False
                 if isinstance(labels, tuple):
                     cryptic_lbl = labels[idx]
                 else:
@@ -538,14 +534,10 @@ class SymbolicDFAFranka(SymbolicDFA):
                 
                 # get the gripper free predicate if label is `free` is high
                 if 'free' in str(cryptic_lbl):
-                    # _pred_int = self.pred_int_map[f'(gripper free)']
                     expr = expr & self.predicate_sym_map_lbl['(gripper free)']
                 else:
                     # extract the box id and loc as str
                     box_loc: str = re.search(r'\d+', str(cryptic_lbl)).group()
-                    # _pred_int = self.pred_int_map[f'(on b{box_loc[0]} l{box_loc[1]})']
-                
-                # preds.append(_pred_int)
                     expr = expr & self.predicate_sym_map_lbl[f'(on b{box_loc[0]} l{box_loc[1]})']
             
             elif value == "0":
@@ -556,48 +548,42 @@ class SymbolicDFAFranka(SymbolicDFA):
                 
                  # get the not(gripper free) predicate if label is `free` is low
                 if 'free' in str(cryptic_lbl):
-                    # _pred_int = self.pred_int_map[f'(gripper free)']
                     expr = expr & ~self.predicate_sym_map_lbl['(gripper free)']
                 else:
                     # extract the box id and loc as str
                     box_loc: str = re.search(r'\d+', str(cryptic_lbl)).group()
-                    # _pred_int = self.pred_int_map[f'(on b{box_loc[0]} l{box_loc[1]})']
-
-                expr = expr & ~self.predicate_sym_map_lbl[f'(on b{box_loc[0]} l{box_loc[1]})']
+                    expr = expr & ~self.predicate_sym_map_lbl[f'(on b{box_loc[0]} l{box_loc[1]})']
             else:
                 assert value == "X", "Error while constructing symbolic LTLF DAF edge. FIX THIS!!!"
         
-        # sort the tuple and get its corresponding symbolic expr
-        # if len(preds) > 1:
-        #     expr = expr | self.predicate_sym_map_lbl.get(tuple(sorted(preds)), self.manager.bddZero())
-        # elif len(preds) == 1:
-        #     expr = expr | self.predicate_sym_map_lbl.get(preds[0])
-        
-            # elif value == "0":
-            #     if isinstance(labels, tuple):
-            #         cryptic_lbl = labels[idx]
-            #     else:
-            #         cryptic_lbl = labels
-                
-            #      # get the gripper free predicate if label is `free`
-            #     if 'free' in str(cryptic_lbl):
-            #         _pred_int = self.pred_int_map[f'(gripper free)']
-            #     else:
-            #         # extract the box id and loc as str
-            #         box_loc: str = re.search(r'\d+', str(cryptic_lbl)).group()
-            #         _pred_int = self.pred_int_map[f'(on b{box_loc[0]} l{box_loc[1]})']
-
-            #     expr = expr & ~self.predicate_sym_map_lbl.get(_pred_int)
-            
-        # if _all_conds_x:
-        #     return self.manager.bddOne()
-
         return expr
 
 
-    def get_edge_boolean_formula(self, curr_state, nxt_state, valid_dfa_edge_formula_size: int = 1):
-        raise NotImplementedError()
-    
+    def in_order_nnf_tree_traversal(self, expression, formula):
+        """
+        Traverse the edge formula given by Promela a binary tree. This function implements a in-order tree traversal algorithm.
+        """
+        if hasattr(formula, 'symbol'):
+            # get the corresponding boolean expression
+            if '!' in formula.name:
+                if 'free' in formula.name:
+                    return ~self.predicate_sym_map_lbl['(gripper free)']
+                else:
+                    # extract the box id and loc as str
+                    box_loc: str = re.search(r'\d+', formula.name).group()
+                    return ~self.predicate_sym_map_lbl[f'(on b{box_loc[0]} l{box_loc[1]})']
+            else:
+                if 'free' in formula.name:
+                    return self.predicate_sym_map_lbl['(gripper free)']
+                else:
+                    # extract the box id and loc as str
+                    box_loc: str = re.search(r'\d+', formula.name).group()
+                    return self.predicate_sym_map_lbl[f'(on b{box_loc[0]} l{box_loc[1]})']
+        
+        expression = self.in_order_nnf_tree_traversal(expression, formula.left)
+        if formula.name == 'AND':
+            expression = expression & self.in_order_nnf_tree_traversal(expression, formula.right)
+        elif formula.name == 'OR':
+            expression |= self.in_order_nnf_tree_traversal(expression, formula.right)
 
-    def create_dfa_transition_system(self, verbose: bool = False, plot: bool = False, valid_dfa_edge_formula_size: int = 1):
-        raise NotImplementedError()
+        return expression
