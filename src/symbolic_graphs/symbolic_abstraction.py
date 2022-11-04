@@ -1038,10 +1038,10 @@ class SymbolicWeightedFrankaTransitionSystem():
         init_tuple = self.get_tuple_from_state(self.init)
         goal_tuple = self.get_tuple_from_state(self.goal)
 
-        self.sym_init_states = self.predicate_add_sym_map_curr.get(init_tuple)
-        self.sym_goal_states = None
+        self.sym_add_init_states = self.predicate_add_sym_map_curr.get(init_tuple)
+        self.sym_add_goal_states = None
 
-        assert self.sym_init_states is not None, "Error extracting the Sym init state. FIX THIS!!!"
+        assert self.sym_add_init_states is not None, "Error extracting the Sym init state. FIX THIS!!!"
     
 
     def _create_sym_var_map(self):
@@ -1298,7 +1298,7 @@ class SymbolicWeightedFrankaTransitionSystem():
 
         _idx = self.tr_action_idx_map.get(action_name)
 
-        self.sym_tr_actions[_idx] |= curr_state_sym & nxt_state_sym
+        self.sym_tr_actions[_idx] |= curr_state_sym & nxt_state_sym & self.weight_dict[action_name]
 
     
 
@@ -1334,7 +1334,7 @@ class SymbolicWeightedFrankaTransitionSystem():
 
         closed: ADD = self.manager.addZero()
 
-        init_state_sym = self.sym_init_states
+        init_state_sym = self.sym_add_init_states
 
         # get the state lbls and create state and state lbl mappinng
         state_lbl: tuple = self.get_conds_from_state(state_tuple=self.predicate_add_sym_map_curr.inv[init_state_sym], only_world_conf=True)

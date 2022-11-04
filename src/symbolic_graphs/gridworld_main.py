@@ -129,12 +129,12 @@ class SimpleGridWorld(BaseSymMain):
         self.ts_handle: Union[SymbolicTransitionSystem, SymbolicWeightedTransitionSystem] = sym_tr
         self.dfa_handle_list: Union[SymbolicDFA, SymbolicAddDFA] = dfa_tr
 
-        self.ts_x_list: Union[List[BDD], List[ADD]] = ts_curr_state
-        self.ts_y_list: Union[List[BDD], List[ADD]] = ts_next_state
-        self.ts_obs_list: Union[List[BDD], List[ADD]] = ts_lbl_states
+        self.ts_x_list: List[BDD] = ts_curr_state
+        self.ts_y_list: List[BDD] = ts_next_state
+        self.ts_obs_list: List[BDD] = ts_lbl_states
 
-        self.dfa_x_list: Union[List[BDD], List[ADD]] = dfa_curr_state
-        self.dfa_y_list: Union[List[BDD], List[ADD]] = dfa_next_state
+        self.dfa_x_list: List[BDD] = dfa_curr_state
+        self.dfa_y_list: List[BDD] = dfa_next_state
 
 
         
@@ -387,7 +387,7 @@ class SimpleGridWorld(BaseSymMain):
         return state_lbl_vars, possible_obs
     
 
-    def build_bdd_abstraction(self) -> Tuple[SymbolicTransitionSystem, list, list, list, int]:
+    def build_bdd_abstraction(self) -> Tuple[SymbolicTransitionSystem, list, list, list]:
         """
         Main Function to Build Transition System that only represent valid edges without any weights
         """
@@ -457,7 +457,7 @@ class SimpleGridWorld(BaseSymMain):
         return _causal_graph_instance.task, _causal_graph_instance.problem.domain, curr_state, next_state
 
 
-    def build_weighted_add_abstraction(self) -> Tuple[SymbolicTransitionSystem, List[ADD], List[ADD], List[ADD], int]:
+    def build_weighted_add_abstraction(self) -> Tuple[SymbolicTransitionSystem, List[ADD], List[ADD], List[ADD]]:
         """
          Main Function to Build Transition System that represents valid edges with their corresponding weights
 

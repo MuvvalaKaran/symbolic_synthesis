@@ -13,16 +13,16 @@ from typing import Tuple, List, Dict, Union
 
 from cudd import Cudd, BDD, ADD
 
-from src.explicit_graphs import CausalGraph, FiniteTransitionSystem
+from src.explicit_graphs import CausalGraph
 
-from src.symbolic_graphs import SymbolicAddDFA, SymbolicDFAFranka, SymbolicWeightedFrankaTransitionSystem
-from src.symbolic_graphs import SymbolicTransitionSystem, SymbolicWeightedTransitionSystem, SymbolicFrankaTransitionSystem
+from src.symbolic_graphs import SymbolicDFAFranka, SymbolicAddDFAFranka
+from src.symbolic_graphs import SymbolicFrankaTransitionSystem, SymbolicWeightedFrankaTransitionSystem
 
-from src.algorithms.blind_search import SymbolicSearch, MultipleFormulaBFS, SymbolicSearchFranka
+from src.algorithms.blind_search import SymbolicSearch, MultipleFormulaBFS
 from src.algorithms.weighted_search import SymbolicDijkstraSearch, MultipleFormulaDijkstra
 from src.algorithms.weighted_search import SymbolicBDDAStar, MultipleFormulaBDDAstar
 
-from src.simulate_strategy import convert_action_dict_to_gridworld_strategy, roll_out_franka_strategy, roll_out_franka_strategy_nLTL
+from src.simulate_strategy import roll_out_franka_strategy, roll_out_franka_strategy_nLTL
 
 from .base_main import BaseSymMain
 
@@ -68,7 +68,7 @@ class FrankaWorld(BaseSymMain):
         print("*****************Creating Boolean variables for Frankaworld!*****************")
         if self.algorithm in ['dijkstras','astar']:
             # All vars (TS, DFA and Predicate) are of type ADDs
-            sym_tr, ts_curr_state, ts_next_state, ts_lbl_states = self.build_weighted_add_abstraction()
+            sym_tr, ts_curr_state, ts_next_state, ts_lbl_states = self.build_weighted_add_abstraction(draw_causal_graph=draw_causal_graph)
             
             # The tuple contains the DFA handle, DFA curr and next vars in this specific order
             dfa_tr, dfa_curr_state, dfa_next_state = self.build_add_symbolic_dfa(sym_tr_handle=sym_tr)
@@ -82,15 +82,15 @@ class FrankaWorld(BaseSymMain):
             warnings.warn("Please enter a valid graph search algorthim. Currently Available - bfs (BDD), dijkstras (BDD/ADD), astar (BDD/ADD)")
 
 
-        self.ts_handle: Union[SymbolicTransitionSystem, SymbolicWeightedTransitionSystem] = sym_tr
-        self.dfa_handle_list: Union[SymbolicDFAFranka, SymbolicAddDFA] = dfa_tr
+        self.ts_handle: Union[SymbolicFrankaTransitionSystem, SymbolicWeightedFrankaTransitionSystem] = sym_tr
+        self.dfa_handle_list: Union[SymbolicDFAFranka, SymbolicAddDFAFranka] = dfa_tr
 
-        self.ts_x_list: Union[List[BDD], List[ADD]] = ts_curr_state
-        self.ts_y_list: Union[List[BDD], List[ADD]] = ts_next_state
-        self.ts_obs_list: Union[List[BDD], List[ADD]] = ts_lbl_states
+        self.ts_x_list: List[ADD] = ts_curr_state
+        self.ts_y_list: List[ADD] = ts_next_state
+        self.ts_obs_list: List[ADD] = ts_lbl_states
 
-        self.dfa_x_list: Union[List[BDD], List[ADD]] = dfa_curr_state
-        self.dfa_y_list: Union[List[BDD], List[ADD]] = dfa_next_state
+        self.dfa_x_list: List[ADD] = dfa_curr_state
+        self.dfa_y_list: List[ADD] = dfa_next_state
 
 
         if self.dyn_var_ordering:
@@ -111,7 +111,7 @@ class FrankaWorld(BaseSymMain):
         DFA_nxt_vars = []
 
         for _idx, fmla in enumerate(self.formulas):
-            # create different boolean variables for different DFAs - [a0_i for ith DFA]
+            # create different boolean variables for different DFAs - [ai_0 for ith DFA]
             dfa_curr_state, dfa_next_state, _dfa = self.create_symbolic_dfa_graph(formula= fmla,
                                                                                   dfa_num=_idx)
 
@@ -131,10 +131,51 @@ class FrankaWorld(BaseSymMain):
                                                     plot=self.plot_dfa,
                                                     valid_dfa_edge_formula_size=len(_dfa.get_symbols()))
 
-            # We extend DFA vars list as we dont need them in stored in separate lists
+            # We extend DFA vars list as we dont need them stored in separate lists
             DFA_handles.append(dfa_tr)
             DFA_curr_vars.extend(dfa_curr_state)
             DFA_nxt_vars.extend(dfa_next_state)
+        
+        return DFA_handles, DFA_curr_vars, DFA_nxt_vars
+    
+
+    def build_add_symbolic_dfa(self, sym_tr_handle: SymbolicWeightedFrankaTransitionSystem) -> Tuple[List[SymbolicAddDFAFranka], List[ADD], List[ADD]]:
+        """
+        A helper function to build a symbolic DFA given a formula from ADD Variables.
+        """      
+        # create a list of DFAs
+        DFA_handles = []
+        DFA_curr_vars = []
+        DFA_nxt_vars = []
+
+        for _idx, fmla in enumerate(self.formulas):
+            # create different ADD variables for different DFAs
+            add_dfa_curr_state, add_dfa_next_state, _dfa = self.create_symbolic_dfa_graph(formula=fmla,
+                                                                                          dfa_num=_idx,
+                                                                                          add_flag=True)
+
+            # create TR corresponding to each DFA - dfa name is only used dumping graph 
+            dfa_tr = SymbolicAddDFAFranka(curr_states=add_dfa_curr_state,
+                                          next_states=add_dfa_next_state,
+                                          predicate_add_sym_map_lbl=sym_tr_handle.predicate_add_sym_map_lbl,
+                                          predicate_sym_map_lbl=sym_tr_handle.predicate_sym_map_lbl,
+                                          pred_int_map=sym_tr_handle.pred_int_map,
+                                          manager=self.manager,
+                                          dfa=_dfa,
+                                          ltlf_flag=self.ltlf_flag,
+                                          dfa_name=f'dfa_{_idx}')
+            
+            if self.ltlf_flag:
+                dfa_tr.create_symbolic_ltlf_transition_system(verbose=self.verbose, plot=self.plot_dfa)
+            else:
+                dfa_tr.create_dfa_transition_system(verbose=self.verbose,
+                                                    plot=self.plot_dfa,
+                                                    valid_dfa_edge_formula_size=len(_dfa.get_symbols()))
+
+            # We extend DFA vars list as we dont need them stored in separate lists
+            DFA_handles.append(dfa_tr)
+            DFA_curr_vars.extend(add_dfa_curr_state)
+            DFA_nxt_vars.extend(add_dfa_next_state)
         
         return DFA_handles, DFA_curr_vars, DFA_nxt_vars
     
@@ -256,14 +297,14 @@ class FrankaWorld(BaseSymMain):
 
 
             elif self.algorithm == 'bfs':
-                graph_search = SymbolicSearchFranka(ts_handle=self.ts_handle,
-                                                    dfa_handle=self.dfa_handle_list[0], 
-                                                    ts_curr_vars=self.ts_x_list,
-                                                    ts_next_vars=self.ts_y_list,
-                                                    dfa_curr_vars=self.dfa_x_list,
-                                                    dfa_next_vars=self.dfa_y_list,
-                                                    ts_obs_vars=self.ts_obs_list,
-                                                    manager=self.manager)
+                graph_search = SymbolicSearch(ts_handle=self.ts_handle,
+                                              dfa_handle=self.dfa_handle_list[0], 
+                                              ts_curr_vars=self.ts_x_list,
+                                              ts_next_vars=self.ts_y_list,
+                                              dfa_curr_vars=self.dfa_x_list,
+                                              dfa_next_vars=self.dfa_y_list,
+                                              ts_obs_vars=self.ts_obs_list,
+                                              manager=self.manager)
 
                 action_dict = graph_search.composed_symbolic_bfs_wLTL(verbose=verbose, obs_flag=False)
 
@@ -291,29 +332,25 @@ class FrankaWorld(BaseSymMain):
             if self.algorithm in ['dijkstras','astar']:
                 init_state_ts_sym = ts_handle.sym_add_init_states
                 state_obs_dd = ts_handle.sym_add_state_labels
-
-                raise NotImplementedError()
             
             else:
                 init_state_ts_sym = ts_handle.sym_init_states
                 state_obs_dd = ts_handle.sym_state_labels
 
-                franka_strategy = roll_out_franka_strategy_nLTL(ts_handle=ts_handle,
-                                                                   dfa_handles=dfa_handles,
-                                                                   action_map=action_dict,
-                                                                   init_state_ts_sym=init_state_ts_sym,
-                                                                   state_obs_dd=state_obs_dd,
-                                                                   ts_curr_vars=ts_curr_vars,
-                                                                   ts_next_vars=ts_next_vars,
-                                                                   dfa_curr_vars=dfa_curr_vars,
-                                                                   dfa_next_vars=dfa_next_vars)
+            franka_strategy = roll_out_franka_strategy_nLTL(ts_handle=ts_handle,
+                                                                dfa_handles=dfa_handles,
+                                                                action_map=action_dict,
+                                                                init_state_ts_sym=init_state_ts_sym,
+                                                                state_obs_dd=state_obs_dd,
+                                                                ts_curr_vars=ts_curr_vars,
+                                                                ts_next_vars=ts_next_vars,
+                                                                dfa_curr_vars=dfa_curr_vars,
+                                                                dfa_next_vars=dfa_next_vars)
 
             if print_strategy:
                 print("{:<30}".format('Action'))
                 for _ts_state, _action in franka_strategy: 
                     print("{:<30}".format(_action,))
-
-
 
         else:
             dfa_handle = self.dfa_handle_list[0]
@@ -321,38 +358,25 @@ class FrankaWorld(BaseSymMain):
             if self.algorithm in ['dijkstras','astar']:
                 init_state_ts = ts_handle.sym_add_init_states
                 state_obs_dd = ts_handle.sym_add_state_labels
-
-                gridworld_strategy = convert_action_dict_to_gridworld_strategy(ts_handle=ts_handle,
-                                                                               dfa_handle=dfa_handle,
-                                                                               action_map=action_dict,
-                                                                               init_state_ts=init_state_ts,
-                                                                               state_obs_dd=state_obs_dd,
-                                                                               ts_curr_vars=ts_curr_vars,
-                                                                               ts_next_vars=ts_next_vars,
-                                                                               dfa_curr_vars=dfa_curr_vars,
-                                                                               dfa_next_vars=dfa_next_vars)
-
             else:
                 init_state_ts = ts_handle.sym_init_states
                 state_obs_dd = ts_handle.sym_state_labels
 
-                franka_strategy = roll_out_franka_strategy(ts_handle=ts_handle,
-                                                           dfa_handle=dfa_handle,
-                                                           action_map=action_dict,
-                                                           init_state_ts=init_state_ts,
-                                                           state_obs_dd=state_obs_dd,
-                                                           ts_curr_vars=ts_curr_vars,
-                                                           ts_next_vars=ts_next_vars,
-                                                           dfa_curr_vars=dfa_curr_vars,
-                                                           dfa_next_vars=dfa_next_vars)
+            franka_strategy = roll_out_franka_strategy(ts_handle=ts_handle,
+                                                        dfa_handle=dfa_handle,
+                                                        action_map=action_dict,
+                                                        init_state_ts=init_state_ts,
+                                                        state_obs_dd=state_obs_dd,
+                                                        ts_curr_vars=ts_curr_vars,
+                                                        ts_next_vars=ts_next_vars,
+                                                        dfa_curr_vars=dfa_curr_vars,
+                                                        dfa_next_vars=dfa_next_vars)
 
-                if print_strategy:
-                    print("{:<30}".format('Action'))
-                    for _ts_state, _action in franka_strategy: 
-                        print("{:<30}".format(_action,))
+            if print_strategy:
+                print("{:<30}".format('Action'))
+                for _ts_state, _action in franka_strategy: 
+                    print("{:<30}".format(_action,))
                     
-
-
     
 
     def _create_symbolic_lbl_vars(self, state_lbls: list, state_var_name: str, add_flag: bool = False) -> List[Union[BDD, ADD]]:
@@ -722,7 +746,7 @@ class FrankaWorld(BaseSymMain):
         sym_tr.create_weighted_transition_system_franka(boxes=boxes,
                                                         state_lbls=possible_lbls,
                                                         add_exist_constr=True,
-                                                        verbose=True,
+                                                        verbose=False,
                                                         plot=self.plot_ts)
         
         stop: float = time.time()

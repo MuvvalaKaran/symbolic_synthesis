@@ -307,44 +307,51 @@ def roll_out_franka_strategy_nLTL(ts_handle: Union[SymbolicWeightedTransitionSys
 
     curr_dfa_state = monolithic_dfa_init
 
-    # get all th dfa vars 
-    monolithic_dfa_vars = [var for dfa_tr in dfa_handles for var in dfa_tr.sym_vars_curr]
-    monolithic_dfa_xcube = reduce(lambda x, y: x & y, monolithic_dfa_vars)
-
     if isinstance(init_state_dfa_list[0], ADD):
         ADD_flag = True
-   
+        ts_bdd_curr_vars = [_avar.bddPattern() for _avar in ts_curr_vars]
+        dfa_bdd_curr_vars = [var.bddPattern() for dfa_tr in dfa_handles for var in dfa_tr.sym_add_vars_curr]
+    else:
+        # get all th dfa vars 
+        monolithic_dfa_vars = [var for dfa_tr in dfa_handles for var in dfa_tr.sym_vars_curr]
+        monolithic_dfa_xcube = reduce(lambda x, y: x & y, monolithic_dfa_vars)
+
     counter = 0
 
     while not curr_dfa_state == monolithic_dfa_target:    
-        # if ADD_flag:
-        #     _a = action_map[curr_dfa_state.bddPattern() & curr_ts_state_sym.bddPattern()]
-        # else:
-        #     _a = action_map[curr_dfa_state & curr_ts_state_sym]
         # get the strategy
-        indv_state = ts_handle._convert_state_lbl_cube_to_func(dd_func=curr_ts_state_sym & curr_dfa_state,
-                                                               prod_curr_list=ts_curr_vars + dfa_curr_vars)
+        if ADD_flag:
+            indv_state = ts_handle._convert_state_lbl_cube_to_func(dd_func=(curr_ts_state_sym & curr_dfa_state).bddPattern(),
+                                                                   prod_curr_list=ts_bdd_curr_vars + dfa_bdd_curr_vars)
+        else:
+            indv_state = ts_handle._convert_state_lbl_cube_to_func(dd_func=curr_ts_state_sym & curr_dfa_state,
+                                                                   prod_curr_list=ts_curr_vars + dfa_curr_vars)
         for prod_state in indv_state:
             if prod_state in action_map:
-                curr_ts_state_sym = prod_state.existAbstract(monolithic_dfa_xcube)
+                
                 if ADD_flag:
-                    _a = action_map[prod_state.bddPattern()]
+                    curr_ts_state = prod_state.existAbstract(reduce(lambda x, y: x & y, dfa_bdd_curr_vars))
+                    curr_dfa_state = prod_state.existAbstract(reduce(lambda x, y: x & y, ts_bdd_curr_vars))
+
+                    _a = action_map[prod_state]
+
+                    ts_state_tuple = ts_handle.predicate_sym_map_curr.inv[curr_ts_state]
+                    ts_state_name = [ts_handle.pred_int_map.inv[pred] for pred in ts_state_tuple]
+                    curr_ts_state = curr_ts_state.toADD()
+                    curr_dfa_state = curr_dfa_state.toADD()
                 else:
+                    curr_ts_state_sym = prod_state.existAbstract(monolithic_dfa_xcube)
+                    curr_dfa_state = prod_state.existAbstract(reduce(lambda x, y: x & y, ts_handle.sym_vars_curr))
                     _a = action_map[prod_state]
                     ts_state_tuple = ts_handle.predicate_sym_map_curr.inv[curr_ts_state_sym]
                     ts_state_name = [ts_handle.pred_int_map.inv[pred] for pred in ts_state_tuple]
                 break
         
-        curr_dfa_state = prod_state.existAbstract(reduce(lambda x, y: x & y, ts_handle.sym_vars_curr))
-
-        
         if isinstance(_a, list):
             # randomly select an action from a list of actions
             _a = random.choice(_a)
-            # _strategy.append(PDDL_TO_GRIDWORLD_MAP.get(_a))
             _strategy.append((ts_state_name ,_a))
         else:
-            # _strategy.append(PDDL_TO_GRIDWORLD_MAP.get(_a))
             _strategy.append((ts_state_name ,_a))
         
         _nxt_ts_state_sym = transition_sys_tr[tr_action_idx_map[_a]].restrict(curr_ts_state_sym)
@@ -359,6 +366,12 @@ def roll_out_franka_strategy_nLTL(ts_handle: Union[SymbolicWeightedTransitionSys
 
         # get the next DFA state
         _nxt_dfa = dfa_monolithic_tr_func.restrict(curr_dfa_state & _sym_obs)
+
+        if ADD_flag:
+            _nxt_dfa = _nxt_dfa.existAbstract(reduce(lambda x, y: x & y, ts_handle.sym_add_vars_lbl))
+            _nxt_dfa = _nxt_dfa.bddPattern().toADD()
+        else:
+            _nxt_dfa = _nxt_dfa.existAbstract(reduce(lambda x, y: x & y, ts_handle.sym_vars_lbl))
 
         # finally swap variables of TS and DFA 
         curr_ts_state_sym = _nxt_ts_state_sym
@@ -393,26 +406,40 @@ def roll_out_franka_strategy(ts_handle: Union[SymbolicWeightedTransitionSystem, 
     
     if isinstance(init_state_dfa, ADD):
         ADD_flag = True
+        ts_bdd_curr_vars = [_avar.bddPattern() for _avar in ts_curr_vars]
+        dfa_bdd_curr_vars = [_avar.bddPattern() for _avar in dfa_curr_vars]
+
     curr_ts_state = init_state_ts
     curr_dfa_state = init_state_dfa
 
+    counter = 0
+
+
     while not target_DFA == curr_dfa_state:
         # get the strategy
-        indv_state = ts_handle._convert_state_lbl_cube_to_func(dd_func=curr_ts_state & curr_dfa_state,
-                                                               prod_curr_list=ts_curr_vars + dfa_curr_vars)
+        if ADD_flag:
+            indv_state = ts_handle._convert_state_lbl_cube_to_func(dd_func=(curr_ts_state & curr_dfa_state).bddPattern(),
+                                                                   prod_curr_list=ts_bdd_curr_vars + dfa_bdd_curr_vars)
+        else:
+            indv_state = ts_handle._convert_state_lbl_cube_to_func(dd_func=curr_ts_state & curr_dfa_state,
+                                                                prod_curr_list=ts_curr_vars + dfa_curr_vars)
         for prod_state in indv_state:
             if prod_state in action_map:
-                curr_ts_state = prod_state.existAbstract(reduce(lambda x, y: x & y, dfa_handle.sym_vars_curr))
                 if ADD_flag:
-                    _a = action_map[prod_state.bddPattern()]
+                    curr_ts_state = prod_state.existAbstract(reduce(lambda x, y: x & y, dfa_bdd_curr_vars))
+                    curr_dfa_state = prod_state.existAbstract(reduce(lambda x, y: x & y, ts_bdd_curr_vars))
+                    _a = action_map[prod_state]
+                    ts_state_tuple = ts_handle.predicate_sym_map_curr.inv[curr_ts_state]
+                    ts_state_name = [ts_handle.pred_int_map.inv[pred] for pred in ts_state_tuple]
+                    curr_ts_state = curr_ts_state.toADD()
+                    curr_dfa_state = curr_dfa_state.toADD()
                 else:
+                    curr_ts_state = prod_state.existAbstract(reduce(lambda x, y: x & y, dfa_handle.sym_vars_curr))
+                    curr_dfa_state = prod_state.existAbstract(reduce(lambda x, y: x & y, ts_handle.sym_vars_curr))
                     _a = action_map[prod_state]
                     ts_state_tuple = ts_handle.predicate_sym_map_curr.inv[curr_ts_state]
                     ts_state_name = [ts_handle.pred_int_map.inv[pred] for pred in ts_state_tuple]
                 break
-
-        
-        curr_dfa_state = prod_state.existAbstract(reduce(lambda x, y: x & y, ts_handle.sym_vars_curr))
 
         if isinstance(_a, list):
             # randomly select an action from a list of actions
@@ -424,6 +451,7 @@ def roll_out_franka_strategy(ts_handle: Union[SymbolicWeightedTransitionSystem, 
         # get the next TS
         _nxt_ts_state = transition_sys_tr[tr_action_idx_map[_a]].restrict(curr_ts_state)
         _nxt_ts_state = _nxt_ts_state.swapVariables(ts_curr_vars, ts_next_vars)
+        
         if ADD_flag:
             # remove the dependency on the weight by first converting it to BDD and then back to ADD.
             _nxt_ts_state = _nxt_ts_state.bddPattern().toADD()
@@ -433,10 +461,17 @@ def roll_out_franka_strategy(ts_handle: Union[SymbolicWeightedTransitionSystem, 
 
         # get the next DFA state
         _nxt_dfa = dfa_tr.restrict(curr_dfa_state & _sym_obs)
-        _nxt_dfa = _nxt_dfa.existAbstract(reduce(lambda x, y: x & y, ts_handle.sym_vars_lbl))
+        if ADD_flag:
+            _nxt_dfa = _nxt_dfa.existAbstract(reduce(lambda x, y: x & y, ts_handle.sym_add_vars_lbl))
+            _nxt_dfa = _nxt_dfa.bddPattern().toADD()
+        else:
+            _nxt_dfa = _nxt_dfa.existAbstract(reduce(lambda x, y: x & y, ts_handle.sym_vars_lbl))
         
         # finally swap variables of TS and DFA 
         curr_ts_state = _nxt_ts_state
         curr_dfa_state = _nxt_dfa.swapVariables(dfa_curr_vars, dfa_next_vars)
+
+        assert counter <= len(action_map), "Error while extracting a valid plan for single DFA."
+        counter += 1
 
     return _strategy

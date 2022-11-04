@@ -8,9 +8,9 @@ GRIDWORLD: bool = False   # Set this flag to true when using gridworld example
 FRANKAWORLD: bool = True  # Set this flag to true when using manipulator scenarios
 
 DIJKSTRAS: bool = False  # set this flag to true when you want to use Dijkstras
-ASTAR: bool = True  # set this flag to true when you want to use A* algorithm 
+ASTAR: bool = False  # set this flag to true when you want to use A* algorithm 
 
-USE_LTLF: bool = False # Construct DFA from LTLf
+USE_LTLF: bool = True # Construct DFA from LTLf
 
 DRAW_EXPLICIT_CAUSAL_GRAPH: bool = False
 SIMULATE_STRATEGY: bool = True
@@ -22,8 +22,20 @@ DYNAMIC_VAR_ORDERING: bool = False
 #################### FRANKA TABLE TOP FORMULAS #######################
 ######################################################################
 
-# formulas = ['F(p01 & p10)']
+# formulas = ['F(p01 & free & F(p12 & free & F(p23 & free & F(p34 & free))))']
+formulas = ['(F((p01 & free)) & F((p12 & free)) & F((p23 & free)) & F((p34 & free)))']
 
+
+# formulas = ['F((p01 & free))',
+#             'F((p12 & free))', 
+#             'F((p23 & free))',
+#             'F((p34 & free))'
+#             ]
+
+# formulas = ['(F((p01 & free)) & F((p12 & free)) & F((p23 & free)) & F((p34 & free)))',
+#             '(F((p12 & free)) & F((p23 & free)) & F((p34 & free)) & F((p01 & free)))', 
+#             '(F((p23 & free)) & F((p34 & free)) & F((p01 & free)) & F((p12 & free)))', 
+#             '(F((p34 & free)) & F((p01 & free)) & F((p12 & free)) & F((p23 & free)))']
 
 
 ######################################################################
@@ -52,17 +64,17 @@ DYNAMIC_VAR_ORDERING: bool = False
 # formulas = [' F(l4)']
 
 
-formulas = ['F(l2)',
-            'F(l91)', 
-            'F(l93)',
-            'F(l4)', 
-            'F(l95)',
-            'F(l6)',
-            'F(l97)',
-            'F(l8)',
-            'F(l99)',
-            'F(l10)'
-            ] 
+# formulas = ['F(l2)',
+#             'F(l91)', 
+#             'F(l93)',
+#             'F(l4)', 
+#             'F(l95)',
+#             'F(l6)',
+#             'F(l97)',
+#             'F(l8)',
+#             'F(l99)',
+#             'F(l10)'
+#             ] 
 
 
 

@@ -104,12 +104,12 @@ class BaseSymMain():
         _num_of_sym_vars = self.manager.size()
 
         for num_var in range(math.ceil(math.log2(num_of_facts))):
-                if add_flag:
-                    curr_state_vars.append(self.manager.addVar(_num_of_sym_vars + (2*num_var), f'{cur_state}{num_var}'))
-                    next_state_vars.append(self.manager.addVar(_num_of_sym_vars + (2*num_var + 1), f'{nxt_state}{num_var}'))
-                else:
-                    curr_state_vars.append(self.manager.bddVar(_num_of_sym_vars + (2*num_var), f'{cur_state}{num_var}'))
-                    next_state_vars.append(self.manager.bddVar(_num_of_sym_vars + (2*num_var + 1), f'{nxt_state}{num_var}'))
+            if add_flag:
+                curr_state_vars.append(self.manager.addVar(_num_of_sym_vars + (2*num_var), f'{cur_state}{num_var}'))
+                next_state_vars.append(self.manager.addVar(_num_of_sym_vars + (2*num_var + 1), f'{nxt_state}{num_var}'))
+            else:
+                curr_state_vars.append(self.manager.bddVar(_num_of_sym_vars + (2*num_var), f'{cur_state}{num_var}'))
+                next_state_vars.append(self.manager.bddVar(_num_of_sym_vars + (2*num_var + 1), f'{nxt_state}{num_var}'))
 
         return (curr_state_vars, next_state_vars)
 
@@ -126,7 +126,7 @@ class BaseSymMain():
         DFA_nxt_vars = []
 
         for _idx, fmla in enumerate(self.formulas):
-            # create different boolean variables for different DFAs - [a0_i for ith DFA]
+            # create different boolean variables for different DFAs - [ai_0 for ith DFA]
             dfa_curr_state, dfa_next_state, _dfa = self.create_symbolic_dfa_graph(formula= fmla,
                                                                                   dfa_num=_idx)
 
@@ -145,7 +145,7 @@ class BaseSymMain():
                                                     plot=self.plot_dfa,
                                                     valid_dfa_edge_formula_size=len(_dfa.get_symbols()))
 
-            # We extend DFA vars list as we dont need them in stored in separate lists
+            # We extend DFA vars list as we dont need them stored in separate lists
             DFA_handles.append(dfa_tr)
             DFA_curr_vars.extend(dfa_curr_state)
             DFA_nxt_vars.extend(dfa_next_state)
@@ -185,7 +185,7 @@ class BaseSymMain():
                                                     plot=self.plot_dfa,
                                                     valid_dfa_edge_formula_size=len(_dfa.get_symbols()))
 
-            # We extend DFA vars list as we dont need them in stored in separate lists
+            # We extend DFA vars list as we dont need them stored in separate lists
             DFA_handles.append(dfa_tr)
             DFA_curr_vars.extend(add_dfa_curr_state)
             DFA_nxt_vars.extend(add_dfa_next_state)

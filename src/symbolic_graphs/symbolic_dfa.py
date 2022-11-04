@@ -518,21 +518,20 @@ class SymbolicDFAFranka(SymbolicDFA):
 
     def get_ltlf_edge_boolean_formula(self, labels: List, guard: str) -> BDD:
         """
-         This function overirdes the base function by parsing the atomic proposition of form p00 to its corresponding rodl cong.
+         This function overirdes the base function by parsing the atomic proposition of form p00 to its corresponding wordl conf.
 
-         p00 := the first int correspond to box id and the second int corresponds to box's location. 
-         Thus, this proposition says box0 should be loc l0 
+         p00 := the first int corresponds to box id and the second int corresponds to box's location. 
+         Thus, this proposition says box0 should be at loc l0. 
         """
         expr = self.manager.bddOne()
         for idx, value in enumerate(guard):
-            # we only keep track of the 1s and ignore the 0s
             if value == "1":
                 if isinstance(labels, tuple):
                     cryptic_lbl = labels[idx]
                 else:
                     cryptic_lbl = labels
                 
-                # get the gripper free predicate if label is `free` is high
+                # get the gripper free predicate if label is `free` and high
                 if 'free' in str(cryptic_lbl):
                     expr = expr & self.predicate_sym_map_lbl['(gripper free)']
                 else:
@@ -546,7 +545,7 @@ class SymbolicDFAFranka(SymbolicDFA):
                 else:
                     cryptic_lbl = labels
                 
-                 # get the not(gripper free) predicate if label is `free` is low
+                 # get the not(gripper free) predicate if label is `free` and low
                 if 'free' in str(cryptic_lbl):
                     expr = expr & ~self.predicate_sym_map_lbl['(gripper free)']
                 else:
@@ -587,3 +586,61 @@ class SymbolicDFAFranka(SymbolicDFA):
             expression |= self.in_order_nnf_tree_traversal(expression, formula.right)
 
         return expression
+    
+
+class SymbolicAddDFAFranka(SymbolicAddDFA):
+    """
+     Class that inherits Symbolic ADD DFA and constructs symbolic Transition Relation associated with Formulas for Franka Abstraction
+    """
+
+    def __init__(self,
+                 curr_states: List[ADD],
+                 next_states: List[ADD],
+                 predicate_add_sym_map_lbl: dict,
+                 predicate_sym_map_lbl: dict,
+                 dfa: DFAGraph, manager: Cudd,
+                 dfa_name: str,
+                 pred_int_map: dict,
+                 ltlf_flag: bool = False):
+        super().__init__(curr_states, next_states, predicate_add_sym_map_lbl, predicate_sym_map_lbl, dfa, manager, dfa_name, ltlf_flag)
+        self.pred_int_map = pred_int_map
+
+    
+    def get_ltlf_edge_boolean_formula(self, labels: List, guard: str) -> ADD:
+        """
+         Construct the edge formulas after parsing the atomic proposition and looking up its corresponsind ADD repr
+        """
+        
+        expr = self.manager.addOne()
+        for idx, value in enumerate(guard):
+            if value == "1":
+                if isinstance(labels, tuple):
+                    cryptic_lbl = labels[idx]
+                else:
+                    cryptic_lbl = labels
+                
+                # get the gripper free predicate if label is `free` and high
+                if 'free' in str(cryptic_lbl):
+                    expr = expr & self.predicate_add_sym_map_lbl['(gripper free)']
+                else:
+                    # extract the box id and loc as str
+                    box_loc: str = re.search(r'\d+', str(cryptic_lbl)).group()
+                    expr = expr & self.predicate_add_sym_map_lbl[f'(on b{box_loc[0]} l{box_loc[1]})']
+            
+            elif value == "0":
+                if isinstance(labels, tuple):
+                    cryptic_lbl = labels[idx]
+                else:
+                    cryptic_lbl = labels
+                
+                 # get the not(gripper free) predicate if label is `free` and low
+                if 'free' in str(cryptic_lbl):
+                    expr = expr & ~self.predicate_add_sym_map_lbl['(gripper free)']
+                else:
+                    # extract the box id and loc as str
+                    box_loc: str = re.search(r'\d+', str(cryptic_lbl)).group()
+                    expr = expr & ~self.predicate_add_sym_map_lbl[f'(on b{box_loc[0]} l{box_loc[1]})']
+            else:
+                assert value == "X", "Error while constructing symbolic LTLF DAF edge. FIX THIS!!!"
+        
+        return expr
