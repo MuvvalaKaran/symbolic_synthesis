@@ -356,6 +356,9 @@ class MultipleFormulaBDDAstar(BaseSymbolicSearch):
                     
                     # Calculate successors. . .
                     for prod_tr_action in self.composed_tr_list:
+                        if prod_tr_action.isZero():
+                            continue
+
                         # first get the corresponding transition action cost (constant at the terminal node)
                         action_cost: ADD = prod_tr_action.findMax()
                         assert action_cost.isConstant() is True, "Error computing action cost during A* search algorithm"
@@ -372,6 +375,7 @@ class MultipleFormulaBDDAstar(BaseSymbolicSearch):
                             continue
                             
                         prod_image_restricted: ADD = image_prod_add.existAbstract(self.ts_obs_cube)
+                        prod_image_restricted = prod_image_restricted.bddPattern().toADD()
 
                         # if verbose:
                         #     self.get_prod_states_from_dd(dd_func=image_prod_add, obs_flag=False, dfa_xcube_list=self.dfa_xcube_list)

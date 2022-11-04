@@ -99,7 +99,7 @@ class SymbolicBDDAStar(BaseSymbolicSearch):
 
         if sanity_check:
             cubes = self.convert_cube_to_func(dd_func=ts_states, curr_state_list=ts_x_list_bdd)
-            assert len(cubes) == GRID_WORLD_SIZE**2, "Error computing set of valid TS states"
+            # assert len(cubes) == GRID_WORLD_SIZE**2, "Error computing set of valid TS states"
             assert self.init_TS.bddPattern() <= ts_states, "Error computing set of valid TS states"
 
         return ts_states.toADD()
@@ -111,6 +111,7 @@ class SymbolicBDDAStar(BaseSymbolicSearch):
         """
         _max = 0
         for tr_action in self.ts_transition_fun_list:
+            if not tr_action.isZero():
                 action_cost = tr_action.findMax()
                 action_cost_int = int(re.findall(r'\d+', action_cost.__repr__())[0])
                 if action_cost_int > _max:
@@ -218,6 +219,9 @@ class SymbolicBDDAStar(BaseSymbolicSearch):
                 # since this is a single formula code, we do not have to explicity create a composed to every formula as we only have one.
                 for prod_tr_action in self.composed_tr_list:
                     # first get the corresponding transition action cost (constant at the terminal node)
+                    if prod_tr_action.isZero():
+                        continue
+
                     action_cost = prod_tr_action.findMax()
                     step = g_val + action_cost
                     step_val = int(re.findall(r'\d+', step.__repr__())[0])
@@ -232,6 +236,7 @@ class SymbolicBDDAStar(BaseSymbolicSearch):
                         continue
                         
                     prod_image_restricted = pred_prod.existAbstract(self.ts_obs_cube)
+                    prod_image_restricted = prod_image_restricted.bddPattern().toADD()
                 
                     if verbose:
                         self.get_prod_states_from_dd(dd_func=pred_prod, obs_flag=False)
@@ -410,6 +415,9 @@ class SymbolicBDDAStar(BaseSymbolicSearch):
                     # Calculate successors. . .
                     for prod_tr_action in self.composed_tr_list:
                         # first get the corresponding transition action cost (constant at the terminal node)
+                        if prod_tr_action.isZero():
+                            continue
+                        
                         action_cost: ADD = prod_tr_action.findMax()
                         assert action_cost.isConstant() is True, "Error computing action cost during A* search algorithm"
                         intaction_cost: int = int(list(action_cost.generate_cubes())[0][1])
@@ -425,6 +433,7 @@ class SymbolicBDDAStar(BaseSymbolicSearch):
                             continue
                         
                         prod_image_restricted: ADD = image_prod_add.existAbstract(self.ts_obs_cube)
+                        prod_image_restricted = prod_image_restricted.bddPattern().toADD()
 
                         if verbose:
                             self.get_prod_states_from_dd(dd_func=image_prod_add, obs_flag=False)

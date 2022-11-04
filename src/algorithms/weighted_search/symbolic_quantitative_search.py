@@ -92,6 +92,7 @@ class SymbolicDijkstraSearch(BaseSymbolicSearch):
         """
         _max = 0
         for tr_action in self.ts_transition_fun_list:
+            if not tr_action.isZero():
                 action_cost = tr_action.findMax()
                 action_cost_int = int(re.findall(r'\d+', action_cost.__repr__())[0])
                 if action_cost_int > _max:
@@ -149,6 +150,9 @@ class SymbolicDijkstraSearch(BaseSymbolicSearch):
 
                 for prod_tr_action in self.composed_tr_list:
                     # first get the corresponding transition action cost (constant at the terminal node)
+                    if prod_tr_action.isZero():
+                        continue
+                    
                     action_cost = prod_tr_action.findMax()
                     step = g_val + action_cost
                     step_val = int(re.findall(r'\d+', step.__repr__())[0])
@@ -164,6 +168,7 @@ class SymbolicDijkstraSearch(BaseSymbolicSearch):
                         continue
 
                     prod_image_restricted = image_prod_add.existAbstract(self.ts_obs_cube)
+                    prod_image_restricted = prod_image_restricted.bddPattern().toADD()
                 
                     if verbose:
                         self.get_prod_states_from_dd(dd_func=image_prod_add, obs_flag=False)
