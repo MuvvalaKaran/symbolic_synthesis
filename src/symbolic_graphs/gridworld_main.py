@@ -105,7 +105,6 @@ class SimpleGridWorld(BaseSymMain):
 
     
     def build_abstraction(self):
-        print("*****************Creating Boolean variables for Gridworld!*****************")
         if self.algorithm in ['dijkstras','astar']:
             
             if len(self.weight_dict.keys()) == 0:
@@ -460,12 +459,12 @@ class SimpleGridWorld(BaseSymMain):
 
     def build_weighted_add_abstraction(self) -> Tuple[SymbolicTransitionSystem, List[ADD], List[ADD], List[ADD], int]:
         """
-        Main Function to Build Transition System that represents valid edges without their corresponding weights
+         Main Function to Build Transition System that represents valid edges with their corresponding weights
 
-        Pyperplan supports the following PDDL fragment: STRIPS without action costs
+         Pyperplan supports the following PDDL fragment: STRIPS without action costs
         """
 
-        # sort them according to their weights and then convert them in to addConst; reverse will sort the weighs in descending order
+        # sort them according to their weights and then convert them in to addConst; reverse will sort the weights in descending order
         weight_dict = {k: v for k, v in sorted(self.weight_dict.items(), key=lambda item: item[1], reverse=True)}
         for action, w in weight_dict.items():
             weight_dict[action] = self.manager.addConst(int(w))
@@ -477,7 +476,6 @@ class SimpleGridWorld(BaseSymMain):
         sym_tr = SymbolicWeightedTransitionSystem(curr_states=add_ts_curr_state,
                                                   next_states=add_ts_next_state,
                                                   lbl_states=add_ts_lbl_states,
-                                                #   observations=possible_obs,
                                                   weight_dict=weight_dict,
                                                   task=task,
                                                   domain=domain,

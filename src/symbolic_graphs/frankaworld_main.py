@@ -15,15 +15,14 @@ from cudd import Cudd, BDD, ADD
 
 from src.explicit_graphs import CausalGraph, FiniteTransitionSystem
 
-from src.symbolic_graphs import SymbolicDFA, SymbolicAddDFA, SymbolicDFAFranka
+from src.symbolic_graphs import SymbolicAddDFA, SymbolicDFAFranka, SymbolicWeightedFrankaTransitionSystem
 from src.symbolic_graphs import SymbolicTransitionSystem, SymbolicWeightedTransitionSystem, SymbolicFrankaTransitionSystem
 
 from src.algorithms.blind_search import SymbolicSearch, MultipleFormulaBFS, SymbolicSearchFranka
 from src.algorithms.weighted_search import SymbolicDijkstraSearch, MultipleFormulaDijkstra
 from src.algorithms.weighted_search import SymbolicBDDAStar, MultipleFormulaBDDAstar
 
-from src.simulate_strategy import create_gridworld, \
-     convert_action_dict_to_gridworld_strategy, convert_action_dict_to_gridworld_strategy_nLTL, roll_out_franka_strategy
+from src.simulate_strategy import convert_action_dict_to_gridworld_strategy, roll_out_franka_strategy, roll_out_franka_strategy_nLTL
 
 from .base_main import BaseSymMain
 
@@ -67,14 +66,24 @@ class FrankaWorld(BaseSymMain):
         A main function that construct a symbolic Franka World TS and its corresponsing DFA
         """
         print("*****************Creating Boolean variables for Frankaworld!*****************")
+        if self.algorithm in ['dijkstras','astar']:
+            # All vars (TS, DFA and Predicate) are of type ADDs
+            sym_tr, ts_curr_state, ts_next_state, ts_lbl_states = self.build_weighted_add_abstraction()
+            
+            # The tuple contains the DFA handle, DFA curr and next vars in this specific order
+            dfa_tr, dfa_curr_state, dfa_next_state = self.build_add_symbolic_dfa(sym_tr_handle=sym_tr)
+        
+        elif self.algorithm == 'bfs':
+            sym_tr, ts_curr_state, ts_next_state, ts_lbl_states = self.build_bdd_abstraction(draw_causal_graph=draw_causal_graph)
 
-        sym_tr, ts_curr_state, ts_next_state, ts_lbl_states = self.build_bdd_abstraction(draw_causal_graph=draw_causal_graph)
-
-        dfa_tr, dfa_curr_state, dfa_next_state = self.build_bdd_symbolic_dfa(sym_tr_handle=sym_tr)
+            dfa_tr, dfa_curr_state, dfa_next_state = self.build_bdd_symbolic_dfa(sym_tr_handle=sym_tr)
+        
+        else:
+            warnings.warn("Please enter a valid graph search algorthim. Currently Available - bfs (BDD), dijkstras (BDD/ADD), astar (BDD/ADD)")
 
 
         self.ts_handle: Union[SymbolicTransitionSystem, SymbolicWeightedTransitionSystem] = sym_tr
-        self.dfa_handle_list: Union[SymbolicDFA, SymbolicAddDFA] = dfa_tr
+        self.dfa_handle_list: Union[SymbolicDFAFranka, SymbolicAddDFA] = dfa_tr
 
         self.ts_x_list: Union[List[BDD], List[ADD]] = ts_curr_state
         self.ts_y_list: Union[List[BDD], List[ADD]] = ts_next_state
@@ -90,7 +99,7 @@ class FrankaWorld(BaseSymMain):
                                          ts_obs_var_len=len(ts_lbl_states))
     
 
-    def build_bdd_symbolic_dfa(self, sym_tr_handle: SymbolicFrankaTransitionSystem) -> Tuple[List[SymbolicDFA], List[BDD], List[BDD]]:
+    def build_bdd_symbolic_dfa(self, sym_tr_handle: SymbolicFrankaTransitionSystem) -> Tuple[List[SymbolicDFAFranka], List[BDD], List[BDD]]:
         """
          This function calls Symbolic Franka DFA to decode the edge formulas into state lbls as per the symbolic state lbl dictionary
           and construct the symbolic TR accoridngly.
@@ -173,7 +182,48 @@ class FrankaWorld(BaseSymMain):
         """
 
         if len(self.formulas) > 1:
-            raise NotImplementedError()
+            start: float = time.time()
+            if self.algorithm == 'dijkstras':
+                graph_search = MultipleFormulaDijkstra(ts_handle=self.ts_handle,
+                                                       dfa_handles=self.dfa_handle_list,
+                                                       ts_curr_vars=self.ts_x_list,
+                                                       ts_next_vars=self.ts_y_list,
+                                                       dfa_curr_vars=self.dfa_x_list,
+                                                       dfa_next_vars=self.dfa_y_list,
+                                                       ts_obs_vars=self.ts_obs_list,
+                                                       cudd_manager=self.manager)
+
+                # call dijkstras for solving minimum cost path over nLTLs
+                action_dict: dict = graph_search.composed_symbolic_dijkstra_nLTL(verbose=verbose)
+            
+            elif self.algorithm == 'astar':
+                graph_search =  MultipleFormulaBDDAstar(ts_handle=self.ts_handle,
+                                                        dfa_handles=self.dfa_handle_list,
+                                                        ts_curr_vars=self.ts_x_list,
+                                                        ts_next_vars=self.ts_y_list,
+                                                        dfa_curr_vars=self.dfa_x_list,
+                                                        dfa_next_vars=self.dfa_y_list,
+                                                        ts_obs_vars=self.ts_obs_list,
+                                                        cudd_manager=self.manager)
+                # For A* we ignore heuristic computation time                                  
+                start: float = time.time()
+                action_dict = graph_search.composed_symbolic_Astar_search_nLTL(verbose=verbose)
+
+            elif self.algorithm == 'bfs':
+                graph_search = MultipleFormulaBFS(ts_handle=self.ts_handle,
+                                                  dfa_handles=self.dfa_handle_list,
+                                                  ts_curr_vars=self.ts_x_list,
+                                                  ts_next_vars=self.ts_y_list,
+                                                  dfa_curr_vars=self.dfa_x_list,
+                                                  dfa_next_vars=self.dfa_y_list,
+                                                  ts_obs_vars=self.ts_obs_list,
+                                                  cudd_manager=self.manager)
+
+                # call BFS for multiple formulas 
+                action_dict: dict = graph_search.symbolic_bfs_nLTL(verbose=verbose)
+
+            stop: float = time.time()
+            print("Time took for plannig: ", stop - start)
         
         else:
             start: float = time.time()
@@ -188,7 +238,6 @@ class FrankaWorld(BaseSymMain):
                                                        ts_obs_vars=self.ts_obs_list,
                                                        cudd_manager=self.manager)
 
-                # action_dict = graph_search.ADD_composed_symbolic_dijkstra_wLTL(verbose=False)
                 action_dict = graph_search.composed_symbolic_dijkstra_wLTL(verbose=verbose)
 
             elif self.algorithm == 'astar':
@@ -237,7 +286,34 @@ class FrankaWorld(BaseSymMain):
         dfa_next_vars = self.dfa_y_list
 
         if len(self.formulas) > 1:
-            raise NotImplementedError()
+            dfa_handles = self.dfa_handle_list
+
+            if self.algorithm in ['dijkstras','astar']:
+                init_state_ts_sym = ts_handle.sym_add_init_states
+                state_obs_dd = ts_handle.sym_add_state_labels
+
+                raise NotImplementedError()
+            
+            else:
+                init_state_ts_sym = ts_handle.sym_init_states
+                state_obs_dd = ts_handle.sym_state_labels
+
+                franka_strategy = roll_out_franka_strategy_nLTL(ts_handle=ts_handle,
+                                                                   dfa_handles=dfa_handles,
+                                                                   action_map=action_dict,
+                                                                   init_state_ts_sym=init_state_ts_sym,
+                                                                   state_obs_dd=state_obs_dd,
+                                                                   ts_curr_vars=ts_curr_vars,
+                                                                   ts_next_vars=ts_next_vars,
+                                                                   dfa_curr_vars=dfa_curr_vars,
+                                                                   dfa_next_vars=dfa_next_vars)
+
+            if print_strategy:
+                print("{:<30}".format('Action'))
+                for _ts_state, _action in franka_strategy: 
+                    print("{:<30}".format(_action,))
+
+
 
         else:
             dfa_handle = self.dfa_handle_list[0]
@@ -572,7 +648,7 @@ class FrankaWorld(BaseSymMain):
         return _causal_graph_instance.task, _causal_graph_instance.problem.domain, curr_vars, next_vars, ts_state_tuples, ts_lbl_vars, boxes, box_preds
         
 
-    def build_bdd_abstraction(self, draw_causal_graph: bool = False):
+    def build_bdd_abstraction(self, draw_causal_graph: bool = False) -> Tuple[SymbolicFrankaTransitionSystem, List[BDD], List[BDD], List[BDD]]:
         """
          Main Function to Build Transition System that only represent valid edges without any weights
         """
@@ -598,7 +674,58 @@ class FrankaWorld(BaseSymMain):
 
 
         return sym_tr, ts_curr_vars, ts_next_vars, ts_lbl_vars
+    
+
+    def _create_weight_dict(self, task) -> Dict[str, int]:
+        """
+         A function that loop over all the paramterized actions, like transit b0 l2, transit b1 l2, grasp b0, grasp b1 etc., and
+          assigns their corresponding from the weight dictionary specified as input.
+        """
+        new_weight_dict = {}
+        for op in task.operators:
+            # extract the action name
+            _generic_action = op.name.split()[0]
+            _generic_action = _generic_action[1:]   # remove the intial '(' braket
+            
+            weight: int = self.weight_dict[_generic_action]
+            new_weight_dict[op.name] = weight
+
+        return new_weight_dict
 
 
-    def build_weighted_add_abstraction(self):
-        pass
+    def build_weighted_add_abstraction(self, draw_causal_graph: bool = False) -> Tuple[SymbolicWeightedFrankaTransitionSystem, List[ADD], List[ADD], List[ADD]]:
+        """
+         Main Function to Build Transition System that represents valid edges with their corresponding weights
+        """
+        task, domain, add_ts_curr_vars, add_ts_next_vars, ts_state_tuples, add_ts_lbl_vars, boxes, possible_lbls = self.create_symbolic_causal_graph(draw_causal_graph=draw_causal_graph,
+                                                                                                                                                     add_flag=True)
+
+        # get the actual parameterized actions and add their corresponding weights
+        new_weight_dict = self._create_weight_dict(task=task)
+
+        # sort them according to their weights and then convert them in to addConst; reverse will sort the weights in descending order
+        weight_dict = {k: v for k, v in sorted(new_weight_dict.items(), key=lambda item: item[1], reverse=True)}
+        for action, w in weight_dict.items():
+            weight_dict[action] = self.manager.addConst(int(w))
+        
+        sym_tr = SymbolicWeightedFrankaTransitionSystem(curr_states=add_ts_curr_vars,
+                                                        next_states=add_ts_next_vars,
+                                                        lbl_states=add_ts_lbl_vars,
+                                                        weight_dict=weight_dict,
+                                                        ts_states=ts_state_tuples,
+                                                        ts_state_map=self.pred_int_map,
+                                                        task=task,
+                                                        domain=domain,
+                                                        manager=self.manager)
+        
+        start: float = time.time()
+        sym_tr.create_weighted_transition_system_franka(boxes=boxes,
+                                                        state_lbls=possible_lbls,
+                                                        add_exist_constr=True,
+                                                        verbose=True,
+                                                        plot=self.plot_ts)
+        
+        stop: float = time.time()
+        print("Time took for constructing the abstraction: ", stop - start)
+
+        return sym_tr, add_ts_curr_vars, add_ts_next_vars, add_ts_lbl_vars

@@ -62,12 +62,22 @@ if __name__ == "__main__":
             algo = 'astar'
         else:
             algo = 'bfs'
+        
+        # grid world dictionary
+        wgt_dict = {
+            "transit" : 1,
+            "grasp"   : 2,
+            "transfer": 3,
+            "release" : 4,
+            
+            }
 
         # frankaworld stuff
         frankaworld_handle = FrankaWorld(domain_file=domain_file_path,
                                          problem_file=problem_file_path,
                                          formulas=formulas,
                                          manager=cudd_manager,
+                                         weight_dict=wgt_dict,
                                          ltlf_flag=USE_LTLF,
                                          dyn_var_ord=DYNAMIC_VAR_ORDERING,
                                          algorithm=algo,
