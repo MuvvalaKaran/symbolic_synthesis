@@ -52,7 +52,7 @@ if __name__ == "__main__":
         gridworld_handle.simulate(action_dict=policy, gridworld_size=GRID_WORLD_SIZE)
 
     elif FRANKAWORLD:
-        #Frank World files 
+        #Franka World files 
         domain_file_path = PROJECT_ROOT + "/pddl_files/example_pddl/domain.pddl"
         problem_file_path = PROJECT_ROOT + "/pddl_files/example_pddl/problem.pddl"
 

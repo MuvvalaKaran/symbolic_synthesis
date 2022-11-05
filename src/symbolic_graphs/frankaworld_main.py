@@ -304,7 +304,7 @@ class FrankaWorld(BaseSymMain):
                                               dfa_curr_vars=self.dfa_x_list,
                                               dfa_next_vars=self.dfa_y_list,
                                               ts_obs_vars=self.ts_obs_list,
-                                              manager=self.manager)
+                                              cudd_manager=self.manager)
 
                 action_dict = graph_search.composed_symbolic_bfs_wLTL(verbose=verbose, obs_flag=False)
 

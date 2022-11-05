@@ -230,7 +230,7 @@ class SimpleGridWorld(BaseSymMain):
                                               dfa_curr_vars=self.dfa_x_list,
                                               dfa_next_vars=self.dfa_y_list,
                                               ts_obs_vars=self.ts_obs_list,
-                                              manager=self.manager)
+                                              cudd_manager=self.manager)
 
                 # TODO: In future store startegy as Mealey machine (Finite State Machine)
                 # The Mealey machine is a characteristic Function that represents a mapping from

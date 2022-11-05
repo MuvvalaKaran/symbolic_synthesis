@@ -64,12 +64,10 @@ class BaseSymbolicSearch(object):
         else: add key-value pair
         """
         # compute all the cubes and store them individually
-        # prod_cubes = self.convert_prod_cube_to_func(key_prod)
         prod_cubes = self.get_prod_cubes(key_prod)
 
         for key in prod_cubes:
             if key in dict_obj:
-                # if key_ts in dict_obj[key_dfa]:
                 if not isinstance(dict_obj[key], list):
                     dict_obj[key] = [dict_obj[key]]
                 dict_obj[key].append(action)
