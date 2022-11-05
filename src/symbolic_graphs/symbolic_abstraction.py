@@ -1,8 +1,6 @@
 import re
 import sys
 import copy
-import math 
-import warnings
 import graphviz as gv
 
 from typing import Tuple, List, Dict
@@ -11,7 +9,7 @@ from functools import reduce
 from cudd import Cudd, BDD, ADD
 from itertools import product
 
-from src.explicit_graphs import CausalGraph, FiniteTransitionSystem
+from src.explicit_graphs import FiniteTransitionSystem
 
 from bidict import bidict
 
@@ -189,10 +187,8 @@ class SymbolicTransitionSystem(object):
         for _key, _value in _node_int_map_curr.items():
             _curr_val_list = []
             _next_val_list = []
-            # _bool_fun = self.manager.bddOne()
             for _idx, _ele in enumerate(_value):
                 if _ele == 1:
-                    # _bool_func = _bool_fun & self.sym_vars_curr[_idx]
                     _curr_val_list.append(self.sym_vars_curr[_idx])
                     _next_val_list.append(self.sym_vars_next[_idx])
                 else:
@@ -602,13 +598,12 @@ class SymbolicFrankaTransitionSystem():
         _node_int_map_curr = bidict({state: boolean_str[index] for index, state in enumerate(self.ts_states)})
         _node_int_map_next = copy.deepcopy(_node_int_map_curr)
 
-        assert len(boolean_str) >= len(_node_int_map_next), "FIX THIS: Looks like there are more Facts that boolean variables!"
+        assert len(boolean_str) >= len(_node_int_map_next), "FIX THIS: Looks like there are more Facts than boolean variables!"
 
         # loop over all the boolean strings and convert them respective bdd vars
         for _key, _value in _node_int_map_curr.items():
             _curr_val_list = []
             _next_val_list = []
-            # _bool_fun = self.manager.bddOne()
             for _idx, _ele in enumerate(_value):
                 if _ele == 1:
                     # _bool_func = _bool_fun & self.sym_vars_curr[_idx]
@@ -923,7 +918,7 @@ class SymbolicFrankaTransitionSystem():
                             next_tuple = tuple(sorted(list(set(next_tuple + list(add_tuple)))))
 
                             # look up its corresponding formula
-                            next_sym_state = self.predicate_sym_map_nxt[next_tuple]
+                            next_sym_state: BDD = self.predicate_sym_map_nxt[next_tuple]
 
                             if verbose:
                                 cstate = self.get_state_from_tuple(state_tuple=tuple(_valid_pre))
@@ -1455,4 +1450,267 @@ class SymbolicWeightedFrankaTransitionSystem():
                     file_name = PROJECT_ROOT + f'/plots/{_action}_ADD_trans_func.pdf'
                     self.manager.dumpDot([self.sym_tr_actions[_idx]], file_path=file_path)
                     gv.render(engine='dot', format='pdf', filepath=file_path, outfile=file_name)
+
+
+class PartitionedFrankaTransitionSystem(SymbolicFrankaTransitionSystem):
+    """
+     This calss build the symbolic Transition Relation for the Franka manipulation casestudy in a
+      partitioned fashion as described in the Syft paper by Zhu et al. 
     
+     Github link: https://github.com/Shufang-Zhu/Syft
+    """
+
+    def __init__(self,
+                 curr_vars: list,
+                 lbl_vars: list,
+                 action_vars: list,
+                 task, domain,
+                 ts_state_map: dict,
+                 ts_states: list,
+                 manager: Cudd):
+        self.sym_vars_action: List[BDD] = action_vars   
+
+        self.predicate_sym_map_act: bidict = {}
+
+        super().__init__(curr_vars, None, lbl_vars, task, domain, ts_state_map, ts_states, manager)
+        
+        # store the bdd associated with each state vars in this list. The index corresonds to its number
+        self.tr_state_bdds = [self.manager.bddZero() for _ in range(len(self.sym_vars_curr))]
+
+
+    def _create_sym_var_map(self):
+        """
+         Loop through all the facts that are reachable and assign a boolean funtion to it.
+          Overrides the base method and removes next state vars as we do not have any next state vars in Partitioned Representation.
+        """
+        # create all combinations of 1-true and 0-false
+        boolean_str = list(product([1, 0], repeat=len(self.sym_vars_curr)))
+
+        _node_int_map_curr = bidict({state: boolean_str[index] for index, state in enumerate(self.ts_states)})
+
+        assert len(boolean_str) >= len(_node_int_map_curr), "FIX THIS: Looks like there are more Facts than boolean variables!"
+
+        # loop over all the boolean strings and convert them respective bdd vars
+        for _key, _value in _node_int_map_curr.items():
+            _curr_val_list = []
+            for _idx, _ele in enumerate(_value):
+                if _ele == 1:
+                    _curr_val_list.append(self.sym_vars_curr[_idx])
+                else:
+                    _curr_val_list.append(~self.sym_vars_curr[_idx])
+            
+            _bool_func_curr = reduce(lambda a, b: a & b, _curr_val_list)
+
+            # update bidict accordingly
+            _node_int_map_curr[_key] = _bool_func_curr
+        
+        self.predicate_sym_map_curr = bidict(_node_int_map_curr)
+
+
+    def _initialize_bdds_for_actions(self):
+        """
+         A function that computes all the possible boolean formulas using the action vars and creates a mapping from
+          each formula to its corresponding action.
+        """
+        # create all combinations of 1-true and 0-false
+        boolean_str = list(product([1, 0], repeat=len(self.sym_vars_action)))
+
+        _node_int_map = bidict({state: boolean_str[index] for index, state in enumerate(self.actions)})
+
+        assert len(boolean_str) >= len(_node_int_map), "FIX THIS: Looks like there are more Actions than boolean variables!"
+
+        # loop over all the boolean strings and convert them respective bdd vars
+        for _key, _value in _node_int_map.items():
+            _act_val_list = []
+            for _idx, _ele in enumerate(_value):
+                if _ele == 1:
+                    _act_val_list.append(self.sym_vars_action[_idx])
+                else:
+                    _act_val_list.append(~self.sym_vars_action[_idx])
+                
+                _bool_func_curr = reduce(lambda a, b: a & b, _act_val_list)
+
+                # update bidict accordingly
+                _node_int_map[_key] = _bool_func_curr
+
+        self.predicate_sym_map_act = bidict(_node_int_map)
+    
+
+    def add_edge_to_action_tr(self, state_start_idx: int, action_name: str, curr_state_tuple: tuple, next_state_tuple: tuple) -> None:
+        """
+         A helper function that add the edge from curr state to the next state in their respective action Transition Relations (TR)
+        
+        @param: state_start_idx
+        
+        """
+        curr_state_sym: BDD = self.predicate_sym_map_curr[curr_state_tuple]
+        nxt_state_sym: BDD = self.predicate_sym_map_curr[next_state_tuple]
+
+        # get the corresponding symbolic action
+        sym_action: BDD = self.predicate_sym_map_act[action_name]
+
+        # for every boolean var in nxt_state check if it high or low. If high add it curr state and the correpsonding action to its BDD
+        for _idx, var in enumerate(nxt_state_sym.cube()):
+            if var == 1 and self.manager.bddVar(_idx) in self.sym_vars_curr:
+                _state_idx: int = _idx - state_start_idx
+                assert _state_idx >= 0, "Error constructing the Partitioned Transition Relation."
+                
+                self.tr_state_bdds[_state_idx] |= curr_state_sym & sym_action
+                # self.tr_state_bdds[_state_idx] |= curr_state_sym
+            
+            elif var == 2 and self.manager.bddVar(_idx) in self.sym_vars_curr:
+                print("Ahh, there are unambiguous vars!!!!!")
+                sys.exit(-1)
+    
+
+    def create_transition_system_franka(self,
+                                        boxes: List[str],
+                                        state_lbls: List,
+                                        add_exist_constr: bool = True,
+                                        verbose:bool = False,
+                                        plot: bool = False):
+        """
+         This function create the symbolic transition relation for the Franka World in Partitioned Fashion.
+
+         This means, we do use two sets o f vars, curr and next but only one set of vars. We construct a BDD associated
+          with each Boolean vars, say x0 will have a BDD associated with it, x1, x2...
+        """
+
+        if verbose:
+            print(f"Creating TR for Actions:", *self.tr_action_idx_map.keys())
+
+        self._create_sym_state_label_map(domain_lbls=state_lbls)
+
+        open_list = defaultdict(lambda: self.manager.bddZero())
+
+        closed = self.manager.bddZero()
+
+        init_state_sym = self.sym_init_states
+
+        # get the state lbls and create state and state lbl mappinng
+        state_lbl = self.get_conds_from_state(state_tuple=self.predicate_sym_map_curr.inv[init_state_sym], only_world_conf=True)
+        init_lbl_sym = self.get_sym_state_lbl_from_tuple(state_lbl)
+
+        self.sym_state_labels |= init_state_sym & init_lbl_sym
+
+        layer = 0
+        
+        # index to determin where the state vars start 
+        state_start_idx: int = len(self.sym_vars_lbl) + len(self.sym_vars_action)
+
+        # no need to check if other boxes are placed at the destination loc during transfer and release as there is only one object
+        if len(boxes) == 1:
+            add_exist_constr = False
+
+        open_list[layer] |= init_state_sym
+
+        while not open_list[layer].isZero():
+            # remove all states that have been explored
+            open_list[layer] = open_list[layer] & ~closed
+
+            # If unexpanded states exist ...
+            if not open_list[layer].isZero():
+                # Add states to be expanded next to already expanded states
+                closed |= open_list[layer]
+
+                if verbose:
+                    print(f"******************************* Layer: {layer}*******************************")
+
+                # get all the states
+                sym_state = self._convert_state_lbl_cube_to_func(dd_func= open_list[layer], prod_curr_list=self.sym_vars_curr)
+                for state in sym_state:
+                    curr_state_tuple = self.predicate_sym_map_curr.inv[state]
+                    
+                    _valid_pre_list = []
+                    # compute the image of the TS states
+                    for action in self.task.operators:
+                        # set action feasbility flag to True - used during transfer and release action to check the des loc is empty
+                        action_feas: bool = True
+                        pre_tuple = self.get_tuple_from_state(action.preconditions)
+                        _necc_robot_conf = self.get_conds_from_state(pre_tuple, only_robot_conf=True)
+
+                        _intersect: bool = set(pre_tuple).issubset(curr_state_tuple)
+
+                        if _intersect:
+                            # get valid pres from current state tuple
+                            pre_robot_conf = self.get_conds_from_state(curr_state_tuple, only_robot_conf=True)
+                            pre_robot_conf = tuple(set(pre_robot_conf).intersection(_necc_robot_conf))
+                            pre_world_conf = self.get_conds_from_state(curr_state_tuple, only_world_conf=True)
+
+                            _valid_pre = sorted(pre_robot_conf + pre_world_conf)
+                            
+                            if tuple(_valid_pre) != curr_state_tuple:
+                                _valid_pre_sym = self.predicate_sym_map_curr[tuple(_valid_pre)]
+                                # check if this state has already being explored or not
+                                if not (_valid_pre_sym & closed).isZero():
+                                    continue
+                                _valid_pre_list.append(_valid_pre_sym)
+
+                            # add existential constraints to transfer and relase action
+                            if add_exist_constr and (('transfer' in action.name) or ('release' in action.name)):
+                                action_feas = self._check_exist_constraint(boxes=boxes,
+                                                                           curr_state_lbl=_valid_pre,
+                                                                           action_name=action.name)
+                            
+                            if not action_feas:
+                                continue
+
+                            # get add and del tuples 
+                            add_tuple = self.get_tuple_from_state(action.add_effects)
+                            del_tuple = self.get_tuple_from_state(action.del_effects)
+
+                            # construct the tuple for next state
+                            next_tuple = list(set(_valid_pre) - set(del_tuple))
+                            next_tuple = tuple(sorted(list(set(next_tuple + list(add_tuple)))))
+
+                            # look up its corresponding formula
+                            next_sym_state: BDD = self.predicate_sym_map_curr[next_tuple]
+
+                            if verbose:
+                                cstate = self.get_state_from_tuple(state_tuple=tuple(_valid_pre))
+                                nstate = self.get_state_from_tuple(state_tuple=next_tuple)
+                                print(f"Adding edge: {cstate} -------{action.name}------> {nstate}")
+                            
+                            # add The edge to its corresponding action
+                            self.add_edge_to_action_tr(state_start_idx=state_start_idx,
+                                                       action_name=action.name,
+                                                       curr_state_tuple=tuple(_valid_pre),
+                                                       next_state_tuple=next_tuple)
+
+                            # get their corresponding lbls 
+                            next_tuple_lbl = self.get_conds_from_state(state_tuple=next_tuple, only_world_conf=True)
+                            next_lbl_sym = self.get_sym_state_lbl_from_tuple(next_tuple_lbl)
+                            self.sym_state_labels |= next_sym_state & next_lbl_sym
+
+                            # store the image in the next bucket
+                            open_list[layer + 1] |= next_sym_state
+
+                    for _val_pre_sym in _valid_pre_list:
+                        # add them the observation bdd
+                        _valid_pre_lbl = self.get_conds_from_state(state_tuple=self.predicate_sym_map_curr.inv[_val_pre_sym],
+                                                                   only_world_conf=True)
+                        _valid_pre_lbl_sym = self.get_sym_state_lbl_from_tuple(_valid_pre_lbl)
+                        self.sym_state_labels |= _val_pre_sym & _valid_pre_lbl_sym
+
+                        closed |= _val_pre_sym
+                
+                layer += 1
+        
+        # testing image computation 
+        image_state = self.sym_init_states.vectorCompose(self.sym_vars_curr, self.tr_state_bdds)
+        
+        # self.predicate_sym_map_curr.inv[init_state_sym]
+
+
+
+        if verbose:
+            for _idx in range(len(self.sym_vars_curr)):
+                _bvar = str(self.manager.bddVar(state_start_idx + _idx))
+                print(f"Charateristic Function for Boolean Var {_bvar} \n")
+                print(self.tr_state_bdds[_idx], " \n")
+                if plot:
+                    file_path = PROJECT_ROOT + f'/plots/{_bvar}_trans_func.dot'
+                    file_name = PROJECT_ROOT + f'/plots/{_bvar}_trans_func.pdf'
+                    self.manager.dumpDot([self.sym_tr_actions[_idx]], file_path=file_path)
+                    gv.render(engine='dot', format='pdf', filepath=file_path, outfile=file_name)
+

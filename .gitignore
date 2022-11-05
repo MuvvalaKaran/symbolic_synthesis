@@ -8,7 +8,7 @@
 # ignore all dot and cache files
 *.dot
 
-# ignore plotd folder
+# ignore plots folder
 plots/
 
 # ignore experimental scripts folder and experimental PDDL files
