@@ -7,3 +7,13 @@
 
 # ignore all dot and cache files
 *.dot
+
+# ignore plotd folder
+plots/
+
+# ignore experimental scripts folder and experimental PDDL files
+old_files/ 
+pddl_files/blocks_world/
+pddl_files/sokoban/
+pddl_files/three_table_scenario/
+pddl_files/two_table_scenario/

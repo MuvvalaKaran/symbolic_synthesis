@@ -3,12 +3,10 @@ This file implements Symbolic Graph search algorithms
 '''
 import sys
 
-from bidict import bidict
 from functools import reduce
-from cudd import Cudd, BDD, ADD
+from cudd import Cudd, BDD
 
 from typing import List
-from itertools import product
 
 from src.algorithms.base import BaseSymbolicSearch
 from src.symbolic_graphs import SymbolicDFA, SymbolicTransitionSystem
@@ -16,7 +14,10 @@ from src.symbolic_graphs import SymbolicDFA, SymbolicTransitionSystem
 
 class SymbolicSearch(BaseSymbolicSearch):
     """
-    Given a Graph, find the shortest path as per the symbolic A* (BDDA*) algorithm as outlined by Jensen, Bryant, Valeso's paper.
+     Given a Graph, find the path with minimum number of actions to accomplish the task. 
+
+     Algorithm from Peter Kissmann's PhD thesis - Symbolic Search in Planning and General Game Playing.
+      Link - https://media.suub.uni-bremen.de/handle/elib/405
     """
 
     def __init__(self,

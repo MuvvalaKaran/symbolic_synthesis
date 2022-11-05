@@ -2,7 +2,7 @@ import re
 import sys
 
 from functools import reduce
-from typing import Union, List
+from typing import List
 
 
 from cudd import Cudd, BDD, ADD

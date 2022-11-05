@@ -3,9 +3,9 @@ import sys
 
 from math import inf
 from functools import reduce
-from typing import List, Union, Tuple
+from typing import List, Tuple
 
-from cudd import Cudd, BDD, ADD
+from cudd import Cudd, ADD
 
 from src.algorithms.base import BaseSymbolicSearch
 from src.algorithms.weighted_search.symbolic_BDDAstar import SymbolicBDDAStar

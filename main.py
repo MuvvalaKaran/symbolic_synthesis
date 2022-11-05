@@ -1,6 +1,7 @@
 from cudd import Cudd
 
-from src.symbolic_graphs import SimpleGridWorld, FrankaWorld
+from src.symbolic_graphs.graph_search_scripts import SimpleGridWorld, FrankaWorld
+from src.symbolic_graphs.strategy_synthesis_scripts import FrankaPartitionedWorld
 
 from utls import *
 from config import *
@@ -91,10 +92,29 @@ if __name__ == "__main__":
         policy: dict = frankaworld_handle.solve(verbose=False)
         frankaworld_handle.simulate(action_dict=policy, print_strategy=True)
     
+    elif STRATEGY_SYNTHESIS:
+        #Franka World files 
+        domain_file_path = PROJECT_ROOT + "/pddl_files/example_pddl/domain.pddl"
+        problem_file_path = PROJECT_ROOT + "/pddl_files/example_pddl/problem.pddl"
+
+
+        wgt_dict = {}
+
+        # partitioned frankaworld stuff
+        frankapartition_handle = FrankaPartitionedWorld(domain_file=domain_file_path,
+                                                        problem_file=problem_file_path,
+                                                        formulas=formulas,
+                                                        manager=cudd_manager,
+                                                        weight_dict=wgt_dict,
+                                                        ltlf_flag=USE_LTLF,
+                                                        dyn_var_ord=DYNAMIC_VAR_ORDERING,
+                                                        algorithm='qual',
+                                                        verbose=False,
+                                                        plot_ts=False,
+                                                        plot_obs=False,
+                                                        plot=False)
+        # build the abstraction
+        frankapartition_handle.build_abstraction()
+
     else:
         warnings.warn("Please set atleast one flag to True - FRANKAWORLD or GRIDWORLD!")
-
-
-
-
-    

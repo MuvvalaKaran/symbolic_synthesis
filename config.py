@@ -4,8 +4,9 @@ PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 
 EXPLICIT_GRAPH: bool = False  # set this flag to true when you want to construct Explicit graph
 
-GRIDWORLD: bool = False   # Set this flag to true when using gridworld example
-FRANKAWORLD: bool = True  # Set this flag to true when using manipulator scenarios
+GRIDWORLD: bool = False   # Set this flag to true when using gridworld example for graph search 
+FRANKAWORLD: bool = False  # Set this flag to true when using manipulator scenarios for graph search
+STRATEGY_SYNTHESIS: bool = True  # Set this flag to truw when  when using manipulator scenarios for Strategy synthesis
 
 DIJKSTRAS: bool = False  # set this flag to true when you want to use Dijkstras
 ASTAR: bool = False  # set this flag to true when you want to use A* algorithm 
@@ -23,7 +24,7 @@ DYNAMIC_VAR_ORDERING: bool = False
 ######################################################################
 
 # formulas = ['F(p01 & free & F(p12 & free & F(p23 & free & F(p34 & free))))']
-formulas = ['(F((p01 & free)) & F((p12 & free)) & F((p23 & free)) & F((p34 & free)))']
+# formulas = ['(F((p01 & free)) & F((p12 & free)) & F((p23 & free)) & F((p34 & free)))']
 
 
 # formulas = ['F((p01 & free))',
@@ -57,7 +58,7 @@ formulas = ['(F((p01 & free)) & F((p12 & free)) & F((p23 & free)) & F((p34 & fre
 #             ]
 
 # single 12 nested formula
-# formulas = ['F(l2) & F(l91) & F(l93) & F(l4) & F(l95) & F(l6) & F(l97) & F(l8) & F(l99) & F(l10) & F(l56) & F(l45)']
+formulas = ['F(l2) & F(l91) & F(l93) & F(l4) & F(l95) & F(l6) & F(l97) & F(l8) & F(l99) & F(l10) & F(l56) & F(l45)']
 
 # single 10 nested formulas
 # formulas = ['F(l4) & F(l95) & F(l6) & F(l97) & F(l8) & F(l99) & F(l10) & F(l12) & F(l56) & F(l45)']
