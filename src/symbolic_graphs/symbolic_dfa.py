@@ -11,6 +11,7 @@ from itertools import product
 
 from cudd import Cudd, BDD, ADD
 
+from src.symbolic_graphs import DynamicFrankaTransitionSystem
 from regret_synthesis_toolbox.src.graph import DFAGraph
 
 from utls import *
@@ -76,7 +77,6 @@ class SymbolicDFA(object):
         Loop through all the States that are reachable and assign a boolean funtion to it
         """
 
-        # for dfa in self.dfa_list:
         # create all combinations of 1-true and 0-false
         boolean_str = list(product([1, 0], repeat=len(self.sym_vars_curr)))
         
@@ -159,9 +159,6 @@ class SymbolicDFA(object):
                 return self.manager.bddZero()
 
             elif len(symbls) <= valid_dfa_edge_formula_size:
-                # for gird world, each state has only one map. But, the edges on the DFA for formula like F(l1 & F(l2))
-                #  will have edges like ((l1)&(!(l2))) and ((l1)&(l2)). While the later is not physically possbile, the first is umabiguous way of
-                #  expressing only 1 symbol. Thus, its a valid edge and we need to create a corresponding boolean formula
                 edgy_formula = self.in_order_nnf_tree_traversal(expression=self.manager.bddZero() , formula=_guard)
                 return edgy_formula
 
@@ -212,6 +209,29 @@ class SymbolicDFA(object):
         return expr
     
 
+    def ltlf_add_edge_to_tr(self, curr_sym: BDD, nxt_sym: BDD, edge_sym: BDD) -> None:
+        """
+         Given the current symbolic state, the next symbolic state, and the corresponding symbolic edge formula,
+          add it to the transition relation representing set of valid edges
+        """
+        self.dfa_bdd_tr |= curr_sym & nxt_sym & edge_sym
+    
+
+    def print_plot_dfa_tr(self, plot: bool = False) -> None:
+        """
+         A helper function that prints the Transition Relation for the DFA.
+
+         @param: plot: Set this flag to true if you also want to print the corresponding BDD as a PDF.
+        """
+        print(f"Charateristic Function for DFA  is \n")
+        print(self.dfa_bdd_tr, " \n")
+        if plot:
+            file_path = PROJECT_ROOT + f'/plots/{self.dfa_name}_ltlf_trans_func.dot'
+            file_name = PROJECT_ROOT + f'/plots/{self.dfa_name}_ltlf_trans_func.pdf'
+            self.manager.dumpDot([self.dfa_bdd_tr], file_path=file_path)
+            gv.render(engine='dot', format='pdf', filepath=file_path, outfile=file_name) 
+
+
     def create_symbolic_ltlf_transition_system(self, verbose: bool = False, plot: bool = False):
         """
         This function parses the Mona DFA output and construct the symbolic TR associated with DFA.
@@ -239,17 +259,12 @@ class SymbolicDFA(object):
                 if orig_state:
                     _curr_sym = self.dfa_predicate_sym_map_curr.get(orig_state) 
                     _nxt_sym = self.dfa_predicate_sym_map_nxt.get(dest_state)
-                    self.dfa_bdd_tr |= _curr_sym & _nxt_sym & _edge_sym
+                    self.ltlf_add_edge_to_tr(curr_sym=_curr_sym,
+                                             nxt_sym=_nxt_sym,
+                                             edge_sym=_edge_sym )
         
         if verbose:
-            print(f"Charateristic Function for DFA  is \n")
-            print(self.dfa_bdd_tr, " \n")
-            if plot:
-                file_path = PROJECT_ROOT + f'/plots/{self.dfa_name}_ADD_ltlf_trans_func.dot'
-                file_name = PROJECT_ROOT + f'/plots/{self.dfa_name}_ADD_ltlf_trans_func.pdf'
-                self.manager.dumpDot([self.dfa_bdd_tr], file_path=file_path)
-                gv.render(engine='dot', format='pdf', filepath=file_path, outfile=file_name)       
-
+            self.print_plot_dfa_tr(plot=plot)   
 
 
 class SymbolicAddDFA(object):
@@ -410,9 +425,6 @@ class SymbolicAddDFA(object):
                 return self.manager.addZero()
 
             elif len(symbls) <= valid_dfa_edge_formula_size:
-                # for gird world, each state has only one map. But, the edges on the DFA for formula like F(l1 & F(l2))
-                #  will have edges like ((l1)&(!(l2))) and ((l1)&(l2)). While the later is not physically possbile, the first is umabiguous way of
-                #  expressing only 1 symbol. Thus, its a valid edge and we need to create a corresponding boolean formula
                 edgy_formula = self.in_order_nnf_tree_traversal(expression=self.manager.addZero() , formula=_guard)
                 return edgy_formula
 
@@ -644,3 +656,58 @@ class SymbolicAddDFAFranka(SymbolicAddDFA):
                 assert value == "X", "Error while constructing symbolic LTLF DAF edge. FIX THIS!!!"
         
         return expr
+
+
+class PartitionedDFA(SymbolicDFAFranka):
+    """
+     A class that constructs the TR is a partitioned fasshion, i.e., We only a BDD associated with each boolean variable and
+      store them in a vector
+    """
+
+    def __init__(self,
+                 curr_states: List[BDD],
+                 predicate_sym_map_lbl: dict,
+                 dfa: DFAGraph,
+                 manager: Cudd,
+                 dfa_name,
+                 sym_tr: DynamicFrankaTransitionSystem,
+                 ltlf_flag: bool = False):
+        super().__init__(curr_states, curr_states, predicate_sym_map_lbl, dfa, manager, dfa_name, sym_tr.pred_int_map, ltlf_flag)
+
+        # store the bdd associated with each state vars in this list. The index corresonds to its number
+        self.tr_state_bdds = [self.manager.bddZero() for _ in range(len(self.sym_vars_curr))]
+        # index to determine where the state vars start 
+        self.state_start_idx: int = len(sym_tr.sym_vars_lbl) +  len(sym_tr.sym_vars_human) + len(sym_tr.sym_vars_robot)  + len(sym_tr.sym_vars_curr)
+    
+
+    def ltlf_add_edge_to_tr(self, curr_sym: BDD, nxt_sym: BDD, edge_sym: BDD) -> None:
+        """
+         A helper function that adds the edge from curr state to the next state by checking if the same variable is high in the next state
+        """
+        # for every boolean var in nxt_state check if it high or low. If high add it curr state and the correpsonding action to its BDD
+        for _idx, var in enumerate(nxt_sym.cube()):
+            if var == 1 and self.manager.bddVar(_idx) in self.sym_vars_curr:
+                _state_idx: int = _idx - self.state_start_idx
+                assert _state_idx >= 0, "Error constructing the Partitioned Transition Relation."
+                
+                self.tr_state_bdds[_state_idx] |= curr_sym & edge_sym
+            
+            elif var == 2 and self.manager.bddVar(_idx) in self.sym_vars_curr:
+                warnings.warn("Encountered an ambiguous varible during TR construction. FIX THIS!!!")
+                sys.exit(-1)
+    
+    def print_plot_dfa_tr(self, plot: bool = False) -> None:
+        """
+         Overides the parent print plot class as the BDD is not stored a monolithic TR but rather for each DFA variable.
+        """
+        print("******************************* Printing Transition Relation for each DFA state variable *******************************")
+        for _idx in range(len(self.sym_vars_curr)):
+            _bvar = str(self.manager.bddVar(self.state_start_idx + _idx))
+            print(f"Charateristic Function for DFA boolean variable {_bvar} \n")
+            print(self.tr_state_bdds[_idx], " \n")
+        
+            if plot:
+                file_path = PROJECT_ROOT + f'/plots/{_bvar}_DFA_ltlf_trans_func.dot'
+                file_name = PROJECT_ROOT + f'/plots/{_bvar}_DFA_ltlf_trans_func.pdf'
+                self.manager.dumpDot([self.tr_state_bdds[_idx]], file_path=file_path)
+                gv.render(engine='dot', format='pdf', filepath=file_path, outfile=file_name) 

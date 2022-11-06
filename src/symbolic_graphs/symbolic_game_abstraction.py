@@ -112,7 +112,7 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
                 self.tr_state_bdds[_state_idx] |= curr_state_sym & sym_action_robot & sym_action_human
             
             elif var == 2 and self.manager.bddVar(_idx) in self.sym_vars_curr:
-                warnings.warn("Ecvountered an ambiguous varible during TR construction. FIX THIS!!!")
+                warnings.warn("Encountered an ambiguous varible during TR construction. FIX THIS!!!")
                 sys.exit(-1)
     
 
@@ -172,6 +172,11 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
 
                 # store the image in the next bucket
                 open_list[layer + 1] |= next_sym_state
+                
+                # get their corresponding lbls 
+                next_tuple_lbl = self.get_conds_from_state(state_tuple=next_tuple, only_world_conf=True)
+                next_lbl_sym = self.get_sym_state_lbl_from_tuple(next_tuple_lbl)
+                self.sym_state_labels |= next_sym_state & next_lbl_sym
 
     
 

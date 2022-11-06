@@ -12,6 +12,7 @@ from cudd import Cudd, BDD, ADD
 
 from src.explicit_graphs import CausalGraph
 
+from src.symbolic_graphs import PartitionedDFA
 from src.symbolic_graphs import PartitionedFrankaTransitionSystem, DynamicFrankaTransitionSystem
 
 from src.symbolic_graphs.graph_search_scripts import FrankaWorld
@@ -54,7 +55,7 @@ class FrankaPartitionedWorld(FrankaWorld):
             else:
                 sym_tr, ts_state_vars, ts_action_vars, ts_lbl_vars = self.build_bdd_abstraction(draw_causal_graph=draw_causal_graph)
 
-            dfa_tr, dfa_curr_state, dfa_next_state = self.build_bdd_symbolic_dfa(sym_tr_handle=sym_tr)
+            dfa_tr, dfa_curr_state = self.build_bdd_symbolic_dfa(sym_tr_handle=sym_tr)
         
         else:
             warnings.warn("Please enter a valid graph search algorthim. Currently Available - Quanlitative")
@@ -167,7 +168,6 @@ class FrankaPartitionedWorld(FrankaWorld):
              ts_lbl_vars, ts_robot_vars, ts_human_vars, boxes, possible_lbls = self.create_symbolic_causal_graph(draw_causal_graph=draw_causal_graph,
                                                                                                                  build_human_move=True)
         
-
         sym_tr = DynamicFrankaTransitionSystem(curr_vars=ts_curr_vars,
                                                lbl_vars=ts_lbl_vars,
                                                robot_action_vars=ts_robot_vars,
@@ -190,3 +190,30 @@ class FrankaPartitionedWorld(FrankaWorld):
         print("Time took for constructing the abstraction: ", stop - start)
 
         return sym_tr, ts_curr_vars, ts_robot_vars, ts_human_vars, ts_lbl_vars
+    
+
+    def build_bdd_symbolic_dfa(self, sym_tr_handle: Union[DynamicFrankaTransitionSystem, PartitionedFrankaTransitionSystem]) \
+         -> Tuple[List[PartitionedDFA], List[BDD], List[BDD]]:
+        """
+         This function constructs the DFA in a partitioned fashion. We do not need two sets of variables to construct the transition relations.
+        """
+        if len(self.formulas) > 1:
+            warnings.warn("Trying to construt Partitioned DFA representation for multiple Formulas. This functionality only works for Monolithic represrntation.")
+            sys.exit(-1)
+
+        dfa_curr_state, _dfa = self.create_partitioned_symbolic_dfa_graph(formula=self.formulas[0])
+
+        # create TR corresponding to each DFA - dfa name is only used dumping graph 
+        dfa_tr = PartitionedDFA(curr_states=dfa_curr_state,
+                                predicate_sym_map_lbl=sym_tr_handle.predicate_sym_map_lbl,
+                                sym_tr=sym_tr_handle,
+                                manager=self.manager,
+                                dfa=_dfa,
+                                ltlf_flag=self.ltlf_flag,
+                                dfa_name='dfa_0')
+        if self.ltlf_flag:
+            dfa_tr.create_symbolic_ltlf_transition_system(verbose=True, plot=self.plot_dfa)
+        else:
+            raise NotImplementedError()
+        
+        return dfa_tr, dfa_curr_state

@@ -514,7 +514,7 @@ class SymbolicFrankaTransitionSystem():
         """
          A helper function that prints the Transition Relation.
 
-         @param: plot: Set thihs flag to true if you also want to print the corresponding BDD as a PDF.
+         @param: plot: Set this flag to true if you also want to print the corresponding BDD as a PDF.
         """
 
         for _action, _idx in self.tr_action_idx_map.items():
@@ -806,7 +806,7 @@ class PartitionedFrankaTransitionSystem(SymbolicFrankaTransitionSystem):
 
     def add_edge_to_action_tr(self, action_name: str, curr_state_tuple: tuple, next_state_tuple: tuple) -> None:
         """
-         A helper function that add the edge from curr state to the next state in their respective action Transition Relations (TR)
+         A helper function that adds the edge from curr state to the next state in their respective action Transition Relations (TR)
         """
         curr_state_sym: BDD = self.predicate_sym_map_curr[curr_state_tuple]
         nxt_state_sym: BDD = self.predicate_sym_map_curr[next_state_tuple]
@@ -828,7 +828,7 @@ class PartitionedFrankaTransitionSystem(SymbolicFrankaTransitionSystem):
     
 
     def _print_plot_tr(self, plot: bool = False) -> None:
-        print("******************************* Printing Transition Relation for each state variable *******************************")
+        print("******************************* Printing Transition Relation for each TS state variable *******************************")
         for _idx in range(len(self.sym_vars_curr)):
             _bvar = str(self.manager.bddVar(self.state_start_idx + _idx))
             print(f"Charateristic Function for Boolean Var {_bvar} \n")
@@ -836,5 +836,5 @@ class PartitionedFrankaTransitionSystem(SymbolicFrankaTransitionSystem):
             if plot:
                 file_path = PROJECT_ROOT + f'/plots/{_bvar}_trans_func.dot'
                 file_name = PROJECT_ROOT + f'/plots/{_bvar}_trans_func.pdf'
-                self.manager.dumpDot([self.sym_tr_actions[_idx]], file_path=file_path)
+                self.manager.dumpDot([self.tr_state_bdds[_idx]], file_path=file_path)
                 gv.render(engine='dot', format='pdf', filepath=file_path, outfile=file_name)
