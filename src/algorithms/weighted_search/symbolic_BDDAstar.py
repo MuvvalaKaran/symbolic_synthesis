@@ -95,9 +95,8 @@ class SymbolicBDDAStar(BaseSymbolicSearch):
         for tr_ac in self.ts_transition_fun_list:
             ts_states |= tr_ac.bddPattern().existAbstract(self.ts_ycube.bddPattern())
 
-        ts_x_list_bdd = [var.bddPattern() for var in self.ts_x_list]
-
         if sanity_check:
+            ts_x_list_bdd = [var.bddPattern() for var in self.ts_x_list]
             cubes = self.convert_cube_to_func(dd_func=ts_states, curr_state_list=ts_x_list_bdd)
             # assert len(cubes) == GRID_WORLD_SIZE**2, "Error computing set of valid TS states"
             assert self.init_TS.bddPattern() <= ts_states, "Error computing set of valid TS states"

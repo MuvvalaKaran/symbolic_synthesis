@@ -12,6 +12,8 @@ from cudd import Cudd, BDD, ADD
 
 from src.explicit_graphs import CausalGraph
 
+from src.algorithms.strategy_synthesis import ReachabilityGame
+
 from src.symbolic_graphs import PartitionedDFA
 from src.symbolic_graphs import PartitionedFrankaTransitionSystem, DynamicFrankaTransitionSystem
 
@@ -51,16 +53,30 @@ class FrankaPartitionedWorld(FrankaWorld):
         
         elif self.algorithm == 'qual':
             if dynamic_env:
-                sym_tr, ts_state_vars, ts_robot_vars, ts_human_vars, ts_lbl_vars = self.build_bdd_abstraction_dynamic(draw_causal_graph=draw_causal_graph)
+                sym_tr, ts_curr_vars, ts_robot_vars, ts_human_vars, ts_lbl_vars = self.build_bdd_abstraction_dynamic(draw_causal_graph=draw_causal_graph)
             else:
-                sym_tr, ts_state_vars, ts_action_vars, ts_lbl_vars = self.build_bdd_abstraction(draw_causal_graph=draw_causal_graph)
+                sym_tr, ts_curr_vars, ts_action_vars, ts_lbl_vars = self.build_bdd_abstraction(draw_causal_graph=draw_causal_graph)
 
             dfa_tr, dfa_curr_state = self.build_bdd_symbolic_dfa(sym_tr_handle=sym_tr)
         
         else:
             warnings.warn("Please enter a valid graph search algorthim. Currently Available - Quanlitative")
         
-        sys.exit(-1)
+        self.ts_handle: Union[DynamicFrankaTransitionSystem, PartitionedFrankaTransitionSystem] = sym_tr
+        self.dfa_handle: PartitionedDFA = dfa_tr
+
+        self.ts_x_list: List[BDD] = ts_curr_vars
+        self.dfa_x_list: List[BDD] = dfa_curr_state
+        self.ts_obs_list: List[BDD] = ts_lbl_vars
+
+        if dynamic_env:
+            self.ts_robot_vars: List[BDD] = ts_robot_vars
+            self.ts_human_vars: List[BDD] = ts_human_vars
+        
+        else:
+            warnings.warn("We haven't implemented a strategy synthesie for single player Partitioned Representation.")
+            warnings.warn("Use the Monolithic Representation if you want graph search by setting the FRANKWORLD flag to True.")
+            raise NotImplementedError()
 
 
     def create_symbolic_causal_graph(self, draw_causal_graph: bool = False, add_flag: bool = False, build_human_move: bool = False) -> Tuple:
@@ -217,3 +233,23 @@ class FrankaPartitionedWorld(FrankaWorld):
             raise NotImplementedError()
         
         return dfa_tr, dfa_curr_state
+    
+
+    def solve(self, verbose: bool = False):
+        """
+         A function that call the winning strategy synthesis code and compute the set of winnign states and winning strategy for robot. 
+        """
+        
+        reachabiility_handle =  ReachabilityGame(ts_handle=self.ts_handle,
+                                                 dfa_handle=self.dfa_handle,
+                                                 ts_curr_vars=self.ts_x_list,
+                                                 dfa_curr_vars=self.dfa_x_list,
+                                                 ts_obs_vars=self.ts_obs_list,
+                                                 sys_act_vars=self.ts_robot_vars,
+                                                 env_act_vars=self.ts_human_vars,
+                                                 cudd_manager=self.manager)
+
+        reachabiility_handle.solve(verbose=verbose)
+
+        print("Done Solving the game :)")
+        sys.exit(-1)

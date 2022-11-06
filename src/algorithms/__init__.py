@@ -1,1 +1,1 @@
-__all__ = ["blind_search", "weighted_search", "base"]
+__all__ = ["strategy_synthesis", "blind_search", "weighted_search", "base"]

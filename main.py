@@ -120,6 +120,7 @@ if __name__ == "__main__":
                                                         plot=False)
         # build the abstraction
         frankapartition_handle.build_abstraction(dynamic_env=TWO_PLAYER_GAME)
+        frankapartition_handle.solve(verbose=False)
 
     else:
         warnings.warn("Please set atleast one flag to True - FRANKAWORLD or GRIDWORLD!")
