@@ -1,6 +1,7 @@
 '''
 This script implements Winning staregy and regret strategy synthesis code for Franka World 
 '''
+import sys
 import time
 import warnings
 
@@ -11,7 +12,7 @@ from cudd import Cudd, BDD, ADD
 
 from src.explicit_graphs import CausalGraph
 
-from src.symbolic_graphs.symbolic_abstraction import PartitionedFrankaTransitionSystem
+from src.symbolic_graphs import PartitionedFrankaTransitionSystem, DynamicFrankaTransitionSystem
 
 from src.symbolic_graphs.graph_search_scripts import FrankaWorld
 
@@ -49,7 +50,7 @@ class FrankaPartitionedWorld(FrankaWorld):
         
         elif self.algorithm == 'qual':
             if dynamic_env:
-                sym_tr, ts_state_vars, ts_action_vars, ts_lbl_vars = self.build_bdd_abstraction_dynamic(draw_causal_graph=draw_causal_graph)
+                sym_tr, ts_state_vars, ts_robot_vars, ts_human_vars, ts_lbl_vars = self.build_bdd_abstraction_dynamic(draw_causal_graph=draw_causal_graph)
             else:
                 sym_tr, ts_state_vars, ts_action_vars, ts_lbl_vars = self.build_bdd_abstraction(draw_causal_graph=draw_causal_graph)
 
@@ -57,6 +58,8 @@ class FrankaPartitionedWorld(FrankaWorld):
         
         else:
             warnings.warn("Please enter a valid graph search algorthim. Currently Available - Quanlitative")
+        
+        sys.exit(-1)
 
 
     def create_symbolic_causal_graph(self, draw_causal_graph: bool = False, add_flag: bool = False, build_human_move: bool = False) -> Tuple:
@@ -83,22 +86,20 @@ class FrankaPartitionedWorld(FrankaWorld):
             _seg_action = defaultdict(lambda: [])
             # segregate actions in robot actions (controllable vars - `o`) and humans moves (uncontrollable vars - `i`)
             for act in _causal_graph_instance.task.operators:
-                if 'human' in act:
-                    _seg_action['human'].append(act)
-                else:
+                # if 'human' in act.name:
+                #     _seg_action['human'].append(act)
+                # else:
+                if 'human' not in act.name:
                     _seg_action['robot'].append(act)
         
         if build_human_move:
-            ts_action_vars = []
             ts_robot_act_vars = self._create_symbolic_lbl_vars(state_lbls=_seg_action['robot'],
                                                                state_var_name='o',
                                                                add_flag=add_flag)
             
-            ts_human_act_vars = self._create_symbolic_lbl_vars(state_lbls=_seg_action['human'],
+            ts_human_act_vars = self._create_symbolic_lbl_vars(state_lbls=['(human-move)', '(no-human-move)'],
                                                                state_var_name='i',
                                                                add_flag=add_flag)
-
-            ts_action_vars = ts_robot_act_vars + ts_human_act_vars
 
         
         else:
@@ -124,7 +125,9 @@ class FrankaPartitionedWorld(FrankaWorld):
                                                    state_var_name='x',
                                                    add_flag=add_flag)
         
-        
+        if build_human_move:
+            return _causal_graph_instance.task, _causal_graph_instance.problem.domain, curr_vars, \
+                 ts_state_tuples, ts_lbl_vars, ts_robot_act_vars, ts_human_act_vars, boxes, box_preds
         
         return _causal_graph_instance.task, _causal_graph_instance.problem.domain, curr_vars, ts_state_tuples, ts_lbl_vars, ts_action_vars, boxes, box_preds
     
@@ -156,8 +159,34 @@ class FrankaPartitionedWorld(FrankaWorld):
         return sym_tr, ts_curr_vars, ts_action_vars, ts_lbl_vars
     
 
-    def build_bdd_abstraction_dynamic(self, draw_causal_graph: bool = False) -> Tuple[PartitionedFrankaTransitionSystem, List[BDD], List[BDD], List[BDD]]:
+    def build_bdd_abstraction_dynamic(self, draw_causal_graph: bool = False) -> Tuple[PartitionedFrankaTransitionSystem, List[BDD], List[BDD], List[BDD], List[BDD]]:
         """
          Main Function to Build Two-player Transition System without edge weights
         """
-        raise NotImplementedError()
+        task, domain, ts_curr_vars, ts_state_tuples, \
+             ts_lbl_vars, ts_robot_vars, ts_human_vars, boxes, possible_lbls = self.create_symbolic_causal_graph(draw_causal_graph=draw_causal_graph,
+                                                                                                                 build_human_move=True)
+        
+
+        sym_tr = DynamicFrankaTransitionSystem(curr_vars=ts_curr_vars,
+                                               lbl_vars=ts_lbl_vars,
+                                               robot_action_vars=ts_robot_vars,
+                                               human_action_vars=ts_human_vars,
+                                               task=task,
+                                               domain=domain,
+                                               ts_states=ts_state_tuples,
+                                               ts_state_map=self.pred_int_map,
+                                               manager=self.manager)
+        
+        start: float = time.time()
+        sym_tr.create_transition_system_franka(boxes=boxes,
+                                               state_lbls=possible_lbls,
+                                               add_exist_constr=True,
+                                               verbose=False,
+                                               plot=self.plot_ts,
+                                               print_tr=False)
+        
+        stop: float = time.time()
+        print("Time took for constructing the abstraction: ", stop - start)
+
+        return sym_tr, ts_curr_vars, ts_robot_vars, ts_human_vars, ts_lbl_vars
