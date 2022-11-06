@@ -3,7 +3,6 @@ import sys
 import time
 import math
 import warnings
-import copy
 
 from bidict import bidict
 from itertools import product

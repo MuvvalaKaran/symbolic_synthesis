@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Simple Franka Blocks world
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(define (domain simple_franka_box_world)
+(define (domain dynamic_franka_box_world)
 
 (:requirements :strips :typing)
 
@@ -13,6 +13,7 @@
     general_loc - location
     robo_loc - general_loc
     box_loc - general_loc
+    hbox_loc - box_loc
 )
 
 (:constants free - status)
@@ -112,4 +113,21 @@
         (not (to-loc ?b ?l))
     )
 )
+
+
+;;; Perform Human Intervention;;;;;
+; A human can move objects when the box in on a location from which the human can intervene
+
+(:action human-move
+    :parameters (?b - box ?l1 - hbox_loc ?l2 - hbox_loc)
+    :precondition (and
+        (on ?b ?l1)
+    )
+    :effect (and
+        (on ?b ?l2)
+        (not (on ?b ?l1))
+    )
+)
+
+
 )
