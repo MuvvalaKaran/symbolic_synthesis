@@ -54,8 +54,8 @@ if __name__ == "__main__":
 
     elif FRANKAWORLD:
         #Franka World files 
-        domain_file_path = PROJECT_ROOT + "/pddl_files/example_pddl/domain.pddl"
-        problem_file_path = PROJECT_ROOT + "/pddl_files/example_pddl/problem.pddl"
+        domain_file_path = PROJECT_ROOT + "/pddl_files/simple_franka_world/domain.pddl"
+        problem_file_path = PROJECT_ROOT + "/pddl_files/simple_franka_world/problem.pddl"
 
         if DIJKSTRAS:
             algo = 'dijkstras'
@@ -94,8 +94,13 @@ if __name__ == "__main__":
     
     elif STRATEGY_SYNTHESIS:
         #Franka World files 
-        domain_file_path = PROJECT_ROOT + "/pddl_files/example_pddl/domain.pddl"
-        problem_file_path = PROJECT_ROOT + "/pddl_files/example_pddl/problem.pddl"
+        if TWO_PLAYER_GAME:
+            domain_file_path = PROJECT_ROOT + "/pddl_files/dynamic_franka_world/domain.pddl"
+            problem_file_path = PROJECT_ROOT + "/pddl_files/dynamic_franka_world/problem.pddl"
+        
+        else:
+            domain_file_path = PROJECT_ROOT + "/pddl_files/simple_franka_world/domain.pddl"
+            problem_file_path = PROJECT_ROOT + "/pddl_files/simple_franka_world/problem.pddl"
 
 
         wgt_dict = {}

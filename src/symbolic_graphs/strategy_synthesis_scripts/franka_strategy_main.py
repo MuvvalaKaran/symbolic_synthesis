@@ -4,6 +4,7 @@ This script implements Winning staregy and regret strategy synthesis code for Fr
 import time
 import warnings
 
+from collections import defaultdict
 from typing import Union, List, Tuple
 
 from cudd import Cudd, BDD, ADD
@@ -37,7 +38,7 @@ class FrankaPartitionedWorld(FrankaWorld):
         super().__init__(domain_file, problem_file, formulas, manager, algorithm, weight_dict, ltlf_flag, dyn_var_ord, verbose, plot_ts, plot_obs, plot_dfa, plot, create_lbls)
 
 
-    def build_abstraction(self, draw_causal_graph: bool = False):
+    def build_abstraction(self, draw_causal_graph: bool = False, dynamic_env: bool = False):
         """
          A main function that construct a symbolic Franka World TS and its corresponsing DFA
         """
@@ -47,7 +48,10 @@ class FrankaPartitionedWorld(FrankaWorld):
             raise NotImplementedError()
         
         elif self.algorithm == 'qual':
-            sym_tr, ts_state_vars, ts_action_vars, ts_lbl_vars = self.build_bdd_abstraction(draw_causal_graph=draw_causal_graph)
+            if dynamic_env:
+                sym_tr, ts_state_vars, ts_action_vars, ts_lbl_vars = self.build_bdd_abstraction_dynamic(draw_causal_graph=draw_causal_graph)
+            else:
+                sym_tr, ts_state_vars, ts_action_vars, ts_lbl_vars = self.build_bdd_abstraction(draw_causal_graph=draw_causal_graph)
 
             dfa_tr, dfa_curr_state, dfa_next_state = self.build_bdd_symbolic_dfa(sym_tr_handle=sym_tr)
         
@@ -55,7 +59,7 @@ class FrankaPartitionedWorld(FrankaWorld):
             warnings.warn("Please enter a valid graph search algorthim. Currently Available - Quanlitative")
 
 
-    def create_symbolic_causal_graph(self, draw_causal_graph: bool = False, add_flag: bool = False) -> Tuple:
+    def create_symbolic_causal_graph(self, draw_causal_graph: bool = False, add_flag: bool = False, build_human_move: bool = False) -> Tuple:
         """
          Overrides the base method. We create boolean variables for all the actions possible.
           We also only create one set of variables (curr state vars) when constructing the symbolic Transition Relation   
@@ -75,9 +79,33 @@ class FrankaPartitionedWorld(FrankaWorld):
         # compute all the possible states
         ts_state_tuples = self.compute_valid_franka_state_tuples(robot_preds=robot_preds, on_preds=on_preds, verbose=True)
         
-        ts_action_vars = self._create_symbolic_lbl_vars(state_lbls=_causal_graph_instance.task.operators,
-                                                        state_var_name='i',
-                                                        add_flag=add_flag)
+        if build_human_move:
+            _seg_action = defaultdict(lambda: [])
+            # segregate actions in robot actions (controllable vars - `o`) and humans moves (uncontrollable vars - `i`)
+            for act in _causal_graph_instance.task.operators:
+                if 'human' in act:
+                    _seg_action['human'].append(act)
+                else:
+                    _seg_action['robot'].append(act)
+        
+        if build_human_move:
+            ts_action_vars = []
+            ts_robot_act_vars = self._create_symbolic_lbl_vars(state_lbls=_seg_action['robot'],
+                                                               state_var_name='o',
+                                                               add_flag=add_flag)
+            
+            ts_human_act_vars = self._create_symbolic_lbl_vars(state_lbls=_seg_action['human'],
+                                                               state_var_name='i',
+                                                               add_flag=add_flag)
+
+            ts_action_vars = ts_robot_act_vars + ts_human_act_vars
+
+        
+        else:
+            ts_action_vars = self._create_symbolic_lbl_vars(state_lbls=_causal_graph_instance.task.operators,
+                                                            state_var_name='o',
+                                                            add_flag=add_flag)
+
         
         # box_preds has predicated segregated as per boxes
         ts_lbl_vars = []
@@ -126,3 +154,10 @@ class FrankaPartitionedWorld(FrankaWorld):
         print("Time took for constructing the abstraction: ", stop - start)
 
         return sym_tr, ts_curr_vars, ts_action_vars, ts_lbl_vars
+    
+
+    def build_bdd_abstraction_dynamic(self, draw_causal_graph: bool = False) -> Tuple[PartitionedFrankaTransitionSystem, List[BDD], List[BDD], List[BDD]]:
+        """
+         Main Function to Build Two-player Transition System without edge weights
+        """
+        raise NotImplementedError()
