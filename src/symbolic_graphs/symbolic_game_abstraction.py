@@ -116,7 +116,7 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
                 sys.exit(-1)
     
 
-    def add_human_moves(self, robot_action_name: str, open_list: dict, curr_state_tuple: tuple, layer: int, verbose: bool = False):
+    def add_human_moves(self, robot_action_name: str, open_list: dict, curr_state_tuple: tuple, layer: int, verbose: bool = False) -> bool:
         """
          A function that loops over all the human moves, check if the preconditions are met, if yes then compute the next state and add it to the TR.  
         """
@@ -177,6 +177,10 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
                 next_tuple_lbl = self.get_conds_from_state(state_tuple=next_tuple, only_world_conf=True)
                 next_lbl_sym = self.get_sym_state_lbl_from_tuple(next_tuple_lbl)
                 self.sym_state_labels |= next_sym_state & next_lbl_sym
+        
+                return True
+        
+        return False
 
     
 
@@ -274,12 +278,11 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
                                 continue
 
                             # add human moves, if any. . .
-                            self.add_human_moves(robot_action_name=action.name,
-                                                open_list=open_list,
-                                                curr_state_tuple=tuple(_valid_pre),
-                                                layer=layer,
-                                                verbose=verbose)
-
+                            add_env_edge =  self.add_human_moves(robot_action_name=action.name,
+                                                                open_list=open_list,
+                                                                curr_state_tuple=tuple(_valid_pre),
+                                                                layer=layer,
+                                                                verbose=verbose)
                             # get add and del tuples 
                             add_tuple = self.get_tuple_from_state(action.add_effects)
                             del_tuple = self.get_tuple_from_state(action.del_effects)
@@ -301,6 +304,17 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
                                                        curr_state_tuple=tuple(_valid_pre),
                                                        next_state_tuple=next_tuple,
                                                        human_intervene=False)
+                            
+                            # if no human edges were added, thus under all possible human moves, for this robot action,
+                            # the evolution is same under human intervention and no human-intervention 
+                            if not add_env_edge:
+                                self.add_edge_to_action_tr(robot_action_name=action.name,
+                                                           curr_state_tuple=tuple(_valid_pre),
+                                                           next_state_tuple=next_tuple,
+                                                           human_intervene=True)
+                                
+                                if verbose:
+                                    print(f"Adding Human edge: {cstate} -------(no-int){action.name}------> {nstate}")
 
 
                             # get their corresponding lbls 

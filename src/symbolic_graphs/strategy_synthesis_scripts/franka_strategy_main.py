@@ -19,6 +19,7 @@ from src.symbolic_graphs import PartitionedFrankaTransitionSystem, DynamicFranka
 
 from src.symbolic_graphs.graph_search_scripts import FrankaWorld
 
+
 class FrankaPartitionedWorld(FrankaWorld):
     """
      This base class construct a symbolic TR in a partitioned fashion. So, we do need two explicit set of boolean variables to
@@ -103,9 +104,6 @@ class FrankaPartitionedWorld(FrankaWorld):
             _seg_action = defaultdict(lambda: [])
             # segregate actions in robot actions (controllable vars - `o`) and humans moves (uncontrollable vars - `i`)
             for act in _causal_graph_instance.task.operators:
-                # if 'human' in act.name:
-                #     _seg_action['human'].append(act)
-                # else:
                 if 'human' not in act.name:
                     _seg_action['robot'].append(act)
         
@@ -198,7 +196,7 @@ class FrankaPartitionedWorld(FrankaWorld):
         sym_tr.create_transition_system_franka(boxes=boxes,
                                                state_lbls=possible_lbls,
                                                add_exist_constr=True,
-                                               verbose=False,
+                                               verbose=self.verbose,
                                                plot=self.plot_ts,
                                                print_tr=False)
         
@@ -228,19 +226,19 @@ class FrankaPartitionedWorld(FrankaWorld):
                                 ltlf_flag=self.ltlf_flag,
                                 dfa_name='dfa_0')
         if self.ltlf_flag:
-            dfa_tr.create_symbolic_ltlf_transition_system(verbose=True, plot=self.plot_dfa)
+            dfa_tr.create_symbolic_ltlf_transition_system(verbose=self.verbose, plot=self.plot_dfa)
         else:
             raise NotImplementedError()
         
         return dfa_tr, dfa_curr_state
     
 
-    def solve(self, verbose: bool = False):
+    def solve(self, verbose: bool = False) -> BDD:
         """
          A function that call the winning strategy synthesis code and compute the set of winnign states and winning strategy for robot. 
         """
         
-        reachabiility_handle =  ReachabilityGame(ts_handle=self.ts_handle,
+        reachability_handle =  ReachabilityGame(ts_handle=self.ts_handle,
                                                  dfa_handle=self.dfa_handle,
                                                  ts_curr_vars=self.ts_x_list,
                                                  dfa_curr_vars=self.dfa_x_list,
@@ -249,7 +247,6 @@ class FrankaPartitionedWorld(FrankaWorld):
                                                  env_act_vars=self.ts_human_vars,
                                                  cudd_manager=self.manager)
 
-        reachabiility_handle.solve(verbose=verbose)
+        win_str: BDD = reachability_handle.solve(verbose=False)
 
-        print("Done Solving the game :)")
-        sys.exit(-1)
+        return win_str
