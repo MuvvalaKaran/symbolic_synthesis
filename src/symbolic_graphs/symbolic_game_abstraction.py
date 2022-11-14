@@ -52,7 +52,7 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
           Boolean formulas expressed using robot vars (o / output vairables/controllable vars) and
           human vars (i / input vairables/uncontrollable vars), respectively. 
         """
-        for _idx, var in enumerate([self.sym_vars_human, self.sym_vars_robot]):
+        for _pidx, var in enumerate([self.sym_vars_human, self.sym_vars_robot]):
         
             # create all combinations of 1-true and 0-false
             boolean_str = list(product([1, 0], repeat=len(var)))
@@ -60,13 +60,17 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
 
             iter_count: int = 0
             for state in self.actions:
-                if _idx == 0:
-                    _node_int_map = {state: boolean_str[index] for index, state in enumerate(['(human-move)', '(no-human-move)'])}
-                    break
-                elif _idx == 1 and 'human' not in state:
+                if _pidx == 0  and 'human' in state:
+                    # _node_int_map = {state: boolean_str[index] for index, state in enumerate(['(human-move)', '(no-human-move)'])}
+                    _node_int_map[state] =  boolean_str[iter_count]
+                    iter_count += 1
+                elif _pidx == 1 and 'human' not in state:
                     _node_int_map[state] =  boolean_str[iter_count]
                     iter_count += 1
 
+            # manually add `no-robot-move` act to the mapping 
+            if _pidx == 1:
+                _node_int_map['(no-robot-move)'] = boolean_str[iter_count]
             assert len(boolean_str) >= len(_node_int_map), "FIX THIS: Looks like there are more Actions than boolean variables!"
 
             # loop over all the boolean strings and convert them respective bdd vars
@@ -83,14 +87,18 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
                     # update bidict accordingly
                     _node_int_map[_key] = _bool_func_curr
             
-            if _idx == 0:
+            if _pidx == 0:
                 self.predicate_sym_map_human = bidict(_node_int_map)
             else:
                 self.predicate_sym_map_robot = bidict(_node_int_map)
         
     
 
-    def add_edge_to_action_tr(self, robot_action_name: str, curr_state_tuple: tuple, next_state_tuple: tuple, human_intervene: bool = False) -> None:
+    def add_edge_to_action_tr(self,
+                              robot_action_name: str,
+                              curr_state_tuple: tuple,
+                              next_state_tuple: tuple,
+                              human_action_name: str = '') -> None:
         """
          While creating the TR for the two-player game, we add both human and robot action. We do encode every parameterized human move, i.e.,
           human-move b0 l6 l7 is simply added as human-move. This, restricts the no. of binary variables required to encode humans to two, i.e., 
@@ -99,24 +107,48 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
         curr_state_sym: BDD = self.predicate_sym_map_curr[curr_state_tuple]
         nxt_state_sym: BDD = self.predicate_sym_map_curr[next_state_tuple]
 
-        # get the corresponding symbolic actions
-        sym_action_robot: BDD = self.predicate_sym_map_robot[robot_action_name]
-        sym_action_human: BDD = self.predicate_sym_map_human['(human-move)'] if human_intervene else self.predicate_sym_map_human['(no-human-move)']
+        # get the corresponding state label
+        # state_lbl = self.get_conds_from_state(state_tuple=curr_state_tuple, only_world_conf=True) 
+        # curr_state_lbl: BDD = self.get_sym_state_lbl_from_tuple(state_lbl)
 
         # for every boolean var in nxt_state check if it high or low. If high add it curr state and the correpsonding action to its BDD
         for _idx, var in enumerate(nxt_state_sym.cube()):
             if var == 1 and self.manager.bddVar(_idx) in self.sym_vars_curr:
                 _state_idx: int = _idx - self.state_start_idx
                 assert _state_idx >= 0, "Error constructing the Partitioned Transition Relation."
-                
-                self.tr_state_bdds[_state_idx] |= curr_state_sym & sym_action_robot & sym_action_human
+                if human_action_name != '':
+                    self.tr_state_bdds[_state_idx] |= curr_state_sym & self.predicate_sym_map_robot['(no-robot-move)'] & self.predicate_sym_map_human[human_action_name] #& curr_state_lbl
+                else:
+                    self.tr_state_bdds[_state_idx] |= curr_state_sym &  self.predicate_sym_map_robot[robot_action_name] #& curr_state_lbl
             
             elif var == 2 and self.manager.bddVar(_idx) in self.sym_vars_curr:
                 warnings.warn("Encountered an ambiguous varible during TR construction. FIX THIS!!!")
                 sys.exit(-1)
     
 
-    def add_human_moves(self, robot_action_name: str, open_list: dict, curr_state_tuple: tuple, layer: int, verbose: bool = False) -> bool:
+    def _check_exist_human_constraint(self, boxes: List[str], curr_state_lbl: tuple, human_action_name: str) -> bool:
+        """
+         A function that check if the destination location that the human is moving a block to is free or not.
+        """
+        _loc_pattern = "[l|L][\d]+"
+        _box_pattern = "[b|B][\d]+"
+        _loc_states: List[str] = re.findall(_loc_pattern, human_action_name)
+        _box_state: str = re.search(_box_pattern, human_action_name).group()
+        dloc = _loc_states[1]
+
+        # if box1 is being manipulated, get the list of rest of boxes (that have to be grounded) at this instance
+        tmp_copy = copy.deepcopy(boxes)
+        tmp_copy.remove(_box_state)
+
+        # create predicates that say on b0 l1 (l1 is the destination in the action)
+        on_preds = [self.pred_int_map[f'(on {bid} {dloc})'] for bid in tmp_copy]
+        
+        if set(on_preds).intersection(set(curr_state_lbl)):
+            return False
+
+        return True
+
+    def add_human_moves(self, robot_action_name: str, open_list: dict, curr_state_tuple: tuple, layer: int, boxes: List[str], verbose: bool = False) -> bool:
         """
          A function that loops over all the human moves, check if the preconditions are met, if yes then compute the next state and add it to the TR.  
         """
@@ -125,7 +157,7 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
             if 'human' not in haction.name:
                 continue
             
-            # check is the preconditions of human action are satisfied or not
+            # check if the preconditions of human action are satisfied or not
             _pre_tuple = self.get_tuple_from_state(haction.preconditions)  # cardinality of human move's precondition is always 1
             _intersect: bool = set(_pre_tuple).issubset(curr_state_tuple)
 
@@ -146,8 +178,14 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
 
                 if _dloc == _hloc:
                     continue
-
+            
+            # check the if the destination loc is free or not
             if _intersect:
+                d_loc_available: bool = self._check_exist_human_constraint(boxes=boxes,
+                                                                        curr_state_lbl=curr_state_tuple,
+                                                                        human_action_name=haction.name)
+
+            if _intersect and d_loc_available:
                 # get add and del tuples 
                 add_tuple = self.get_tuple_from_state(haction.add_effects)
                 del_tuple = self.get_tuple_from_state(haction.del_effects)
@@ -168,7 +206,7 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
                 self.add_edge_to_action_tr(robot_action_name=robot_action_name,
                                            curr_state_tuple=curr_state_tuple,
                                            next_state_tuple=next_tuple,
-                                           human_intervene=True)
+                                           human_action_name=haction.name)
 
                 # store the image in the next bucket
                 open_list[layer + 1] |= next_sym_state
@@ -279,10 +317,11 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
 
                             # add human moves, if any. . .
                             add_env_edge =  self.add_human_moves(robot_action_name=action.name,
-                                                                open_list=open_list,
-                                                                curr_state_tuple=tuple(_valid_pre),
-                                                                layer=layer,
-                                                                verbose=verbose)
+                                                                 open_list=open_list,
+                                                                 curr_state_tuple=tuple(_valid_pre),
+                                                                 layer=layer,
+                                                                 boxes=boxes,
+                                                                 verbose=verbose)
                             # get add and del tuples 
                             add_tuple = self.get_tuple_from_state(action.add_effects)
                             del_tuple = self.get_tuple_from_state(action.del_effects)
@@ -302,20 +341,7 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
                             # add The edge to its corresponding action
                             self.add_edge_to_action_tr(robot_action_name=action.name,
                                                        curr_state_tuple=tuple(_valid_pre),
-                                                       next_state_tuple=next_tuple,
-                                                       human_intervene=False)
-                            
-                            # if no human edges were added, thus under all possible human moves, for this robot action,
-                            # the evolution is same under human intervention and no human-intervention 
-                            if not add_env_edge:
-                                self.add_edge_to_action_tr(robot_action_name=action.name,
-                                                           curr_state_tuple=tuple(_valid_pre),
-                                                           next_state_tuple=next_tuple,
-                                                           human_intervene=True)
-                                
-                                if verbose:
-                                    print(f"Adding Human edge: {cstate} -------(no-int){action.name}------> {nstate}")
-
+                                                       next_state_tuple=next_tuple)
 
                             # get their corresponding lbls 
                             next_tuple_lbl = self.get_conds_from_state(state_tuple=next_tuple, only_world_conf=True)

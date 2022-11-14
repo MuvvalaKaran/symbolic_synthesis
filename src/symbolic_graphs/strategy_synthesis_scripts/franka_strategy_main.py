@@ -78,6 +78,9 @@ class FrankaPartitionedWorld(FrankaWorld):
             warnings.warn("We haven't implemented a strategy synthesie for single player Partitioned Representation.")
             warnings.warn("Use the Monolithic Representation if you want graph search by setting the FRANKWORLD flag to True.")
             raise NotImplementedError()
+        
+        if self.dyn_var_ordering:
+            self.set_variable_reordering()
 
 
     def create_symbolic_causal_graph(self, draw_causal_graph: bool = False, add_flag: bool = False, build_human_move: bool = False) -> Tuple:
@@ -106,16 +109,19 @@ class FrankaPartitionedWorld(FrankaWorld):
             for act in _causal_graph_instance.task.operators:
                 if 'human' not in act.name:
                     _seg_action['robot'].append(act)
+                else:
+                    _seg_action['human'].append(act)
         
         if build_human_move:
-            ts_robot_act_vars = self._create_symbolic_lbl_vars(state_lbls=_seg_action['robot'],
-                                                               state_var_name='o',
-                                                               add_flag=add_flag)
-            
-            ts_human_act_vars = self._create_symbolic_lbl_vars(state_lbls=['(human-move)', '(no-human-move)'],
+            # manually add `no-robot-move` action to for transitions due to human int.
+            _seg_action['robot'].append('no-robot-move')
+            ts_human_act_vars = self._create_symbolic_lbl_vars(state_lbls=_seg_action['human'],
                                                                state_var_name='i',
                                                                add_flag=add_flag)
 
+            ts_robot_act_vars = self._create_symbolic_lbl_vars(state_lbls=_seg_action['robot'],
+                                                               state_var_name='o',
+                                                               add_flag=add_flag)
         
         else:
             ts_action_vars = self._create_symbolic_lbl_vars(state_lbls=_causal_graph_instance.task.operators,
@@ -233,11 +239,24 @@ class FrankaPartitionedWorld(FrankaWorld):
         return dfa_tr, dfa_curr_state
     
 
+    def set_variable_reordering(self, make_tree_node: bool = False, **kwargs):
+        """
+         Overides the parent method and removes the TREE node computation
+          as we do not have two explicit set of variables for curr state and next state vars in our Partitioned TR representation
+        """
+        self.manager.autodynEnable()
+
+        if self.verbose:
+            self.manager.enableOrderingMonitoring()
+        else:
+            self.manager.enableReorderingReporting()
+    
+
     def solve(self, verbose: bool = False) -> BDD:
         """
          A function that call the winning strategy synthesis code and compute the set of winnign states and winning strategy for robot. 
         """
-        
+        start = time.time()
         reachability_handle =  ReachabilityGame(ts_handle=self.ts_handle,
                                                  dfa_handle=self.dfa_handle,
                                                  ts_curr_vars=self.ts_x_list,
@@ -247,6 +266,11 @@ class FrankaPartitionedWorld(FrankaWorld):
                                                  env_act_vars=self.ts_human_vars,
                                                  cudd_manager=self.manager)
 
-        win_str: BDD = reachability_handle.solve(verbose=False)
+        win_str: BDD = reachability_handle.solve(verbose=verbose)
+        stop = time.time()
+        print("Time for solving the game: ", stop - start)
+
+        # rollout for sanity checking
+        reachability_handle.roll_out_strategy(transducer=win_str)
 
         return win_str

@@ -434,8 +434,6 @@ class SymbolicFrankaTransitionSystem():
     def _create_sym_state_label_map(self, domain_lbls):
         """
         Loop through all the facts that are reachable and assign a boolean funtion to it.
-         
-         This method is called whten Gridworld state labels are created
         """
         
         # loop over each box and create its corresponding boolean formula 

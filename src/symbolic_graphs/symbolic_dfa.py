@@ -204,7 +204,7 @@ class SymbolicDFA(object):
             elif value == "0":
                 expr = expr & ~self.predicate_sym_map_lbl.get(str(labels[idx]) if isinstance(labels, tuple) else str(labels))
             else:
-                assert value == "X", "Error while constructing symbolic LTLF DAF edge. FIX THIS!!!"
+                assert value == "X", "Error while constructing symbolic LTLF DFA edge. FIX THIS!!!"
         
         return expr
     
@@ -565,7 +565,7 @@ class SymbolicDFAFranka(SymbolicDFA):
                     box_loc: str = re.search(r'\d+', str(cryptic_lbl)).group()
                     expr = expr & ~self.predicate_sym_map_lbl[f'(on b{box_loc[0]} l{box_loc[1]})']
             else:
-                assert value == "X", "Error while constructing symbolic LTLF DAF edge. FIX THIS!!!"
+                assert value == "X", "Error while constructing symbolic LTLF DFA edge. FIX THIS!!!"
         
         return expr
 
