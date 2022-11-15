@@ -208,7 +208,7 @@ class FrankaPartitionedWorld(FrankaWorld):
         
         stop: float = time.time()
         print("Time took for constructing the abstraction: ", stop - start)
-
+        
         return sym_tr, ts_curr_vars, ts_robot_vars, ts_human_vars, ts_lbl_vars
     
 
@@ -271,6 +271,6 @@ class FrankaPartitionedWorld(FrankaWorld):
         print("Time for solving the game: ", stop - start)
 
         # rollout for sanity checking
-        reachability_handle.roll_out_strategy(transducer=win_str)
+        reachability_handle.roll_out_strategy(transducer=win_str, verbose=True)
 
         return win_str

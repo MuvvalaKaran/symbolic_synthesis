@@ -6,17 +6,17 @@ EXPLICIT_GRAPH: bool = False  # set this flag to true when you want to construct
 
 GRIDWORLD: bool = False   # Set this flag to true when using gridworld example for graph search 
 FRANKAWORLD: bool = False  # Set this flag to true when using manipulator scenarios for graph search
-STRATEGY_SYNTHESIS: bool = True  # Set this flag to truw when  when using manipulator scenarios for Strategy synthesis
-TWO_PLAYER_GAME: bool = False  # Set this flag to true when you want to contruct a two-player game env.
+STRATEGY_SYNTHESIS: bool = True  # Set this flag to true when  when using manipulator scenarios for Strategy synthesis
+TWO_PLAYER_GAME: bool = True  # Set this flag to true when you want to contruct a two-player game env.
 
 DIJKSTRAS: bool = False  # set this flag to true when you want to use Dijkstras
-ASTAR: bool = False  # set this flag to true when you want to use A* algorithm 
+ASTAR: bool = False # set this flag to true when you want to use A* algorithm 
 
 USE_LTLF: bool = True # Construct DFA from LTLf
 
 DRAW_EXPLICIT_CAUSAL_GRAPH: bool = False
 SIMULATE_STRATEGY: bool = True
-GRID_WORLD_SIZE: int = 10
+GRID_WORLD_SIZE: int = 5
 OBSTACLE: bool = False  # flag to load the obstacle gridworld and color the gridworld accordingly
 DYNAMIC_VAR_ORDERING: bool = False
 
@@ -24,14 +24,22 @@ DYNAMIC_VAR_ORDERING: bool = False
 #################### FRANKA TABLE TOP FORMULAS #######################
 ######################################################################
 
-# formulas = ['F(p01 & free & F(p12 & free & F(p23 & free & F(p34 & free))))']
+##### FRANKA ARCH CONF #######
+# formulas = ['F((p00 & p12 & p21 & free) | (p10 & p01 & p22 & free) | (p10 & p21 & p02 & free) | (p20 & p01 & p12 & free) | (p20 & p11 & p02 & free))']
+# formulas = ['F(p00 & p12 & p21 & free) & G((~p00 | ~p21) -> (~p12))']
+
+
+formulas = ['F(p01 & free & F(p12 & free & F(p23 & free & F(p34 & free))))']
+# formulas = ['F(p01 & free & F(p12 & free & F(p23 & free)))']
 # formulas = ['(F((p01 & free)) & F((p12 & free)) & F((p23 & free)) & F((p34 & free)))']
 
 
-# formulas = ['F((p01 & free))',
-#             'F((p12 & free))', 
-#             'F((p23 & free))',
-#             'F((p34 & free))'
+# formulas = [
+#             # 'F((p01 & p20 & free))',
+#             'F(p20 & free & F(p01 & free))',
+#             # 'F((p12 & free))', 
+#             # 'F((p23 & free))',
+#             # 'F((p34 & free))'
 #             ]
 
 # formulas = ['(F((p01 & free)) & F((p12 & free)) & F((p23 & free)) & F((p34 & free)))',
@@ -59,7 +67,7 @@ DYNAMIC_VAR_ORDERING: bool = False
 #             ]
 
 # single 12 nested formula
-formulas = ['F(l2) & F(l91) & F(l93) & F(l4) & F(l95) & F(l6) & F(l97) & F(l8) & F(l99) & F(l10) & F(l56) & F(l45)']
+# formulas = ['F(l2) & F(l91) & F(l93) & F(l4) & F(l95) & F(l6) & F(l97) & F(l8) & F(l99) & F(l10) & F(l56) & F(l45)']
 
 # single 10 nested formulas
 # formulas = ['F(l4) & F(l95) & F(l6) & F(l97) & F(l8) & F(l99) & F(l10) & F(l12) & F(l56) & F(l45)']

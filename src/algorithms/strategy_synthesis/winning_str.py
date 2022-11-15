@@ -1,5 +1,6 @@
 import re 
 import sys
+import random
 
 from functools import reduce
 from collections import defaultdict
@@ -54,7 +55,7 @@ class ReachabilityGame(BaseSymbolicSearch):
         self.dfa_bdd_sym_to_curr_state_map: bidict = dfa_handle.dfa_predicate_sym_map_curr.inv
 
         self.ts_bdd_sym_to_human_act_map: bidict = ts_handle.predicate_sym_map_human.inv
-        self.ts_bdd_sym_to_robot_act_map: bidict = ts_handle. predicate_sym_map_robot.inv
+        self.ts_bdd_sym_to_robot_act_map: bidict = ts_handle.predicate_sym_map_robot.inv
 
         self.obs_bdd: BDD = ts_handle.sym_state_labels
 
@@ -62,7 +63,6 @@ class ReachabilityGame(BaseSymbolicSearch):
         self.dfa_handle = dfa_handle
 
         self.winning_states: DefaultDict[int, BDD] = defaultdict(lambda: self.manager.bddZero())
-        self.winning_str:  DefaultDict[int, BDD] = defaultdict(lambda: self.manager.bddZero())
 
         # create corresponding cubes to avoid repetition
         self.ts_xcube = reduce(lambda x, y: x & y, self.ts_x_list)
@@ -92,7 +92,6 @@ class ReachabilityGame(BaseSymbolicSearch):
         accp_states: BDD = ts_states & self.target_DFA
 
         self.winning_states[0] |= accp_states & self.obs_bdd
-        self.winning_str[0] |= accp_states
     
     @deprecated
     def get_state_action(self, dd_func: BDD, **kwargs) -> None:
@@ -143,19 +142,67 @@ class ReachabilityGame(BaseSymbolicSearch):
             
             print(f"({_ts_name}, {_dfa_name})")
 
-    @deprecated
-    def roll_out_strategy(self):
+
+    def roll_out_strategy(self, transducer: BDD, verbose: bool = False) -> None:
         """
          A function to roll out the synthesize winning strategy
         """
 
-        curr_pod_state = self.init_TS & self.init_DFA
-        # until you reach a goal state. . .
-        while (self.target_DFA & curr_pod_state).isZero():
-            # get the next action 
+        curr_dfa_state = self.init_DFA
+        curr_prod_state = self.init_TS & curr_dfa_state & self.obs_bdd
+        counter = 0
 
-            # how to get successor?
-            raise NotImplementedError()
+        # until you reach a goal state. . .
+        while (self.target_DFA & curr_prod_state).isZero():
+            # get the next action
+            curr_state_act: BDD =  transducer & curr_prod_state
+            curr_act: BDD = curr_state_act.existAbstract(self.prod_xcube & self.ts_obs_cube)
+
+            curr_act_cubes = list(curr_act.generate_cubes())
+            # if multiple winning actions exisit from same state
+            if len(curr_act_cubes) > 1:
+                act_cube: List[int] = random.choice(curr_act_cubes)
+                act_dd = self.manager.fromLiteralList(act_cube)
+                act_name: str = self.ts_bdd_sym_to_robot_act_map[act_dd]
+
+            else:
+                act_name: str = self.ts_bdd_sym_to_robot_act_map[curr_act]
+
+            if verbose:
+                print(f"Step {counter}: {act_name}")
+            
+            # current state tuple
+            curr_ts_state: BDD = curr_prod_state.existAbstract(self.dfa_xcube & self.ts_obs_cube & self.sys_env_cube)
+            curr_ts_tuple: tuple = self.ts_bdd_sym_to_curr_state_map[curr_ts_state]
+
+            # get add and del tuples
+            for op in self.ts_handle.task.operators:
+                if op.name == act_name:
+                    add_tuple = self.ts_handle.get_tuple_from_state(op.add_effects)
+                    del_tuple = self.ts_handle.get_tuple_from_state(op.del_effects)
+                    break
+
+            # construct the tuple for next state
+            next_tuple = list(set(curr_ts_tuple) - set(del_tuple))
+            next_tuple = tuple(sorted(list(set(next_tuple + list(add_tuple)))))
+
+            # look up its corresponding formula
+            curr_ts_state: BDD = self.ts_bdd_sym_to_curr_state_map.inv[next_tuple]
+
+            curr_ts_lbl = curr_ts_state & self.obs_bdd
+            # create DFA edge and check if it satisfies any of the dges or not
+            for dfa_state in self.dfa_bdd_sym_to_curr_state_map.keys():
+                dfa_pre = dfa_state.vectorCompose(self.dfa_x_list, self.dfa_transition_fun_list)
+                edge_exists: bool = not (dfa_pre & (curr_dfa_state & curr_ts_lbl)).isZero()
+
+                if edge_exists:
+                    curr_dfa_state = dfa_state
+                    break 
+
+            # curr_prod_state = curr_ts_state & self.init_DFA
+            curr_prod_state = curr_ts_state & curr_dfa_state
+
+            counter += 1
 
 
     def get_strategy(self, transducer: BDD, verbose: bool = False) -> BDD:
@@ -163,11 +210,12 @@ class ReachabilityGame(BaseSymbolicSearch):
          A function that compute the action to take from each state from the transducer. 
         """
         strategy: BDD = transducer.solveEqn(self.sys_act_vars)
-        state_action: BDD = strategy[1][0].existAbstract(self.ts_obs_cube)
+        state_action = strategy[0].vectorCompose(self.sys_act_vars, strategy[1])
+
 
         # restrict the strategy to non accpeting state, as we don not care what the Roboto after it reaches an accepting state
         if verbose:
-            self.get_state_action(state_action.restrict(~self.dfa_x_list[0]))
+            self.get_state_action(state_action & self.init_DFA)
         
         return state_action
 
@@ -178,67 +226,68 @@ class ReachabilityGame(BaseSymbolicSearch):
         """
 
         stra_list = defaultdict(lambda: self.manager.bddZero())
-        # closed = self.manager.bddZero()
+        closed = self.manager.bddZero()  # BDD to keep track of winning states explore till now
 
         layer: int = 0
 
         stra_list[layer] = self.winning_states[layer]
+        if verbose:
+            closed |= self.winning_states[layer].existAbstract(self.ts_obs_cube)
 
         while True:
-            # remove all states that have been explored
-            # open_list[layer] = open_list[layer] & ~closed
             if layer > 0 and stra_list[layer].compare(stra_list[layer - 1], 2):
-                print("**************************Reached a Fixed Point**************************")
+                print(f"**************************Reached a Fixed Point in {layer} layers**************************")
                 if not ((self.init_TS & self.init_DFA) & stra_list[layer]).isZero():
                     print("A Winning Strategy Exists!!")
-                    # winning_str: BDD = self.get_strategy(transducer=stra_list[layer], verbose=False)
-                    
-                    # # testing print action from init state
-                    # print("init action:")
-                    # act = winning_str & (self.init_TS & self.init_DFA)
-                    # print(act)
+                    # winning_str: BDD = self.get_strategy(transducer=stra_list[layer], verbose=True)
 
                     return stra_list[layer]
                 else:
-                    print("No Winning Strategy Exists!!")
-                    return self.manager.bddZero()
+                    print("No Winning Strategy Exists!!!")
+                    sys.exit(-1)
 
-            # If unexpanded states exist ... 
-            # if not open_list[layer].isZero():
-            if verbose:
-                print(f"**************************Layer: {layer}**************************")
+            # if verbose:
+            print(f"**************************Layer: {layer}**************************")
 
             pre_prod_state: BDD = self.winning_states[layer].vectorCompose([*self.ts_x_list, *self.dfa_x_list],
                                                        [*self.ts_transition_fun_list, *self.dfa_transition_fun_list])
-
-            # pre_ts_state: BDD = stra_list[layer].vectorCompose(self.ts_x_list, self.ts_transition_fun_list)
-            # pre_ts_lbl: BDD = pre_ts_state & self.obs_bdd
-            # pre_dfa_state: BDD = pre_ts_lbl.vectorCompose(self.dfa_x_list, self.dfa_transition_fun_list)
+            
+            # we need to fix the state labeling
+            pre_prod_state = pre_prod_state.existAbstract(self.ts_obs_cube)
 
             # if verbose:
-            #     self.get_prod_states_from_dd(dd_func=(pre_prod_state).existAbstract(self.sys_env_cube), obs_flag=False)
-
+            #     print(f"Pre states at Iter {layer + 1} before universal Abstraction")
+            #     new_states = pre_prod_state.existAbstract(self.sys_env_cube)
+            #     self.get_prod_states_from_dd(dd_func=new_states)
 
             # do universal quantification
-            # pre_univ = (pre_ts_lbl & pre_dfa_state).univAbstract(self.env_cube)
             pre_univ = (pre_prod_state).univAbstract(self.env_cube)
+            # add the correct labels back
+            pre_univ = pre_univ & self.obs_bdd
 
-            # self.get_prod_states_from_dd(dd_func=pre_univ.existAbstract(self.sys_env_cube))
+            # if verbose:
+            #     print(f"Pre states at Iter {layer + 1} After universal Abstraction")
+            #     new_states = pre_univ.existAbstract(self.sys_env_cube)
+            #     # self.get_prod_states_from_dd(dd_func=new_states)
+            #     # print only the init DFA states
+            #     self.get_prod_states_from_dd(dd_func=(new_states & self.init_DFA))
+                
             
             # remove self loops
             stra_list[layer + 1] |= stra_list[layer] | (~self.winning_states[layer] & pre_univ)
-
-            # if verbose: 
-            #     print(f"Winning strategy at Iter {layer + 1}")
-            #     self.get_state_action(dd_func=stra_list[layer + 1])
+            
 
             # do existentail quantification
-            self.winning_states[layer + 1] |=  stra_list[layer + 1].existAbstract(self.sys_cube & self.ts_obs_cube)
+            self.winning_states[layer + 1] |=  stra_list[layer + 1].existAbstract(self.sys_cube)
 
+            # print new winning states in each iteration
             if verbose:
                 print(f"Winning states at Iter {layer + 1}")
-                self.get_prod_states_from_dd(dd_func= (~self.winning_states[layer] & pre_univ).existAbstract(self.sys_cube & self.ts_obs_cube))
+                # new_state_acts = stra_list[layer + 1] & ~stra_list[layer]
+                new_states = ~closed & pre_univ.existAbstract(self.sys_env_cube & self.ts_obs_cube)
+                self.get_prod_states_from_dd(dd_func=new_states)
+
+                closed |= pre_univ.existAbstract(self.sys_env_cube & self.ts_obs_cube)
 
             layer +=1
-
 
