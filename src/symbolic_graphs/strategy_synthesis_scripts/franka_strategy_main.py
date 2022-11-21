@@ -83,7 +83,7 @@ class FrankaPartitionedWorld(FrankaWorld):
             self.set_variable_reordering()
 
 
-    def create_symbolic_causal_graph(self, draw_causal_graph: bool = False, add_flag: bool = False, build_human_move: bool = False) -> Tuple:
+    def create_symbolic_causal_graph(self, draw_causal_graph: bool = False, add_flag: bool = False, build_human_move: bool = False, print_facts: bool = False) -> Tuple:
         """
          Overrides the base method. We create boolean variables for all the actions possible.
           We also only create one set of variables (curr state vars) when constructing the symbolic Transition Relation   
@@ -113,8 +113,6 @@ class FrankaPartitionedWorld(FrankaWorld):
                     _seg_action['human'].append(act)
         
         if build_human_move:
-            # manually add `no-robot-move` action to for transitions due to human int.
-            _seg_action['robot'].append('no-robot-move')
             ts_human_act_vars = self._create_symbolic_lbl_vars(state_lbls=_seg_action['human'],
                                                                state_var_name='i',
                                                                add_flag=add_flag)
@@ -122,14 +120,21 @@ class FrankaPartitionedWorld(FrankaWorld):
             ts_robot_act_vars = self._create_symbolic_lbl_vars(state_lbls=_seg_action['robot'],
                                                                state_var_name='o',
                                                                add_flag=add_flag)
+            
+            if print_facts:
+                print(f"******************# of boolean Vars for Human actions: {len(ts_human_act_vars)}******************")
+                print(f"******************# of boolean Vars for Robot actions: {len(ts_robot_act_vars)}******************")
         
         else:
             ts_action_vars = self._create_symbolic_lbl_vars(state_lbls=_causal_graph_instance.task.operators,
                                                             state_var_name='o',
                                                             add_flag=add_flag)
+            
+            if print_facts:
+                print(f"******************# of boolean Vars for Robot actions: {len(ts_action_vars)}******************")
 
         
-        # box_preds has predicated segregated as per boxes
+        # box_preds has predicates segregated as per boxes
         ts_lbl_vars = []
         for _id, b in enumerate(box_preds.keys()):
             if b == 'gripper':
@@ -141,10 +146,16 @@ class FrankaPartitionedWorld(FrankaWorld):
                                                                   state_var_name=f'b{_id}_',
                                                                   add_flag=add_flag))
         
+        if print_facts:
+            print(f"******************# of boolean Vars for TS lbls: {len(ts_lbl_vars)}******************")
+
         # The order for the boolean vara is first actions vars, then lbls, then state vars
         curr_vars = self._create_symbolic_lbl_vars(state_lbls=ts_state_tuples,
                                                    state_var_name='x',
                                                    add_flag=add_flag)
+        
+        if print_facts:
+            print(f"******************# of boolean Vars for TS states: {len(curr_vars)}******************")
         
         if build_human_move:
             return _causal_graph_instance.task, _causal_graph_instance.problem.domain, curr_vars, \
@@ -157,7 +168,8 @@ class FrankaPartitionedWorld(FrankaWorld):
         """
          Main Function to Build Transition System that only represent valid edges without any weights
         """
-        task, domain, ts_curr_vars, ts_state_tuples, ts_lbl_vars, ts_action_vars, boxes, possible_lbls = self.create_symbolic_causal_graph(draw_causal_graph=draw_causal_graph)
+        task, domain, ts_curr_vars, ts_state_tuples, ts_lbl_vars, ts_action_vars, boxes, possible_lbls = self.create_symbolic_causal_graph(draw_causal_graph=draw_causal_graph,
+                                                                                                                                           print_facts=True)
 
         sym_tr = PartitionedFrankaTransitionSystem(curr_vars=ts_curr_vars,
                                                    lbl_vars=ts_lbl_vars,
@@ -186,7 +198,8 @@ class FrankaPartitionedWorld(FrankaWorld):
         """
         task, domain, ts_curr_vars, ts_state_tuples, \
              ts_lbl_vars, ts_robot_vars, ts_human_vars, boxes, possible_lbls = self.create_symbolic_causal_graph(draw_causal_graph=draw_causal_graph,
-                                                                                                                 build_human_move=True)
+                                                                                                                 build_human_move=True,
+                                                                                                                 print_facts=True)
         
         sym_tr = DynamicFrankaTransitionSystem(curr_vars=ts_curr_vars,
                                                lbl_vars=ts_lbl_vars,
@@ -223,6 +236,7 @@ class FrankaPartitionedWorld(FrankaWorld):
 
         dfa_curr_state, _dfa = self.create_partitioned_symbolic_dfa_graph(formula=self.formulas[0])
 
+        start = time.time()
         # create TR corresponding to each DFA - dfa name is only used dumping graph 
         dfa_tr = PartitionedDFA(curr_states=dfa_curr_state,
                                 predicate_sym_map_lbl=sym_tr_handle.predicate_sym_map_lbl,
@@ -235,7 +249,9 @@ class FrankaPartitionedWorld(FrankaWorld):
             dfa_tr.create_symbolic_ltlf_transition_system(verbose=self.verbose, plot=self.plot_dfa)
         else:
             raise NotImplementedError()
-        
+        stop = time.time()
+        print("Time for Constructing the LTLF DFA: ", stop - start)
+
         return dfa_tr, dfa_curr_state
     
 

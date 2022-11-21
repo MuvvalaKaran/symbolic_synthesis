@@ -49,6 +49,7 @@ if __name__ == "__main__":
         
         # build the TS and DFA(s)
         gridworld_handle.build_abstraction()
+        print("No. of Boolean Variables in the memory:", cudd_manager.size())
         policy: dict = gridworld_handle.solve(verbose=False)
         gridworld_handle.simulate(action_dict=policy, gridworld_size=GRID_WORLD_SIZE)
 
@@ -89,6 +90,7 @@ if __name__ == "__main__":
 
         # build the abstraction
         frankaworld_handle.build_abstraction()
+        print("No. of Boolean Variables in the memory:", cudd_manager.size())
         policy: dict = frankaworld_handle.solve(verbose=False)
         frankaworld_handle.simulate(action_dict=policy, print_strategy=True)
     
@@ -120,7 +122,9 @@ if __name__ == "__main__":
                                                         plot=False)
         # build the abstraction
         frankapartition_handle.build_abstraction(dynamic_env=TWO_PLAYER_GAME)
+        print("No. of Boolean Variables in the memory:", cudd_manager.size())
         frankapartition_handle.solve(verbose=False)
+
 
     else:
         warnings.warn("Please set atleast one flag to True - FRANKAWORLD or GRIDWORLD!")

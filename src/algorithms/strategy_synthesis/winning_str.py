@@ -255,23 +255,10 @@ class ReachabilityGame(BaseSymbolicSearch):
             # we need to fix the state labeling
             pre_prod_state = pre_prod_state.existAbstract(self.ts_obs_cube)
 
-            # if verbose:
-            #     print(f"Pre states at Iter {layer + 1} before universal Abstraction")
-            #     new_states = pre_prod_state.existAbstract(self.sys_env_cube)
-            #     self.get_prod_states_from_dd(dd_func=new_states)
-
             # do universal quantification
             pre_univ = (pre_prod_state).univAbstract(self.env_cube)
             # add the correct labels back
             pre_univ = pre_univ & self.obs_bdd
-
-            # if verbose:
-            #     print(f"Pre states at Iter {layer + 1} After universal Abstraction")
-            #     new_states = pre_univ.existAbstract(self.sys_env_cube)
-            #     # self.get_prod_states_from_dd(dd_func=new_states)
-            #     # print only the init DFA states
-            #     self.get_prod_states_from_dd(dd_func=(new_states & self.init_DFA))
-                
             
             # remove self loops
             stra_list[layer + 1] |= stra_list[layer] | (~self.winning_states[layer] & pre_univ)
@@ -283,7 +270,6 @@ class ReachabilityGame(BaseSymbolicSearch):
             # print new winning states in each iteration
             if verbose:
                 print(f"Winning states at Iter {layer + 1}")
-                # new_state_acts = stra_list[layer + 1] & ~stra_list[layer]
                 new_states = ~closed & pre_univ.existAbstract(self.sys_env_cube & self.ts_obs_cube)
                 self.get_prod_states_from_dd(dd_func=new_states)
 

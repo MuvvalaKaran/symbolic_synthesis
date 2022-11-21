@@ -61,16 +61,12 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
             iter_count: int = 0
             for state in self.actions:
                 if _pidx == 0  and 'human' in state:
-                    # _node_int_map = {state: boolean_str[index] for index, state in enumerate(['(human-move)', '(no-human-move)'])}
                     _node_int_map[state] =  boolean_str[iter_count]
                     iter_count += 1
                 elif _pidx == 1 and 'human' not in state:
                     _node_int_map[state] =  boolean_str[iter_count]
                     iter_count += 1
 
-            # manually add `no-robot-move` act to the mapping 
-            if _pidx == 1:
-                _node_int_map['(no-robot-move)'] = boolean_str[iter_count]
             assert len(boolean_str) >= len(_node_int_map), "FIX THIS: Looks like there are more Actions than boolean variables!"
 
             # loop over all the boolean strings and convert them respective bdd vars
@@ -128,7 +124,7 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
             if var == 1 and self.manager.bddVar(_idx) in self.sym_vars_curr:
                 _state_idx: int = _idx - self.state_start_idx
                 assert _state_idx >= 0, "Error constructing the Partitioned Transition Relation."
-                # if human intervenes then the edge looks like (no-robot-move) & (human move b# l# l#)
+                # if human intervenes then the edge looks like (robot-action) & (human move b# l# l#)
                 if human_action_name != '':
                     self.tr_state_bdds[_state_idx] |= curr_state_sym & self.predicate_sym_map_robot[robot_action_name] & self.predicate_sym_map_human[human_action_name] 
                 # if human does not intervene then the edge looks like (robot-action) & not(valid human moves)
@@ -218,13 +214,6 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
                 # construct the tuple for next state as per the human action
                 hnext_tuple = list(set(robot_nxt_tuple) - set(del_tuple))
                 hnext_tuple = tuple(sorted(list(set(hnext_tuple + list(add_tuple)))))
-
-                # # add the effects due to the robot's action; robot_conf + 
-                # robot_conf = self.get_conds_from_state(state_tuple=robot_nxt_tuple, only_robot_conf=True)
-                # world_conf = self.get_conds_from_state(state_tuple=robot_nxt_tuple, only_world_conf=True)
-
-                # add the tuples 
-                # next_tuple = set(hnext_tuple) + set(robot_conf)
                 
                 # For transit - if the human's curr loc and the robot's dest loc is the same then do not add to-obj predicate
                 if 'transit' in robot_action_name:

@@ -142,7 +142,7 @@ class SymbolicDijkstraSearch(BaseSymbolicSearch):
             # If unexpanded states exist ... 
             if not open_list[g_layer].isZero():
                 if verbose:
-                    print(f"********************Layer: {g_layer }**************************")
+                    print(f"********************Layer: {g_layer}**************************")
                 # reset the empty bucket counter 
                 empty_bucket_counter = 0
                 # Add states to be expanded next to already expanded states
