@@ -75,7 +75,7 @@ class FrankaPartitionedWorld(FrankaWorld):
             self.ts_human_vars: List[BDD] = ts_human_vars
         
         else:
-            warnings.warn("We haven't implemented a strategy synthesie for single player Partitioned Representation.")
+            warnings.warn("We haven't implemented a strategy synthesis for single player Partitioned Representation.")
             warnings.warn("Use the Monolithic Representation if you want graph search by setting the FRANKWORLD flag to True.")
             raise NotImplementedError()
         
@@ -156,6 +156,7 @@ class FrankaPartitionedWorld(FrankaWorld):
         
         if print_facts:
             print(f"******************# of boolean Vars for TS states: {len(curr_vars)}******************")
+            print(f"******************# of Actions in TS: {len(_causal_graph_instance.task.operators)}******************")
         
         if build_human_move:
             return _causal_graph_instance.task, _causal_graph_instance.problem.domain, curr_vars, \

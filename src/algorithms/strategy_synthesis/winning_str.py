@@ -1,5 +1,6 @@
 import re 
 import sys
+import time
 import random
 
 from functools import reduce
@@ -47,7 +48,8 @@ class ReachabilityGame(BaseSymbolicSearch):
         self.sys_act_vars = sys_act_vars
         self.env_act_vars = env_act_vars
 
-        self.ts_transition_fun_list: List[BDD] = ts_handle.tr_state_bdds
+        # self.ts_transition_fun_list: List[BDD] = ts_handle.tr_state_bdds
+        self.ts_transition_fun_list: List[List[BDD]] = ts_handle.sym_tr_actions
         self.dfa_transition_fun_list: List[BDD] = dfa_handle.tr_state_bdds
 
         self.ts_bdd_sym_to_curr_state_map: bidict = ts_handle.predicate_sym_map_curr.inv
@@ -161,9 +163,11 @@ class ReachabilityGame(BaseSymbolicSearch):
             curr_act_cubes = list(curr_act.generate_cubes())
             # if multiple winning actions exisit from same state
             if len(curr_act_cubes) > 1:
-                act_cube: List[int] = random.choice(curr_act_cubes)
-                act_dd = self.manager.fromLiteralList(act_cube)
-                act_name: str = self.ts_bdd_sym_to_robot_act_map[act_dd]
+                act_name = None
+                while act_name is None:
+                    act_cube: List[int] = random.choice(curr_act_cubes)
+                    act_dd = self.manager.fromLiteralList(act_cube)
+                    act_name: str = self.ts_bdd_sym_to_robot_act_map.get(act_dd, None)
 
             else:
                 act_name: str = self.ts_bdd_sym_to_robot_act_map[curr_act]
@@ -218,7 +222,53 @@ class ReachabilityGame(BaseSymbolicSearch):
             self.get_state_action(state_action & self.init_DFA)
         
         return state_action
+    
+    def get_pre_states(self, layer: int, alg_num: int) -> BDD:
+        """
+         Computes Predecessor States from the current set of states. 
+        """
+        # compute composed predecessor in one step
+        if alg_num == 0:
+            pre_prod_state: BDD = self.winning_states[layer].vectorCompose([*self.ts_x_list, *self.dfa_x_list],
+                                                       [*self.ts_transition_fun_list, *self.dfa_transition_fun_list])
+        # single vector compose
+        elif alg_num == 1:
+            pre_prod_state: BDD = self.manager.bddZero()
+            for ts_transition in self.ts_transition_fun_list:
+                pre_prod_state |= self.winning_states[layer].vectorCompose([*self.ts_x_list, *self.dfa_x_list],
+                                                       [*ts_transition, *self.dfa_transition_fun_list])
+        # two step vector compose
+        elif alg_num == 2:
+            # start = time.time()
+            pre_prod_state: BDD = self.manager.bddZero()
+            tmp = self.manager.bddZero()
+            print("-------------------------------------------------------------------------------")
+            for c, ts_transition in enumerate(self.ts_transition_fun_list):
+                sa = time.time()
+                tmp |= self.winning_states[layer].vectorCompose(self.ts_x_list, ts_transition)
+                so = time.time()
+                print(f"{self.ts_handle.tr_action_idx_map.inv[c]} predecssors: ", so - sa)
+            print("-------------------------------------------------------------------------------")
+            sa = time.time()
+            pre_prod_state |= tmp.vectorCompose(self.dfa_x_list, self.dfa_transition_fun_list)
+            so = time.time()
 
+            # stop = time.time()
+            print(f"Time to Compute DFA Predecessors: {so - sa}")
+        elif alg_num == 3:
+            pre_prod_state: BDD = self.manager.bddZero()
+            for ts_transition in self.ts_transition_fun_list:
+                tmp_list = [*ts_transition, *self.dfa_transition_fun_list]
+                tmp_s = self.winning_states[layer]
+                for count, var  in enumerate([*self.ts_x_list, *self.dfa_x_list]):
+                    if not tmp_list[count].isZero():
+                        tmp_s = tmp_s.compose(tmp_list[count], var.index())
+                    else:
+                        tmp_s = tmp_s.compose(~var, var.index())
+
+                pre_prod_state |= tmp_s
+
+        return pre_prod_state
 
     def solve(self, verbose: bool = False) -> BDD:
         """
@@ -235,6 +285,7 @@ class ReachabilityGame(BaseSymbolicSearch):
             closed |= self.winning_states[layer].existAbstract(self.ts_obs_cube)
 
         while True:
+            loop_start = time.time()
             if layer > 0 and stra_list[layer].compare(stra_list[layer - 1], 2):
                 print(f"**************************Reached a Fixed Point in {layer} layers**************************")
                 if not ((self.init_TS & self.init_DFA) & stra_list[layer]).isZero():
@@ -249,11 +300,22 @@ class ReachabilityGame(BaseSymbolicSearch):
             # if verbose:
             print(f"**************************Layer: {layer}**************************")
 
-            pre_prod_state: BDD = self.winning_states[layer].vectorCompose([*self.ts_x_list, *self.dfa_x_list],
-                                                       [*self.ts_transition_fun_list, *self.dfa_transition_fun_list])
-            
+            start = time.time()
+            pre_prod_state = self.get_pre_states(layer=layer, alg_num=2)
+            # pre_prod_state = self.get_pre_states(layer=layer, alg_num=2)
+
+            # print(f"Pre state are same: {pre_prod_state_3 == pre_prod_state}")
+            # print("**********************************")
+            # pre_prod_state.display()
+            # print("**********************************")
+            # pre_prod_state_3.display()
+
+            stop = time.time()
+            print(f"Time to Compute Predecessors: {stop - start}")
+
             # we need to fix the state labeling
             pre_prod_state = pre_prod_state.existAbstract(self.ts_obs_cube)
+            
 
             # do universal quantification
             pre_univ = (pre_prod_state).univAbstract(self.env_cube)
@@ -263,6 +325,13 @@ class ReachabilityGame(BaseSymbolicSearch):
             # remove self loops
             stra_list[layer + 1] |= stra_list[layer] | (~self.winning_states[layer] & pre_univ)
             
+
+            # if init state is reached
+            if not ((self.init_TS & self.init_DFA) & stra_list[layer + 1]).isZero():
+                print("A Winning Strategy Exists!!")
+                # winning_str: BDD = self.get_strategy(transducer=stra_list[layer], verbose=True)
+
+                return stra_list[layer + 1]
 
             # do existentail quantification
             self.winning_states[layer + 1] |=  stra_list[layer + 1].existAbstract(self.sys_cube)
@@ -276,4 +345,6 @@ class ReachabilityGame(BaseSymbolicSearch):
                 closed |= pre_univ.existAbstract(self.sys_env_cube & self.ts_obs_cube)
 
             layer +=1
+            loop_stop = time.time()
+            print(f"Time to Complete One lop: {loop_stop - loop_start}")
 
