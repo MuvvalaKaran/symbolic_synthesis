@@ -90,12 +90,13 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
         
         # initiate BDDs for all the action 
         action_idx_map = bidict()
-        _actions = self.actions
+        # _actions = self.actions
+        _actions = ['transit', 'transfer', 'grasp', 'release', 'human-move']
         for _idx, _action in enumerate(_actions):
             action_idx_map[_action] = _idx
         
         self.tr_action_idx_map = action_idx_map
-        self.sym_tr_actions = [[self.manager.bddZero() for _ in range(len(self.sym_vars_curr))] for _ in range(len(self.actions))]
+        self.sym_tr_actions = [[self.manager.bddZero() for _ in range(len(self.sym_vars_curr))] for _ in range(len(_actions))]
         
     
 
@@ -126,9 +127,18 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
             sys.exit(-1)
 
         if human_action_name != '':
-            _tr_idx = self.tr_action_idx_map.get(human_action_name)
+            # _tr_idx = self.tr_action_idx_map.get(human_action_name)
+            _tr_idx = 4
         else:
-            _tr_idx = self.tr_action_idx_map.get(robot_action_name)
+            if 'transit' in robot_action_name:
+                _tr_idx = 0
+            elif 'transfer':
+                _tr_idx = 1
+            elif 'grasp':
+                _tr_idx = 2
+            elif 'release':
+                _tr_idx = 3
+            # _tr_idx = self.tr_action_idx_map.get(robot_action_name)
 
         curr_state_sym: BDD = self.predicate_sym_map_curr[curr_state_tuple]
         nxt_state_sym: BDD = self.predicate_sym_map_curr[next_state_tuple]

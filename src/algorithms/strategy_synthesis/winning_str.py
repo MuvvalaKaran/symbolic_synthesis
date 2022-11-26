@@ -160,13 +160,18 @@ class ReachabilityGame(BaseSymbolicSearch):
             curr_state_act: BDD =  transducer & curr_prod_state
             curr_act: BDD = curr_state_act.existAbstract(self.prod_xcube & self.ts_obs_cube)
 
-            curr_act_cubes = list(curr_act.generate_cubes())
+            # curr_act_cubes = list(curr_act.generate_cubes())
+            curr_act_cubes = self.convert_prod_cube_to_func(dd_func=curr_act, prod_curr_list=self.sys_act_vars)
+
+
             # if multiple winning actions exisit from same state
             if len(curr_act_cubes) > 1:
                 act_name = None
                 while act_name is None:
-                    act_cube: List[int] = random.choice(curr_act_cubes)
-                    act_dd = self.manager.fromLiteralList(act_cube)
+                    # act_cube: List[int] = random.choice(curr_act_cubes)
+                    # act_dd = self.manager.fromLiteralList(act_cube)
+                    # using my cube generating function
+                    act_dd: List[int] = random.choice(curr_act_cubes)
                     act_name: str = self.ts_bdd_sym_to_robot_act_map.get(act_dd, None)
 
             else:
@@ -213,9 +218,22 @@ class ReachabilityGame(BaseSymbolicSearch):
         """
          A function that compute the action to take from each state from the transducer. 
         """
-        strategy: BDD = transducer.solveEqn(self.sys_act_vars)
-        state_action = strategy[0].vectorCompose(self.sys_act_vars, strategy[1])
+        consist, strategy = transducer.solveEqn(self.sys_act_vars)
+        # return strategy[0]
+        # print("Particular solution:")
+        # testing
+        for g in strategy:
+            p = g
+            for u in self.sys_act_vars:
+                p = p.compose(self.manager.bddOne(), u.index())
+            # for u in y:
+            #     p = p.compose(m.bddOne(), u.index())
+            return p
+            break 
+            # p.display()
+            # print(p)
 
+        # state_action = strategy[0].vectorCompose(self.sys_act_vars, strategy[1])
 
         # restrict the strategy to non accpeting state, as we don not care what the Roboto after it reaches an accepting state
         if verbose:
@@ -290,7 +308,7 @@ class ReachabilityGame(BaseSymbolicSearch):
                 print(f"**************************Reached a Fixed Point in {layer} layers**************************")
                 if not ((self.init_TS & self.init_DFA) & stra_list[layer]).isZero():
                     print("A Winning Strategy Exists!!")
-                    # winning_str: BDD = self.get_strategy(transducer=stra_list[layer], verbose=True)
+                    winning_str: BDD = self.get_strategy(transducer=stra_list[layer], verbose=True)
 
                     return stra_list[layer]
                 else:
@@ -329,9 +347,10 @@ class ReachabilityGame(BaseSymbolicSearch):
             # if init state is reached
             if not ((self.init_TS & self.init_DFA) & stra_list[layer + 1]).isZero():
                 print("A Winning Strategy Exists!!")
-                # winning_str: BDD = self.get_strategy(transducer=stra_list[layer], verbose=True)
+                winning_str: BDD = self.get_strategy(transducer=stra_list[layer], verbose=True)
 
-                return stra_list[layer + 1]
+                return winning_str
+                # return stra_list[layer + 1]
 
             # do existentail quantification
             self.winning_states[layer + 1] |=  stra_list[layer + 1].existAbstract(self.sys_cube)

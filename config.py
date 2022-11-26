@@ -16,7 +16,7 @@ USE_LTLF: bool = True # Construct DFA from LTLf
 
 DRAW_EXPLICIT_CAUSAL_GRAPH: bool = False
 SIMULATE_STRATEGY: bool = True
-GRID_WORLD_SIZE: int = 5
+GRID_WORLD_SIZE: int = 20
 OBSTACLE: bool = False  # flag to load the obstacle gridworld and color the gridworld accordingly
 DYNAMIC_VAR_ORDERING: bool = False
 
@@ -29,18 +29,22 @@ DYNAMIC_VAR_ORDERING: bool = False
 # formulas = ['F(p00 & p12 & p21 & free) & G((~p00 | ~p21) -> (~p12))']
 
 
-formulas = ['F(p01 & free & F(p12 & free & F(p23 & free & F(p34 & free))))']
+# formulas = ['F(p01 & free & F(p12 & free & F(p23 & free & F(p34 & free))))']
 # formulas = ['F(p01 & free & F(p12 & free & F(p23 & free)))']
 # formulas = ['(F((p01 & free)) & F((p12 & free)) & F((p23 & free)) & F((p34 & free)))']
 
 
-# formulas = [
-#             # 'F((p01 & p20 & free))',
-#             'F(p20 & free & F(p01 & free))',
-#             # 'F((p12 & free))', 
-#             # 'F((p23 & free))',
-#             # 'F((p34 & free))'
-#             ]
+formulas = [
+            # 'F((p01 & p20 & free))',
+            # 'F(p20 & free & F(p01 & free))',
+            'F(p20 & !p01 & free & F(p01 & free))',   # interesting behavior when you have excalty 3 locs in the robot region
+            # 'F((p12 & free))', 
+            # 'F((p23 & free))',
+            # 'F((p34 & free))'
+            ]
+
+# simple one box formula
+# formulas = ['F(p01 & free)']
 
 # formulas = ['(F((p01 & free)) & F((p12 & free)) & F((p23 & free)) & F((p34 & free)))',
 #             '(F((p12 & free)) & F((p23 & free)) & F((p34 & free)) & F((p01 & free)))', 
@@ -115,13 +119,13 @@ formulas = ['F(p01 & free & F(p12 & free & F(p23 & free & F(p34 & free))))']
 #             "F(l96 & F(l5) & F(l50))",
 #             "F(l97 & F(l4) & F(l40))",
 #             "F(l98 & F(l3) & F(l30))",
-#             # "F(l99 & F(l2) & F(l20))", # from here onwards formulas are just for stress testing
-#             # "F(l81 & F(l18) & F(l79))",   # 976,562,500
-#             # "F(l82 & F(l17) & F(l69))",   # 4,882,812,500
-#             # "F(l83 & F(l16) & F(l59))",   # 24,414,062,500   ~10sec for A*
-#             # "F(l84 & F(l15) & F(l49))",   # 122,070,312,500  ~20sec for A*
-#             # "F(l85 & F(l14) & F(l39))",   # 610,351,562,500  ~80sec for A*   - Dijkstras algorithm broke here 
-#             # "F(l86 & F(l13) & F(l29))",   # 3.0517578e+12    ~ 250sec for A*
+#             "F(l99 & F(l2) & F(l20))", # from here onwards formulas are just for stress testing
+#             "F(l81 & F(l18) & F(l79))",   # 976,562,500
+#             "F(l82 & F(l17) & F(l69))",   # 4,882,812,500
+#             "F(l83 & F(l16) & F(l59))",   # 24,414,062,500   ~10sec for A*
+#             "F(l84 & F(l15) & F(l49))",   # 122,070,312,500  ~20sec for A*
+#             "F(l85 & F(l14) & F(l39))",   # 610,351,562,500  ~80sec for A*   - Dijkstras algorithm broke here 
+#             "F(l86 & F(l13) & F(l29))",   # 3.0517578e+12    ~ 250sec for A*
 #             # "F(l87 & F(l12) & F(l19))",
 #             # "F(l88 & F(l11) & F(l))",
 #             ]
