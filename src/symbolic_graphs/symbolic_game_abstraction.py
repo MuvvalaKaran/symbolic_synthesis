@@ -53,7 +53,6 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
           human vars (i / input vairables/uncontrollable vars), respectively. 
         """
         for _pidx, var in enumerate([self.sym_vars_human, self.sym_vars_robot]):
-        
             # create all combinations of 1-true and 0-false
             boolean_str = list(product([1, 0], repeat=len(var)))
             _node_int_map =  {}
@@ -283,8 +282,6 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
                                         **kwargs):
         """
          This method overrides the parent method. For every robot action, we loop over all the human actions.
-
-
         """
         
         if verbose:
@@ -419,3 +416,76 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
         
         if kwargs['print_tr'] is True:
             self._print_plot_tr(plot=plot)
+
+    
+
+class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
+    """
+     A class that constructs symbolic Two-player Transition Relation with bounded Human interventions
+    """
+
+    def __init__(self,
+                 curr_vars: list,
+                 lbl_vars: list,
+                 human_int_vars: list,
+                 robot_action_vars: list,
+                 human_action_vars: list,
+                 task, domain,
+                 ts_state_map: dict,
+                 ts_states: list,
+                 max_human_int: int,
+                 manager: Cudd):
+        super().__init__(curr_vars, lbl_vars, robot_action_vars, human_action_vars, task, domain, ts_state_map, ts_states, manager)
+        self.sym_var_hint: List[BDD] = human_int_vars
+        self.max_hint: int = max_human_int
+
+        self.predicate_sym_map_hint: bidict = {}
+
+        self._initialize_bdd_for_human_int()
+
+
+    def _initialize_bdd_for_human_int(self):
+        """
+         This function initialized bdd the represent the number of human interventions left at each state. 
+        """
+        # create all combinations of 1-true and 0-false
+        boolean_str = list(product([1, 0], repeat=len(self.sym_var_hint)))
+        _node_int_map = bidict({_hint: boolean_str[_hint] for _hint in range(self.max_hint)})
+
+        assert len(boolean_str) >= len(_node_int_map), \
+             "FIX THIS: Looks like there are more human interventions than it's corresponding boolean variables!"
+        
+        # loop over all the boolean strings and convert them respective bdd vars
+        for _key, _value in _node_int_map.items():
+            _val_list = []
+            for _idx, _ele in enumerate(_value):
+                if _ele == 1:
+                    _val_list.append(self.sym_var_hint[_idx])
+                else:
+                    _val_list.append(~self.sym_var_hint[_idx])
+            
+            _bool_func_curr = reduce(lambda a, b: a & b, _val_list)
+
+            # update bidict accordingly
+            _node_int_map[_key] = _bool_func_curr
+        
+        self.predicate_sym_map_hint = bidict(_node_int_map)
+
+
+    def add_edge_to_action_tr(self,
+                              robot_action_name: str,
+                              curr_state_tuple: tuple,
+                              next_state_tuple: tuple,
+                              human_action_name: str = '',
+                              valid_hact_list: List[str] = None) -> None:
+        raise NotImplementedError
+
+
+    def create_transition_system_franka(self,
+                                        boxes: List[str],
+                                        state_lbls: list,
+                                        add_exist_constr: bool = True,
+                                        verbose: bool = False,
+                                        plot: bool = False,
+                                        **kwargs):
+        raise NotImplementedError

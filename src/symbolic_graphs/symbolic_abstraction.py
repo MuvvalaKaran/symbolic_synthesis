@@ -348,7 +348,6 @@ class SymbolicFrankaTransitionSystem():
             _next_val_list = []
             for _idx, _ele in enumerate(_value):
                 if _ele == 1:
-                    # _bool_func = _bool_fun & self.sym_vars_curr[_idx]
                     _curr_val_list.append(self.sym_vars_curr[_idx])
                     _next_val_list.append(self.sym_vars_next[_idx])
                 else:

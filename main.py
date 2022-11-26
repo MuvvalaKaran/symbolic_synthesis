@@ -54,7 +54,7 @@ if __name__ == "__main__":
         gridworld_handle.simulate(action_dict=policy, gridworld_size=GRID_WORLD_SIZE)
 
     elif FRANKAWORLD:
-        #Franka World files 
+        # Franka World files 
         domain_file_path = PROJECT_ROOT + "/pddl_files/simple_franka_world/domain.pddl"
         problem_file_path = PROJECT_ROOT + "/pddl_files/simple_franka_world/problem.pddl"
 
@@ -95,11 +95,17 @@ if __name__ == "__main__":
         frankaworld_handle.simulate(action_dict=policy, print_strategy=True)
     
     elif STRATEGY_SYNTHESIS:
-        #Franka World files 
+        # Franka World files 
         if TWO_PLAYER_GAME:
             domain_file_path = PROJECT_ROOT + "/pddl_files/dynamic_franka_world/domain.pddl"
             problem_file_path = PROJECT_ROOT + "/pddl_files/dynamic_franka_world/problem.pddl"
         
+        elif TWO_PLAYER_GAME_BND:
+            domain_file_path = PROJECT_ROOT + "/pddl_files/bounded_dynamic_franka_world/domain.pddl"
+            problem_file_path = PROJECT_ROOT + "/pddl_files/bounded_dynamic_franka_world/problem.pddl"
+
+            assert HUMAN_INT_BND >= 0, "Please make sure you enter a non-negative number of human interventions."
+
         else:
             domain_file_path = PROJECT_ROOT + "/pddl_files/simple_franka_world/domain.pddl"
             problem_file_path = PROJECT_ROOT + "/pddl_files/simple_franka_world/problem.pddl"
@@ -120,8 +126,14 @@ if __name__ == "__main__":
                                                         plot_ts=False,
                                                         plot_obs=False,
                                                         plot=False)
+        
+        assert TWO_PLAYER_GAME is not TWO_PLAYER_GAME_BND, "PLease set only one flag to True - BND_TWO_PLAYER_GAME or TWO_PLAYER_GAME!"
+
         # build the abstraction
-        frankapartition_handle.build_abstraction(dynamic_env=TWO_PLAYER_GAME)
+        frankapartition_handle.build_abstraction(dynamic_env=TWO_PLAYER_GAME,
+                                                 bnd_dynamic_env=TWO_PLAYER_GAME_BND,
+                                                 max_human_int=HUMAN_INT_BND)
+                                                 
         print("No. of Boolean Variables in the memory:", cudd_manager.size())
         frankapartition_handle.solve(verbose=False)
 
