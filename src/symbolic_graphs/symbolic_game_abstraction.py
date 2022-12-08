@@ -576,7 +576,10 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
         # get the state lbls and create state and state lbl mappinng
         state_lbl = self.get_conds_from_state(state_tuple=self.predicate_sym_map_curr.inv[init_state_sym], only_world_conf=True)
         init_lbl_sym = self.get_sym_state_lbl_from_tuple(state_lbl)
-        init_hint = self.predicate_sym_map_hint[self.max_hint - 1]
+        init_hint: BDD = self.predicate_sym_map_hint[self.max_hint - 1]
+
+        # update the init state with hint
+        self.sym_init_states = self.sym_init_states & init_hint
         
         # each states consists of boolean Vars corresponding to: S, LBL; K
         self.sym_state_labels |= init_state_sym & init_lbl_sym

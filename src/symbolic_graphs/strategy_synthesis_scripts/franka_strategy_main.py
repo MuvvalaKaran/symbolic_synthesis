@@ -12,7 +12,7 @@ from cudd import Cudd, BDD, ADD
 
 from src.explicit_graphs import CausalGraph
 
-from src.algorithms.strategy_synthesis import ReachabilityGame
+from src.algorithms.strategy_synthesis import ReachabilityGame, BndReachabilityGame
 
 from src.symbolic_graphs import PartitionedDFA
 from src.symbolic_graphs import PartitionedFrankaTransitionSystem, DynamicFrankaTransitionSystem, BndDynamicFrankaTransitionSystem
@@ -62,7 +62,7 @@ class FrankaPartitionedWorld(FrankaWorld):
                                                                                                                          max_human_int=max_human_int)
             else:
                 sym_tr, ts_curr_vars, ts_action_vars, ts_lbl_vars = self.build_bdd_abstraction(draw_causal_graph=draw_causal_graph)
-
+            
             dfa_tr, dfa_curr_state = self.build_bdd_symbolic_dfa(sym_tr_handle=sym_tr)
         
         else:
@@ -75,12 +75,15 @@ class FrankaPartitionedWorld(FrankaWorld):
         self.dfa_x_list: List[BDD] = dfa_curr_state
         self.ts_obs_list: List[BDD] = ts_lbl_vars
 
-        if dynamic_env:
+        if dynamic_env or bnd_dynamic_env:
             self.ts_robot_vars: List[BDD] = ts_robot_vars
             self.ts_human_vars: List[BDD] = ts_human_vars
-        
+        # elif bnd_dynamic_env:
+        #     self.ts_robot_vars: List[BDD] = ts_robot_vars
+        #     self.ts_human_vars: List[BDD] = ts_human_vars
+        #     # self.ts_hint_vars: List[BDD] = ts_
         else:
-            warnings.warn("We haven't implemented a strategy synthesie for single player Partitioned Representation.")
+            warnings.warn("We haven't implemented a strategy synthesis for single player Partitioned Representation.")
             warnings.warn("Use the Monolithic Representation if you want graph search by setting the FRANKAWORLD flag to True.")
             raise NotImplementedError()
         
@@ -226,11 +229,11 @@ class FrankaPartitionedWorld(FrankaWorld):
         
         stop: float = time.time()
         print("Time took for constructing the abstraction: ", stop - start)
-        
+        sys.exit(-1)
         return sym_tr, ts_curr_vars, ts_robot_vars, ts_human_vars, ts_lbl_vars
     
 
-    def build_bdd_bnd_abstraction_dynamic(self, max_human_int: int, draw_causal_graph: bool = False) -> Tuple[BndDynamicFrankaTransitionSystem, List[BDD], List[BDD], List[BDD], List[BDD]]:
+    def build_bdd_bnd_abstraction_dynamic(self, max_human_int: int, draw_causal_graph: bool = False, print_facts: bool = True) -> Tuple[BndDynamicFrankaTransitionSystem, List[BDD], List[BDD], List[BDD], List[BDD]]:
         """
          Main function to Build Two-player Game without edge weights and with bounded human intervention.
           The # of remainig Human interventions is added as a counter to each state.
@@ -238,11 +241,14 @@ class FrankaPartitionedWorld(FrankaWorld):
         task, domain, ts_curr_vars, ts_state_tuples, \
              ts_lbl_vars, ts_robot_vars, ts_human_vars, boxes, possible_lbls = self.create_symbolic_causal_graph(draw_causal_graph=draw_causal_graph,
                                                                                                                  build_human_move=True,
-                                                                                                                 print_facts=True)
+                                                                                                                 print_facts=print_facts)
         # we create human intervention boolean vars right  after the state vars 
         ts_hint_vars = self._create_symbolic_lbl_vars(state_lbls=list(range(max_human_int + 1)),
                                                       state_var_name='k',
                                                       add_flag=False)
+
+        if print_facts:
+            print(f"******************# of boolean Vars for Human Interventions: {len(ts_hint_vars)}******************")
         
         sym_tr = BndDynamicFrankaTransitionSystem(curr_vars=ts_curr_vars,
                                                   lbl_vars=ts_lbl_vars,
@@ -266,7 +272,7 @@ class FrankaPartitionedWorld(FrankaWorld):
         
         stop: float = time.time()
         print("Time took for constructing the abstraction: ", stop - start)
-        
+
         return sym_tr, ts_curr_vars, ts_robot_vars, ts_human_vars, ts_lbl_vars
     
 
@@ -276,7 +282,7 @@ class FrankaPartitionedWorld(FrankaWorld):
          This function constructs the DFA in a partitioned fashion. We do not need two sets of variables to construct the transition relations.
         """
         if len(self.formulas) > 1:
-            warnings.warn("Trying to construt Partitioned DFA representation for multiple Formulas. This functionality only works for Monolithic represrntation.")
+            warnings.warn("Trying to construt Partitioned DFA representation for multiple Formulas. This functionality only works for Monolithic representation.")
             sys.exit(-1)
 
         dfa_curr_state, _dfa = self.create_partitioned_symbolic_dfa_graph(formula=self.formulas[0])
@@ -318,14 +324,25 @@ class FrankaPartitionedWorld(FrankaWorld):
          A function that call the winning strategy synthesis code and compute the set of winnign states and winning strategy for robot. 
         """
         start = time.time()
-        reachability_handle =  ReachabilityGame(ts_handle=self.ts_handle,
-                                                 dfa_handle=self.dfa_handle,
-                                                 ts_curr_vars=self.ts_x_list,
-                                                 dfa_curr_vars=self.dfa_x_list,
-                                                 ts_obs_vars=self.ts_obs_list,
-                                                 sys_act_vars=self.ts_robot_vars,
-                                                 env_act_vars=self.ts_human_vars,
-                                                 cudd_manager=self.manager)
+        if isinstance(self.ts_handle, BndDynamicFrankaTransitionSystem):
+            reachability_handle =  BndReachabilityGame(ts_handle=self.ts_handle,
+                                                    dfa_handle=self.dfa_handle,
+                                                    ts_curr_vars=self.ts_x_list,
+                                                    dfa_curr_vars=self.dfa_x_list,
+                                                    ts_obs_vars=self.ts_obs_list,
+                                                    sys_act_vars=self.ts_robot_vars,
+                                                    env_act_vars=self.ts_human_vars,
+                                                    cudd_manager=self.manager)
+        
+        else:
+            reachability_handle =  ReachabilityGame(ts_handle=self.ts_handle,
+                                                    dfa_handle=self.dfa_handle,
+                                                    ts_curr_vars=self.ts_x_list,
+                                                    dfa_curr_vars=self.dfa_x_list,
+                                                    ts_obs_vars=self.ts_obs_list,
+                                                    sys_act_vars=self.ts_robot_vars,
+                                                    env_act_vars=self.ts_human_vars,
+                                                    cudd_manager=self.manager)
 
         win_str: BDD = reachability_handle.solve(verbose=verbose)
         stop = time.time()

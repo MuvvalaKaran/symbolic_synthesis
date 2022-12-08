@@ -4,16 +4,17 @@ import random
 
 from functools import reduce
 from collections import defaultdict
-from typing import List, DefaultDict
+from typing import List, DefaultDict, Union
 from bidict import bidict
 
 from cudd import Cudd, BDD
 
 from src.algorithms.base import BaseSymbolicSearch
 from src.symbolic_graphs import PartitionedDFA
-from src.symbolic_graphs import DynamicFrankaTransitionSystem
+from src.symbolic_graphs import DynamicFrankaTransitionSystem, BndDynamicFrankaTransitionSystem
 
 from utls import *
+
 
 class ReachabilityGame(BaseSymbolicSearch):
     """
@@ -28,7 +29,7 @@ class ReachabilityGame(BaseSymbolicSearch):
     """
 
     def __init__(self,
-                 ts_handle: DynamicFrankaTransitionSystem,
+                 ts_handle: Union[DynamicFrankaTransitionSystem, BndDynamicFrankaTransitionSystem],
                  dfa_handle: PartitionedDFA,
                  ts_curr_vars: List[BDD],
                  dfa_curr_vars: List[BDD],
@@ -65,19 +66,26 @@ class ReachabilityGame(BaseSymbolicSearch):
         self.winning_states: DefaultDict[int, BDD] = defaultdict(lambda: self.manager.bddZero())
 
         # create corresponding cubes to avoid repetition
-        self.ts_xcube = reduce(lambda x, y: x & y, self.ts_x_list)
-        self.dfa_xcube = reduce(lambda x, y: x & y, self.dfa_x_list)
-        self.ts_obs_cube = reduce(lambda x, y: x & y, self.ts_obs_list)
+        self.ts_xcube: BDD = reduce(lambda x, y: x & y, self.ts_x_list)
+        self.dfa_xcube: BDD = reduce(lambda x, y: x & y, self.dfa_x_list)
+        self.ts_obs_cube: BDD = reduce(lambda x, y: x & y, self.ts_obs_list)
 
-        self.sys_cube = reduce(lambda x, y: x & y, self.sys_act_vars)
-        self.env_cube = reduce(lambda x, y: x & y, self.env_act_vars)
+        self.sys_cube: BDD = reduce(lambda x, y: x & y, self.sys_act_vars)
+        self.env_cube: BDD = reduce(lambda x, y: x & y, self.env_act_vars)
 
         # create ts and dfa combines cube
-        self.prod_xlist = self.ts_x_list + self.dfa_x_list
-        self.prod_xcube = reduce(lambda x, y: x & y, self.prod_xlist)
+        self.prod_xlist: list = self.ts_x_list + self.dfa_x_list
+        self.prod_xcube: BDD = reduce(lambda x, y: x & y, self.prod_xlist)
 
         # sys and env cube
         self.sys_env_cube = reduce(lambda x, y: x & y, [*self.sys_act_vars, *self.env_act_vars])
+
+        # for bounded Game abstraction with addition boolean vars for # remaining human interventions
+        if isinstance(self.ts_handle, BndDynamicFrankaTransitionSystem):
+            self.max_hint: int = self.ts_handle.max_hint - 1
+            self.hint_cube: BDD = reduce(lambda x, y: x & y, self.ts_handle.sym_vars_hint)
+            self.hint_list = self.ts_handle.sym_vars_hint
+            self.ts_bdd_sym_to_hint_map: bidict = self.ts_handle.predicate_sym_map_hint.inv
 
         self._initialize_w_t()
     
@@ -123,12 +131,15 @@ class ReachabilityGame(BaseSymbolicSearch):
 
 
     # overriding base class
-    def get_prod_states_from_dd(self, dd_func: BDD, obs_flag: bool = False, **kwargs) -> None:
+    def get_prod_states_from_dd(self, dd_func: BDD, obs_flag: bool = False, prod_curr_list: list = None, **kwargs) -> None:
         """
          This base class overrides the base method by return the Actual state name using the
           pred int map dictionary rather than the state tuple. 
         """
-        prod_cube_string: List[BDD] = self.convert_prod_cube_to_func(dd_func=dd_func)
+        if prod_curr_list is None:
+            prod_cube_string: List[BDD] = self.convert_prod_cube_to_func(dd_func=dd_func)
+        else:
+            prod_cube_string: List[BDD] = self.convert_prod_cube_to_func(dd_func=dd_func, prod_curr_list=prod_curr_list) 
         for prod_cube in prod_cube_string:
             _ts_dd = prod_cube.existAbstract(self.dfa_xcube & self.ts_obs_cube)
             _ts_tuple = self.ts_bdd_sym_to_curr_state_map.get(_ts_dd)
@@ -263,6 +274,19 @@ class ReachabilityGame(BaseSymbolicSearch):
             # remove self loops
             stra_list[layer + 1] |= stra_list[layer] | (~self.winning_states[layer] & pre_univ)
             
+            # if init state is reached
+            if not ((self.init_TS & self.init_DFA) & stra_list[layer + 1]).isZero():
+                print("A Winning Strategy Exists!!")
+                # winning_str: BDD = self.get_strategy(transducer=stra_list[layer], verbose=True)
+
+                # return winning_str
+                if verbose:
+                    print(f"Winning states at Iter {layer + 1}")
+                    new_states = ~closed & pre_univ.existAbstract(self.sys_env_cube & self.ts_obs_cube)
+                    self.get_prod_states_from_dd(dd_func=new_states)
+
+                    closed |= pre_univ.existAbstract(self.sys_env_cube & self.ts_obs_cube)
+                return stra_list[layer + 1]
 
             # do existentail quantification
             self.winning_states[layer + 1] |=  stra_list[layer + 1].existAbstract(self.sys_cube)
@@ -277,3 +301,121 @@ class ReachabilityGame(BaseSymbolicSearch):
 
             layer +=1
 
+
+class BndReachabilityGame(ReachabilityGame):
+    """
+     Compute the Winning strategy for Game Abstraction with bounded human intervention encounded as counter to each Node. 
+    """
+
+    def __init__(self,
+                 ts_handle: Union[DynamicFrankaTransitionSystem, BndDynamicFrankaTransitionSystem],
+                 dfa_handle: PartitionedDFA,
+                 ts_curr_vars: List[BDD],
+                 dfa_curr_vars: List[BDD],
+                 ts_obs_vars: List[BDD],
+                 sys_act_vars: List[BDD],
+                 env_act_vars: List[BDD],
+                 cudd_manager: Cudd):
+        super().__init__(ts_handle,
+                         dfa_handle,
+                         ts_curr_vars,
+                         dfa_curr_vars,
+                         ts_obs_vars,
+                         sys_act_vars,
+                         env_act_vars,
+                         cudd_manager)
+    
+    def get_prod_states_from_dd(self, dd_func: BDD, obs_flag: bool = False, **kwargs) -> None:
+        """
+         This base class overrides the base method by return the Actual state name using the
+          pred int map dictionary rather than the state tuple. 
+        """
+
+        prod_curr_list=self.ts_x_list + self.dfa_x_list + self.hint_list
+        prod_cube_string: List[BDD] = self.convert_prod_cube_to_func(dd_func=dd_func, prod_curr_list=prod_curr_list) 
+        for prod_cube in prod_cube_string:
+            _ts_dd = prod_cube.existAbstract(self.dfa_xcube & self.ts_obs_cube & self.hint_cube)
+            _ts_tuple = self.ts_bdd_sym_to_curr_state_map.get(_ts_dd)
+            _ts_name = self.ts_handle.get_state_from_tuple(state_tuple=_ts_tuple)
+            assert _ts_name is not None, "Couldn't convert TS Cube to its corresponding State. FIX THIS!!!"
+
+            _dfa_name = self._look_up_dfa_name(prod_dd=prod_cube.existAbstract(self.hint_cube),
+                                               dfa_dict=self.dfa_bdd_sym_to_curr_state_map,
+                                               ADD_flag=False,
+                                               **kwargs)
+            
+            _ts_hint_dd = prod_cube.existAbstract(self.dfa_xcube & self.ts_obs_cube & self.ts_xcube)
+            _ts_hint: int = self.ts_bdd_sym_to_hint_map.get(_ts_hint_dd)
+            
+            print(f"([{_ts_name},{_ts_hint}], {_dfa_name})")
+
+    def roll_out_strategy(self,
+                          transducer: BDD,
+                          verbose: bool = False) -> None:
+        """
+         A function to roll out the synthesize winning strategy
+        """
+
+        curr_dfa_state = self.init_DFA
+        curr_prod_state = self.init_TS & curr_dfa_state & self.obs_bdd
+        # curr_hint = self.init_TS.existAbstract(self.ts_xcube)
+        counter = 0
+
+        # until you reach a goal state. . .
+        while (self.target_DFA & curr_prod_state).isZero():
+            # get the next action
+            curr_state_act: BDD =  transducer & curr_prod_state
+            curr_act: BDD = curr_state_act.existAbstract(self.prod_xcube & self.ts_obs_cube & self.hint_cube)
+
+            # curr_act_cubes = list(curr_act.generate_cubes())
+            curr_act_cubes = self.convert_prod_cube_to_func(dd_func=curr_act, prod_curr_list=self.sys_act_vars)
+
+
+            # if multiple winning actions exisit from same state
+            if len(curr_act_cubes) > 1:
+                act_name = None
+                while act_name is None:
+                    # act_cube: List[int] = random.choice(curr_act_cubes)
+                    # act_dd = self.manager.fromLiteralList(act_cube)
+                    # act_name: str = self.ts_bdd_sym_to_robot_act_map[act_dd]
+                    act_dd: List[int] = random.choice(curr_act_cubes)
+                    act_name: str = self.ts_bdd_sym_to_robot_act_map.get(act_dd, None)
+
+            else:
+                act_name: str = self.ts_bdd_sym_to_robot_act_map[curr_act]
+
+            if verbose:
+                print(f"Step {counter}: {act_name}")
+            
+            # current state tuple
+            curr_ts_state: BDD = curr_prod_state.existAbstract(self.dfa_xcube & self.ts_obs_cube & self.sys_env_cube & self.hint_cube)
+            curr_ts_tuple: tuple = self.ts_bdd_sym_to_curr_state_map[curr_ts_state]
+
+            # get add and del tuples
+            for op in self.ts_handle.task.operators:
+                if op.name == act_name:
+                    add_tuple = self.ts_handle.get_tuple_from_state(op.add_effects)
+                    del_tuple = self.ts_handle.get_tuple_from_state(op.del_effects)
+                    break
+
+            # construct the tuple for next state
+            next_tuple = list(set(curr_ts_tuple) - set(del_tuple))
+            next_tuple = tuple(sorted(list(set(next_tuple + list(add_tuple)))))
+
+            # look up its corresponding formula
+            curr_ts_state: BDD = self.ts_bdd_sym_to_curr_state_map.inv[next_tuple]
+
+            curr_ts_lbl = curr_ts_state & self.obs_bdd
+            # create DFA edge and check if it satisfies any of the dges or not
+            for dfa_state in self.dfa_bdd_sym_to_curr_state_map.keys():
+                dfa_pre = dfa_state.vectorCompose(self.dfa_x_list, self.dfa_transition_fun_list)
+                edge_exists: bool = not (dfa_pre & (curr_dfa_state & curr_ts_lbl)).isZero()
+
+                if edge_exists:
+                    curr_dfa_state = dfa_state
+                    break 
+
+            # curr_prod_state = curr_ts_state & self.init_DFA
+            curr_prod_state = curr_ts_state & curr_dfa_state
+
+            counter += 1
