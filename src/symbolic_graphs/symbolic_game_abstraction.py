@@ -320,9 +320,9 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
         # get the state lbls and create state and state lbl mappinng
         state_lbl = self.get_conds_from_state(state_tuple=self.predicate_sym_map_curr.inv[init_state_sym], only_world_conf=True)
         init_lbl_sym = self.get_sym_state_lbl_from_tuple(state_lbl)
-
+        
         self.sym_state_labels |= init_state_sym & init_lbl_sym
-
+        
         layer = 0
 
         # no need to check if other boxes are placed at the destination loc during transfer and release as there is only one object
@@ -465,6 +465,14 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
 
         self._initialize_bdd_for_human_int()
 
+        # store the bdd associated with each state vars in this list. The index corresonds to its number
+        self.tr_state_bdds = [self.manager.bddZero() for _ in range(len(self.sym_vars_curr) + len(self.sym_vars_hint))]
+
+        # create adj map. Useful when rolling out strategy with human intervention for sanity checking
+        self.adj_map = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda : {'h': [], 'r': []})))
+        # edge counter
+        self.ecount = 0
+
 
     def _initialize_bdd_for_human_int(self):
         """
@@ -507,7 +515,7 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
             # if there are any valid human edges from curr state
             if len(valid_hact_list) > 0:
                 valid_hact: List[BDD] = [self.predicate_sym_map_human[ha] for ha in valid_hact_list]
-                no_human_move: BDD = ~(reduce(lambda x, y: x & y, valid_hact))
+                no_human_move: BDD = ~(reduce(lambda x, y: x | y, valid_hact))
             else:
                 no_human_move: BDD = self.manager.bddOne()
 
@@ -519,15 +527,39 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
         curr_state_sym: BDD = self.predicate_sym_map_curr[curr_state_tuple]
         nxt_state_sym: BDD = self.predicate_sym_map_curr[next_state_tuple]
 
+        if human_action_name != '':
+            nxt_state_sym = nxt_state_sym & self.predicate_sym_map_hint[curr_hint - 1]
+            
+            if 'debug' in kwargs:
+                edge_exist: bool = (self.mono_tr_bdd & curr_state_sym & self.predicate_sym_map_robot[robot_action_name] & \
+                            self.predicate_sym_map_human[human_action_name] & self.predicate_sym_map_hint[curr_hint]).isZero()
+                if not edge_exist:
+                    print(f"Nondeterminism due to Human Action: {self.get_state_from_tuple(curr_state_tuple)}[{curr_hint}] ---{human_action_name}---> {self.get_state_from_tuple(next_state_tuple)}[{curr_hint - 1}]")
+                    self.mono_tr_bdd |= curr_state_sym & self.predicate_sym_map_robot[robot_action_name] & \
+                                self.predicate_sym_map_human[human_action_name] & self.predicate_sym_map_hint[curr_hint]
+        else:
+            nxt_state_sym = nxt_state_sym & self.predicate_sym_map_hint[curr_hint]
+            
+            if 'debug' in kwargs:
+                edge_exist: bool = (self.mono_tr_bdd &  curr_state_sym & self.predicate_sym_map_robot[robot_action_name] & \
+                            no_human_move & self.predicate_sym_map_hint[curr_hint]).isZero()
+                
+                if not edge_exist:
+                    print(f"Nondeterminism due to Robot Action: {self.get_state_from_tuple(curr_state_tuple)}[{curr_hint}] ---{robot_action_name}---> {self.get_state_from_tuple(next_state_tuple)}[{curr_hint}]")
+                
+                    self.mono_tr_bdd |= curr_state_sym & self.predicate_sym_map_robot[robot_action_name] & \
+                                no_human_move & self.predicate_sym_map_hint[curr_hint]             
+
+
         # for every boolean var in nxt_state check if it high or low. If high add it curr state and the correpsonding action to its BDD
         for _idx, var in enumerate(nxt_state_sym.cube()):
-            if var == 1 and self.manager.bddVar(_idx) in self.sym_vars_curr:
+            if var == 1 and self.manager.bddVar(_idx) in [*self.sym_vars_curr, *self.sym_vars_hint]:
                 _state_idx: int = _idx - self.state_start_idx
                 assert _state_idx >= 0, "Error constructing the Partitioned Transition Relation."
                 # if human intervenes then the edge looks like (robot-action) & (human move b# l# l#)
                 if human_action_name != '':
                     self.tr_state_bdds[_state_idx] |= curr_state_sym & self.predicate_sym_map_robot[robot_action_name] & \
-                         self.predicate_sym_map_human[human_action_name] & self.predicate_sym_map_hint[curr_hint - 1]
+                         self.predicate_sym_map_human[human_action_name] & self.predicate_sym_map_hint[curr_hint]
                 # if human does not intervene then the edge looks like (robot-action) & not(valid human moves)
                 else:
                     self.tr_state_bdds[_state_idx] |= curr_state_sym & self.predicate_sym_map_robot[robot_action_name] & \
@@ -536,6 +568,14 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
             elif var == 2 and self.manager.bddVar(_idx) in self.sym_vars_curr:
                 warnings.warn("Encountered an ambiguous varible during TR construction. FIX THIS!!!")
                 sys.exit(-1)
+        
+        if human_action_name != '':
+            self.adj_map[curr_state_tuple][robot_action_name][curr_hint]['h'].append(next_state_tuple)
+        else:
+            self.adj_map[curr_state_tuple][robot_action_name][curr_hint]['r'].append(next_state_tuple)
+        
+        # update edge count 
+        self.ecount += 1
     
     
     def print_human_edge(self, curr_state_tuple: tuple, hnext_tuple: tuple, robot_action_name: str, haction, **kwargs):
@@ -560,7 +600,10 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
 
          Thus, from a state (S, K), if the human intervenes, then we transit to a state with (S', K-1) where S -> S' is a valid transtion in the TS and K is the # of human interventions remaining. 
 
-         Note: When K=0; the human can not intervene anymore.  
+         Note: When K=0; the human can not intervene anymore. 
+               Pass 'debug' (kwarg) as True for sanity checking. The Compositional Approach as outlined
+               by Zhu et al. (LTLF Syft) does not work when you have nondeterminism, i.e., for same (State, Action) pair, you cannot evolve to two distinct successors.
+               By setting debug to True, we keep track of all the edge created during the Abstarction Construction process.  
         """
         if verbose:
             print(f"Creating TR for Actions:", *self.tr_action_idx_map.keys())
@@ -583,12 +626,16 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
         
         # each states consists of boolean Vars corresponding to: S, LBL; K
         self.sym_state_labels |= init_state_sym & init_lbl_sym
-
+     
         # human int cube 
         hint_cube = reduce(lambda x, y: x & y, self.sym_vars_hint)
         state_cube = reduce(lambda x, y: x & y, self.sym_vars_curr)
 
         layer = 0
+
+        # creating monolithinc tr bdd to keep track all the transition we are creating to detect nondeterminism
+        if 'debug' in kwargs:
+            self.mono_tr_bdd = self.manager.bddZero() 
 
         # no need to check if other boxes are placed at the destination loc during transfer and release as there is only one object
         if len(boxes) == 1:
@@ -680,14 +727,16 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
                                                                             layer=layer,
                                                                             boxes=boxes,
                                                                             verbose=verbose,
-                                                                            curr_hint=curr_hint)
+                                                                            curr_hint=curr_hint,
+                                                                            **kwargs)
                             
                             # add The edge to its corresponding action
                             self.add_edge_to_action_tr(robot_action_name=action.name,
                                                        curr_state_tuple=tuple(_valid_pre),
                                                        next_state_tuple=next_tuple,
                                                        curr_hint=curr_hint,
-                                                       valid_hact_list=env_edge_acts)
+                                                       valid_hact_list=env_edge_acts,
+                                                       **kwargs)
 
                             # get their corresponding lbls 
                             next_tuple_lbl = self.get_conds_from_state(state_tuple=next_tuple, only_world_conf=True)

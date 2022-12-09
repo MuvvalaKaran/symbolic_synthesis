@@ -229,7 +229,7 @@ class FrankaPartitionedWorld(FrankaWorld):
         
         stop: float = time.time()
         print("Time took for constructing the abstraction: ", stop - start)
-        sys.exit(-1)
+        # sys.exit(-1)
         return sym_tr, ts_curr_vars, ts_robot_vars, ts_human_vars, ts_lbl_vars
     
 
@@ -268,10 +268,14 @@ class FrankaPartitionedWorld(FrankaWorld):
                                                add_exist_constr=True,
                                                verbose=self.verbose,
                                                plot=self.plot_ts,
-                                               print_tr=False)
+                                               print_tr=False,
+                                               debug=True)
         
         stop: float = time.time()
         print("Time took for constructing the abstraction: ", stop - start)
+
+        if print_facts:
+            print(f"******************# of Edges in Franka Abstraction: {sym_tr.ecount}******************")
 
         return sym_tr, ts_curr_vars, ts_robot_vars, ts_human_vars, ts_lbl_vars
     
