@@ -1,1 +1,1 @@
-from .winning_str import ReachabilityGame
+from .winning_str import ReachabilityGame, BndReachabilityGame
