@@ -40,6 +40,11 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
         # index to determine where the state vars start 
         self.state_start_idx: int = len(self.sym_vars_lbl) + len(self.sym_vars_human) + len(self.sym_vars_robot)
 
+        # create adj map. Useful when rolling out strategy with human intervention for sanity checking
+        self.adj_map = defaultdict(lambda: defaultdict(lambda : {'h': [], 'r': []}))
+        # edge counter
+        self.ecount = 0
+
         # for safety remove variable deprecated vars from parent class
         del self.sym_vars_action
         del self.predicate_sym_map_act
@@ -87,7 +92,6 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
             else:
                 self.predicate_sym_map_robot = bidict(_node_int_map)
         
-    
 
     def add_edge_to_action_tr(self,
                               robot_action_name: str,
@@ -108,7 +112,7 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
             # if there are any valid human edges from curr state
             if len(valid_hact_list) > 0:
                 valid_hact: List[BDD] = [self.predicate_sym_map_human[ha] for ha in valid_hact_list]
-                no_human_move: BDD = ~(reduce(lambda x, y: x & y, valid_hact))
+                no_human_move: BDD = ~(reduce(lambda x, y: x | y, valid_hact))
             else:
                 no_human_move: BDD = self.manager.bddOne()
 
@@ -134,6 +138,14 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
             elif var == 2 and self.manager.bddVar(_idx) in self.sym_vars_curr:
                 warnings.warn("Encountered an ambiguous varible during TR construction. FIX THIS!!!")
                 sys.exit(-1)
+        
+        if human_action_name != '':
+            self.adj_map[curr_state_tuple][robot_action_name]['h'].append(next_state_tuple)
+        else:
+            self.adj_map[curr_state_tuple][robot_action_name]['r'].append(next_state_tuple)
+        
+        # update edge count 
+        self.ecount += 1
     
 
     def _check_exist_human_constraint(self, boxes: List[str], curr_state_lbl: tuple, human_action_name: str) -> bool:
@@ -264,9 +276,6 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
                                           robot_action_name=robot_action_name,
                                           haction=haction,
                                           **kwargs)
-                    # cstate = self.get_state_from_tuple(state_tuple=tuple(curr_state_tuple))
-                    # nstate = self.get_state_from_tuple(state_tuple=hnext_tuple)
-                    # print(f"Adding Human edge: {cstate} -------{robot_action_name} & {haction.name}------> {nstate}")
 
                 # add The edge to its corresponding action
                 self.add_edge_to_action_tr(robot_action_name=robot_action_name,
@@ -470,8 +479,6 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
 
         # create adj map. Useful when rolling out strategy with human intervention for sanity checking
         self.adj_map = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda : {'h': [], 'r': []})))
-        # edge counter
-        self.ecount = 0
 
 
     def _initialize_bdd_for_human_int(self):

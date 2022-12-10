@@ -78,10 +78,7 @@ class FrankaPartitionedWorld(FrankaWorld):
         if dynamic_env or bnd_dynamic_env:
             self.ts_robot_vars: List[BDD] = ts_robot_vars
             self.ts_human_vars: List[BDD] = ts_human_vars
-        # elif bnd_dynamic_env:
-        #     self.ts_robot_vars: List[BDD] = ts_robot_vars
-        #     self.ts_human_vars: List[BDD] = ts_human_vars
-        #     # self.ts_hint_vars: List[BDD] = ts_
+        
         else:
             warnings.warn("We haven't implemented a strategy synthesis for single player Partitioned Representation.")
             warnings.warn("Use the Monolithic Representation if you want graph search by setting the FRANKAWORLD flag to True.")
@@ -200,14 +197,14 @@ class FrankaPartitionedWorld(FrankaWorld):
         return sym_tr, ts_curr_vars, ts_action_vars, ts_lbl_vars
     
 
-    def build_bdd_abstraction_dynamic(self, draw_causal_graph: bool = False) -> Tuple[DynamicFrankaTransitionSystem, List[BDD], List[BDD], List[BDD], List[BDD]]:
+    def build_bdd_abstraction_dynamic(self, draw_causal_graph: bool = False, print_facts: bool = True) -> Tuple[DynamicFrankaTransitionSystem, List[BDD], List[BDD], List[BDD], List[BDD]]:
         """
          Main Function to Build Two-player Transition System without edge weights
         """
         task, domain, ts_curr_vars, ts_state_tuples, \
              ts_lbl_vars, ts_robot_vars, ts_human_vars, boxes, possible_lbls = self.create_symbolic_causal_graph(draw_causal_graph=draw_causal_graph,
                                                                                                                  build_human_move=True,
-                                                                                                                 print_facts=True)
+                                                                                                                 print_facts=print_facts)
         
         sym_tr = DynamicFrankaTransitionSystem(curr_vars=ts_curr_vars,
                                                lbl_vars=ts_lbl_vars,
@@ -229,7 +226,10 @@ class FrankaPartitionedWorld(FrankaWorld):
         
         stop: float = time.time()
         print("Time took for constructing the abstraction: ", stop - start)
-        # sys.exit(-1)
+        
+        if print_facts:
+            print(f"******************# of Edges in Franka Abstraction: {sym_tr.ecount}******************")
+            
         return sym_tr, ts_curr_vars, ts_robot_vars, ts_human_vars, ts_lbl_vars
     
 

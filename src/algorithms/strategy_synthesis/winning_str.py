@@ -227,7 +227,15 @@ class ReachabilityGame(BaseSymbolicSearch):
         
         return state_action
 
-
+    def get_pre_states(self, layer: int) -> BDD:
+        """
+         A function to compute all predecessors from the current set of winning states
+        """
+        pre_prod_state: BDD = self.winning_states[layer].vectorCompose([*self.ts_x_list, *self.dfa_x_list],
+                                                       [*self.ts_transition_fun_list, *self.dfa_transition_fun_list])
+        
+        return pre_prod_state
+    
     def solve(self, verbose: bool = False) -> BDD:
         """
          This function compute the set of winning states and winnign strategies. 
@@ -254,32 +262,17 @@ class ReachabilityGame(BaseSymbolicSearch):
                     print("No Winning Strategy Exists!!!")
                     sys.exit(-1)
 
-            # if verbose:
             print(f"**************************Layer: {layer}**************************")
-
-            # no hint vars
-            # pre_prod_state: BDD = self.winning_states[layer].vectorCompose([*self.ts_x_list, *self.dfa_x_list],
-            #                                            [*self.ts_transition_fun_list, *self.dfa_transition_fun_list])
             
-            # with hint vars
-            pre_prod_state: BDD = self.winning_states[layer].vectorCompose([*self.ts_x_list, *self.ts_handle.sym_vars_hint, *self.dfa_x_list],
-                                                       [*self.ts_transition_fun_list, *self.dfa_transition_fun_list])
+            pre_prod_state = self.get_pre_states(layer=layer)
             
             # we need to fix the state labeling
             pre_prod_state = pre_prod_state.existAbstract(self.ts_obs_cube)
-
-            # if verbose:
-            #     print("********************* Before Universal Quantificaion *********************")
-            #     self.get_prod_states_from_dd(dd_func=(pre_prod_state & self.init_DFA).existAbstract(self.sys_env_cube), obs_flag=False)
 
             # do universal quantification
             pre_univ = (pre_prod_state).univAbstract(self.env_cube)
             # add the correct labels back
             pre_univ = pre_univ & self.obs_bdd
-            
-            # if verbose:
-            #     print("********************* After Universal Quantification **********************")
-            #     self.get_prod_states_from_dd(dd_func=(pre_univ & self.init_DFA).existAbstract(self.sys_env_cube), obs_flag=False)
 
             # remove self loops
             stra_list[layer + 1] |= stra_list[layer] | (~self.winning_states[layer] & pre_univ)
@@ -336,6 +329,16 @@ class BndReachabilityGame(ReachabilityGame):
                          env_act_vars,
                          cudd_manager)
     
+    def get_pre_states(self, layer: int) -> BDD:
+        """
+         We  have an additional human intervention variables that we need to account 
+        """
+        pre_prod_state: BDD = self.winning_states[layer].vectorCompose([*self.ts_x_list, *self.ts_handle.sym_vars_hint, *self.dfa_x_list],
+                                                       [*self.ts_transition_fun_list, *self.dfa_transition_fun_list])
+        
+        return pre_prod_state
+
+
     def get_prod_states_from_dd(self, dd_func: BDD, obs_flag: bool = False, **kwargs) -> None:
         """
          This base class overrides the base method by return the Actual state name using the
@@ -472,9 +475,6 @@ class BndReachabilityGame(ReachabilityGame):
             if len(curr_act_cubes) > 1:
                 ract_name = None
                 while ract_name is None:
-                    # act_cube: List[int] = random.choice(curr_act_cubes)
-                    # act_dd = self.manager.fromLiteralList(act_cube)
-                    # act_name: str = self.ts_bdd_sym_to_robot_act_map[act_dd]
                     ract_dd: List[int] = random.choice(curr_act_cubes)
                     ract_name = self.ts_bdd_sym_to_robot_act_map.get(ract_dd, None)
 
@@ -515,7 +515,7 @@ class BndReachabilityGame(ReachabilityGame):
                     curr_dfa_state = dfa_state
                     break 
 
-            # curr_prod_state = curr_ts_state & self.init_DFA
+           
             curr_prod_state = curr_ts_state & curr_dfa_state & self.ts_bdd_sym_to_hint_map.inv[curr_hint]
 
             counter += 1
