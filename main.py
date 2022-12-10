@@ -129,7 +129,7 @@ if __name__ == "__main__":
                                                         plot_obs=False,
                                                         plot=False)
         
-        assert TWO_PLAYER_GAME is not TWO_PLAYER_GAME_BND, "PLease set only one flag to True - BND_TWO_PLAYER_GAME or TWO_PLAYER_GAME!"
+        assert TWO_PLAYER_GAME is not TWO_PLAYER_GAME_BND, "Please set only one flag to True - BND_TWO_PLAYER_GAME or TWO_PLAYER_GAME!"
 
         # build the abstraction
         frankapartition_handle.build_abstraction(dynamic_env=TWO_PLAYER_GAME,

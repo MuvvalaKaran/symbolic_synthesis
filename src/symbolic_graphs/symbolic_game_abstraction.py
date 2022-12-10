@@ -140,7 +140,7 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
             _tr_idx: int = self.tr_action_idx_map.get(human_action_name)
         else:
             _tr_idx: int = self.tr_action_idx_map.get(robot_action_name)
-
+        
         curr_state_sym: BDD = self.predicate_sym_map_curr[curr_state_tuple]
         nxt_state_sym: BDD = self.predicate_sym_map_curr[next_state_tuple]
 

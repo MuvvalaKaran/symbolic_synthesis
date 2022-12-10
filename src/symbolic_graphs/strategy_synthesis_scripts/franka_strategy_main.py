@@ -229,7 +229,7 @@ class FrankaPartitionedWorld(FrankaWorld):
         
         if print_facts:
             print(f"******************# of Edges in Franka Abstraction: {sym_tr.ecount}******************")
-            
+
         return sym_tr, ts_curr_vars, ts_robot_vars, ts_human_vars, ts_lbl_vars
     
 
@@ -352,7 +352,8 @@ class FrankaPartitionedWorld(FrankaWorld):
         stop = time.time()
         print("Time for solving the game: ", stop - start)
 
-        # rollout for sanity checking
-        reachability_handle.roll_out_strategy(transducer=win_str, verbose=True)
+        if win_str:
+            # rollout for sanity checking
+            reachability_handle.roll_out_strategy(transducer=win_str, verbose=True)
 
         return win_str

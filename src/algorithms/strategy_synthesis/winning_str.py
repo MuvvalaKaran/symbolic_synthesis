@@ -266,7 +266,8 @@ class ReachabilityGame(BaseSymbolicSearch):
                     return stra_list[layer]
                 else:
                     print("No Winning Strategy Exists!!!")
-                    sys.exit(-1)
+                    return
+
 
             print(f"**************************Layer: {layer}**************************")
             
@@ -277,6 +278,7 @@ class ReachabilityGame(BaseSymbolicSearch):
 
             # do universal quantification
             pre_univ = (pre_prod_state).univAbstract(self.env_cube)
+            
             # add the correct labels back
             pre_univ = pre_univ & self.obs_bdd
 
@@ -429,8 +431,7 @@ class BndReachabilityGame(ReachabilityGame):
                                                                     curr_hint=curr_hint,
                                                                     curr_dfa_state=curr_dfa_state,
                                                                     ract_name=ract_name)
-            # if not (self.target_DFA & curr_prod_state).isZero():
-            #     break
+           
             # forcing human to not make a move that satisfies the specification
             while not (self.target_DFA & nxt_prod_state).isZero():
                 nxt_prod_state, nxt_ts_tuple = self.evolve_as_per_human(curr_state_tuple=hnext_tuple,

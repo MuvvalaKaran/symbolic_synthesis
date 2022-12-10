@@ -37,8 +37,8 @@
     (gripper free)
     
     (on b0 l0)
-    (on b1 l6)
-    (on b2 l2)
+    (on b1 l1)
+    (on b2 l6)
     ;(on b3 l3)
     ;(on b4 l6)
     ;(on b5 l5)
