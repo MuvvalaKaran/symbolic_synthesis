@@ -48,7 +48,8 @@ class ReachabilityGame(BaseSymbolicSearch):
         self.sys_act_vars = sys_act_vars
         self.env_act_vars = env_act_vars
 
-        self.ts_transition_fun_list: List[BDD] = ts_handle.tr_state_bdds
+        # self.ts_transition_fun_list: List[BDD] = ts_handle.tr_state_bdds
+        self.ts_transition_fun_list: List[List[BDD]] = ts_handle.sym_tr_actions
         self.dfa_transition_fun_list: List[BDD] = dfa_handle.tr_state_bdds
 
         self.ts_bdd_sym_to_curr_state_map: bidict = ts_handle.predicate_sym_map_curr.inv
@@ -231,8 +232,13 @@ class ReachabilityGame(BaseSymbolicSearch):
         """
          A function to compute all predecessors from the current set of winning states
         """
-        pre_prod_state: BDD = self.winning_states[layer].vectorCompose([*self.ts_x_list, *self.dfa_x_list],
-                                                       [*self.ts_transition_fun_list, *self.dfa_transition_fun_list])
+        # pre_prod_state: BDD = self.winning_states[layer].vectorCompose([*self.ts_x_list, *self.dfa_x_list],
+        #                                                [*self.ts_transition_fun_list, *self.dfa_transition_fun_list])
+        
+        pre_prod_state: BDD = self.manager.bddZero()
+        for ts_transition in self.ts_transition_fun_list:
+            pre_prod_state |= self.winning_states[layer].vectorCompose([*self.ts_x_list, *self.dfa_x_list],
+                                                    [*ts_transition, *self.dfa_transition_fun_list])
         
         return pre_prod_state
     
@@ -333,8 +339,13 @@ class BndReachabilityGame(ReachabilityGame):
         """
          We  have an additional human intervention variables that we need to account 
         """
-        pre_prod_state: BDD = self.winning_states[layer].vectorCompose([*self.ts_x_list, *self.ts_handle.sym_vars_hint, *self.dfa_x_list],
-                                                       [*self.ts_transition_fun_list, *self.dfa_transition_fun_list])
+        # pre_prod_state: BDD = self.winning_states[layer].vectorCompose([*self.ts_x_list, *self.ts_handle.sym_vars_hint, *self.dfa_x_list],
+        #                                                [*self.ts_transition_fun_list, *self.dfa_transition_fun_list])
+        
+        pre_prod_state: BDD = self.manager.bddZero()
+        for ts_transition in self.ts_transition_fun_list:
+            pre_prod_state |= self.winning_states[layer].vectorCompose([*self.ts_x_list, *self.ts_handle.sym_vars_hint, *self.dfa_x_list],
+                                                    [*ts_transition, *self.dfa_transition_fun_list])
         
         return pre_prod_state
 

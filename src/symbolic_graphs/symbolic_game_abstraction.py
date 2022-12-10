@@ -92,6 +92,22 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
             else:
                 self.predicate_sym_map_robot = bidict(_node_int_map)
         
+        self.initialize_sym_tr_action_list()
+        
+    
+    def initialize_sym_tr_action_list(self):
+        """
+         Create a list of False BDDs for each paramterized action (Robot and Human) defined in the pddl domain file.
+        """
+        # initiate BDDs for all the action 
+        action_idx_map = bidict()
+        _actions = self.actions
+        for _idx, _action in enumerate(_actions):
+            action_idx_map[_action] = _idx
+        
+        self.tr_action_idx_map = action_idx_map
+        self.sym_tr_actions = [[self.manager.bddZero() for _ in range(len(self.sym_vars_curr))] for _ in range(len(self.actions))]
+        
 
     def add_edge_to_action_tr(self,
                               robot_action_name: str,
@@ -119,6 +135,11 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
         else:
             warnings.warn("Invalid Default args type when constructing the Symbolic Franka Abstraction. FIX THIS!!!")
             sys.exit(-1)
+        
+        if human_action_name != '':
+            _tr_idx: int = self.tr_action_idx_map.get(human_action_name)
+        else:
+            _tr_idx: int = self.tr_action_idx_map.get(robot_action_name)
 
         curr_state_sym: BDD = self.predicate_sym_map_curr[curr_state_tuple]
         nxt_state_sym: BDD = self.predicate_sym_map_curr[next_state_tuple]
@@ -130,10 +151,12 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
                 assert _state_idx >= 0, "Error constructing the Partitioned Transition Relation."
                 # if human intervenes then the edge looks like (robot-action) & (human move b# l# l#)
                 if human_action_name != '':
-                    self.tr_state_bdds[_state_idx] |= curr_state_sym & self.predicate_sym_map_robot[robot_action_name] & self.predicate_sym_map_human[human_action_name] 
+                    self.sym_tr_actions[_tr_idx][_state_idx] |= curr_state_sym & self.predicate_sym_map_robot[robot_action_name] & self.predicate_sym_map_human[human_action_name]
+                    # self.tr_state_bdds[_state_idx] |= curr_state_sym & self.predicate_sym_map_robot[robot_action_name] & self.predicate_sym_map_human[human_action_name] 
                 # if human does not intervene then the edge looks like (robot-action) & not(valid human moves)
                 else:
-                    self.tr_state_bdds[_state_idx] |= curr_state_sym & self.predicate_sym_map_robot[robot_action_name] & no_human_move
+                    self.sym_tr_actions[_tr_idx][_state_idx] |= curr_state_sym & self.predicate_sym_map_robot[robot_action_name] & no_human_move
+                    # self.tr_state_bdds[_state_idx] |= curr_state_sym & self.predicate_sym_map_robot[robot_action_name] & no_human_move
             
             elif var == 2 and self.manager.bddVar(_idx) in self.sym_vars_curr:
                 warnings.warn("Encountered an ambiguous varible during TR construction. FIX THIS!!!")
@@ -466,8 +489,9 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
                  ts_states: list,
                  max_human_int: int,
                  manager: Cudd):
-        super().__init__(curr_vars, lbl_vars, robot_action_vars, human_action_vars, task, domain, ts_state_map, ts_states, manager)
         self.sym_vars_hint: List[BDD] = human_int_vars
+        super().__init__(curr_vars, lbl_vars, robot_action_vars, human_action_vars, task, domain, ts_state_map, ts_states, manager)
+        
         self.max_hint: int = max_human_int
 
         self.predicate_sym_map_hint: bidict = {}
@@ -479,6 +503,20 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
 
         # create adj map. Useful when rolling out strategy with human intervention for sanity checking
         self.adj_map = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda : {'h': [], 'r': []})))
+
+    def initialize_sym_tr_action_list(self):
+        """
+         Override the parent function as we have additional boolean variables corresponding
+          to Human intervention and thus the length of the state bdd is different.
+        """
+        # initiate BDDs for all the action 
+        action_idx_map = bidict()
+        _actions = self.actions
+        for _idx, _action in enumerate(_actions):
+            action_idx_map[_action] = _idx
+        
+        self.tr_action_idx_map = action_idx_map
+        self.sym_tr_actions = [[self.manager.bddZero() for _ in range(len(self.sym_vars_curr) + len(self.sym_vars_hint))] for _ in range(len(self.actions))]
 
 
     def _initialize_bdd_for_human_int(self):
@@ -536,7 +574,7 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
 
         if human_action_name != '':
             nxt_state_sym = nxt_state_sym & self.predicate_sym_map_hint[curr_hint - 1]
-            
+            _tr_idx: int = self.tr_action_idx_map.get(human_action_name)
             if 'debug' in kwargs:
                 edge_exist: bool = (self.mono_tr_bdd & curr_state_sym & self.predicate_sym_map_robot[robot_action_name] & \
                             self.predicate_sym_map_human[human_action_name] & self.predicate_sym_map_hint[curr_hint]).isZero()
@@ -546,7 +584,7 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
                                 self.predicate_sym_map_human[human_action_name] & self.predicate_sym_map_hint[curr_hint]
         else:
             nxt_state_sym = nxt_state_sym & self.predicate_sym_map_hint[curr_hint]
-            
+            _tr_idx: int = self.tr_action_idx_map.get(robot_action_name)
             if 'debug' in kwargs:
                 edge_exist: bool = (self.mono_tr_bdd &  curr_state_sym & self.predicate_sym_map_robot[robot_action_name] & \
                             no_human_move & self.predicate_sym_map_hint[curr_hint]).isZero()
@@ -565,12 +603,18 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
                 assert _state_idx >= 0, "Error constructing the Partitioned Transition Relation."
                 # if human intervenes then the edge looks like (robot-action) & (human move b# l# l#)
                 if human_action_name != '':
-                    self.tr_state_bdds[_state_idx] |= curr_state_sym & self.predicate_sym_map_robot[robot_action_name] & \
+                    self.sym_tr_actions[_tr_idx][_state_idx] |= curr_state_sym & self.predicate_sym_map_robot[robot_action_name] & \
                          self.predicate_sym_map_human[human_action_name] & self.predicate_sym_map_hint[curr_hint]
+
+                    # self.tr_state_bdds[_state_idx] |= curr_state_sym & self.predicate_sym_map_robot[robot_action_name] & \
+                    #      self.predicate_sym_map_human[human_action_name] & self.predicate_sym_map_hint[curr_hint]
                 # if human does not intervene then the edge looks like (robot-action) & not(valid human moves)
                 else:
-                    self.tr_state_bdds[_state_idx] |= curr_state_sym & self.predicate_sym_map_robot[robot_action_name] & \
+                    self.sym_tr_actions[_tr_idx][_state_idx] |= curr_state_sym & self.predicate_sym_map_robot[robot_action_name] & \
                          no_human_move & self.predicate_sym_map_hint[curr_hint]
+
+                    # self.tr_state_bdds[_state_idx] |= curr_state_sym & self.predicate_sym_map_robot[robot_action_name] & \
+                    #      no_human_move & self.predicate_sym_map_hint[curr_hint]
             
             elif var == 2 and self.manager.bddVar(_idx) in self.sym_vars_curr:
                 warnings.warn("Encountered an ambiguous varible during TR construction. FIX THIS!!!")
