@@ -10,7 +10,7 @@ STRATEGY_SYNTHESIS: bool = True  # Set this flag to true when  when using manipu
 TWO_PLAYER_GAME: bool = False  # Set this flag to true when you want to contruct a two-player game env.
 TWO_PLAYER_GAME_BND: bool = True  # Set this flag to true when you want to construct som bounded no. off human interventions.
 
-HUMAN_INT_BND: int = 1
+HUMAN_INT_BND: int = 3
 
 DIJKSTRAS: bool = False  # set this flag to true when you want to use Dijkstras
 ASTAR: bool = False # set this flag to true when you want to use A* algorithm 
@@ -32,12 +32,12 @@ DYNAMIC_VAR_ORDERING: bool = False
 # formulas = ['F(p00 & p12 & p21 & free) & G((~p00 | ~p21) -> (~p12))']
 
 
-formulas = ['F(p01 & free & F(p12 & free & F(p23 & free & F(p34 & free))))']
+# formulas = ['F(p01 & free & F(p12 & free & F(p23 & free & F(p34 & free))))']
 # formulas = ['F(p01 & free & F(p12 & free & F(p23 & free)))']
 # formulas = ['(F((p01 & free)) & F((p12 & free)) & F((p23 & free)) & F((p34 & free)))']
 
 # simple one box formula 
-# formulas = ['F(p01 & free)']
+formulas = ['F(p01 & free)']
 
 # formulas = [
 #             # 'F((p01 & p20 & free))',

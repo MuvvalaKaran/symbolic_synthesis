@@ -20,7 +20,7 @@
     b0 - box
     b1 - box
     b2 - box
-    b3 - box
+    ;b3 - box
     ;b4 - box
     ;b5 - box
     ;b6 - box
@@ -36,7 +36,7 @@
     (on b0 l0)
     (on b1 l1)
     (on b2 l2)
-    (on b3 l3)
+    ;(on b3 l3)
     ;(on b4 l4)
     ;(on b5 l5)
     ;(on b6 l6)

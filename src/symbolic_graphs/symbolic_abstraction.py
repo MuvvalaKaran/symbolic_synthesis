@@ -269,7 +269,8 @@ class SymbolicFrankaTransitionSystem():
                  task, domain,
                  ts_state_map: dict,
                  ts_states: list,
-                 manager: Cudd):
+                 manager: Cudd,
+                 **kwargs):
         self.sym_vars_curr: List[BDD] = curr_states
         self.sym_vars_next: List[BDD] = next_states
         self.sym_vars_lbl: List[BDD] = lbl_states
@@ -282,7 +283,8 @@ class SymbolicFrankaTransitionSystem():
         self.task: dict = task
         self.domain: dict = domain
         self.manager = manager
-        self.actions: dict = [action.name for action in task.operators]
+        # self.actions: dict = [action.name for action in task.operators]
+        self.actions: list = None
         self.tr_action_idx_map: dict = {}
         self.sym_init_states: BDD = manager.bddZero()
         self.sym_goal_states: BDD = manager.bddZero()
@@ -298,13 +300,21 @@ class SymbolicFrankaTransitionSystem():
         # parent dictions with all the nxt and state lbl vars
         self.monolihtic_sym_map_nxt: bidict = {}
 
+        self.set_actions(**kwargs)
         self._create_sym_var_map()
         self._initialize_bdds_for_actions()
         self._initialize_sym_init_goal_states()
 
+
+    def set_actions(self, **kwargs):
+        """
+         A function to initialize the set of valid actions
+        """
+        self.actions = [action.name for action in self.task.operators]
+
     def _initialize_bdds_for_actions(self):
         """
-        A function to intialize bdds for all the actions
+         A function to intialize bdds for all the actions
         """
         #  initiate BDDs for all the action 
         action_idx_map = bidict()
@@ -715,7 +725,7 @@ class SymbolicFrankaTransitionSystem():
 
 class PartitionedFrankaTransitionSystem(SymbolicFrankaTransitionSystem):
     """
-     This calss builds the symbolic Transition Relation for the Franka manipulation casestudy in a
+     This class builds the symbolic Transition Relation for the Franka manipulation casestudy wihtout Human intervention in a
       partitioned fashion as described in the Syft paper by Zhu et al. 
     
      Github link: https://github.com/Shufang-Zhu/Syft
@@ -728,13 +738,14 @@ class PartitionedFrankaTransitionSystem(SymbolicFrankaTransitionSystem):
                  task, domain,
                  ts_state_map: dict,
                  ts_states: list,
-                 manager: Cudd):
+                 manager: Cudd,
+                 **kwargs):
         self.sym_vars_action: List[BDD] = action_vars
 
         self.predicate_sym_map_act: bidict = {}
 
         # curr-vars and next-vars are the same. Similarly their look dictionary is same as well. 
-        super().__init__(curr_vars, curr_vars, lbl_vars, task, domain, ts_state_map, ts_states, manager)
+        super().__init__(curr_vars, curr_vars, lbl_vars, task, domain, ts_state_map, ts_states, manager, **kwargs)
         
         # store the bdd associated with each state vars in this list. The index corresonds to its number
         self.tr_state_bdds = [self.manager.bddZero() for _ in range(len(self.sym_vars_curr))]

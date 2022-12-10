@@ -488,7 +488,7 @@ class FrankaWorld(BaseSymMain):
         _valid_combos = _valid_combos_free + _valid_combos_occ
 
         if verbose:
-            print(f"********************************* # Valid States in Frank abstraction: {len(_valid_combos)} *********************************")
+            print(f"********************************* # Valid States in Franka abstraction: {len(_valid_combos)} *********************************")
 
         _state_tuples = []
         for _exp_state in _valid_combos:
