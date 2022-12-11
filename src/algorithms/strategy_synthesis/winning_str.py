@@ -400,7 +400,13 @@ class BndReachabilityGame(ReachabilityGame):
         return nxt_ts_lbl & nxt_dfa_state, nxt_state_tuple
     
 
-    def human_intervention(self, ract_name: str, curr_state_tuple: tuple, curr_dfa_state: BDD, curr_hint: int, verbose: bool = True) -> Tuple[tuple, int]:
+    def human_intervention(self,
+                           ract_name: str,
+                           curr_state_tuple: tuple,
+                           curr_dfa_state: BDD,
+                           curr_hint: int,
+                           nxt_state_tuple: tuple,
+                           verbose: bool = True) -> Tuple[tuple, int]:
         """
          Evolve on the game as per human intervention
         """
@@ -452,9 +458,12 @@ class BndReachabilityGame(ReachabilityGame):
 
             # update hint counter 
             curr_prod_state = nxt_prod_state & curr_hint_dd
-            curr_ts_tuple = nxt_ts_tuple
+            curr_state_tuple = nxt_ts_tuple
 
-        return curr_ts_tuple, curr_hint
+            return curr_state_tuple, curr_hint
+        
+        else:
+            return nxt_state_tuple, curr_hint
 
 
     def roll_out_strategy(self,
@@ -512,7 +521,11 @@ class BndReachabilityGame(ReachabilityGame):
                 # coin = random.randint(0, 1)
                 heads = 1
                 if heads:
-                    next_tuple, curr_hint = self.human_intervention(ract_name=ract_name, curr_state_tuple=curr_ts_tuple, curr_dfa_state=curr_dfa_state, curr_hint=curr_hint, verbose=True)
+                    next_tuple, curr_hint = self.human_intervention(ract_name=ract_name,
+                                                                    curr_state_tuple=curr_ts_tuple,
+                                                                    curr_dfa_state=curr_dfa_state,
+                                                                    nxt_state_tuple=next_tuple,
+                                                                    curr_hint=curr_hint, verbose=True)
 
             # look up its corresponding formula
             curr_ts_state: BDD = self.ts_bdd_sym_to_curr_state_map.inv[next_tuple]

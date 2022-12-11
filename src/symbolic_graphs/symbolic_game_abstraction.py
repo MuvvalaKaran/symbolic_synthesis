@@ -10,6 +10,8 @@ from itertools import product
 from typing import Tuple, List, Dict
 from cudd import Cudd, BDD, ADD
 
+from config import *
+
 from bidict import bidict
 
 from src.symbolic_graphs import PartitionedFrankaTransitionSystem
@@ -181,6 +183,10 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
         _box_state: str = re.search(_box_pattern, human_action_name).group()
         dloc = _loc_states[1]
 
+        # human cannot move an object to TOP LOC
+        if dloc in TOP_LOC:
+            return False
+
         # if box1 is being manipulated, get the list of rest of boxes (that have to be grounded) at this instance
         tmp_copy = copy.deepcopy(boxes)
         tmp_copy.remove(_box_state)
@@ -200,6 +206,36 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
         cstate = self.get_state_from_tuple(state_tuple=tuple(curr_state_tuple))
         nstate = self.get_state_from_tuple(state_tuple=hnext_tuple)
         print(f"Adding Human edge: {cstate} -------{robot_action_name} & {haction.name}------> {nstate}")
+    
+
+    def check_support_constraint(self, boxes: List[str], curr_state_lbl: tuple, human_action_name: str, robot_action_name: str) -> bool:
+        """
+         Given the current human move check if the box being manipulated by the human is a support location or not. If yes, heck if there is something in "top loc" or not.
+        """
+        _box_pattern = "[b|B][\d]+"
+        _loc_pattern = "[l|L][\d]+"
+        _chloc: List[str] = re.findall(_loc_pattern, human_action_name)[0]
+        _box_state: str = re.search(_box_pattern, human_action_name).group()
+        # check if the box is in support loc and has another box in top location, i.e,
+        # if box1 is being manipulated, get the list of rest of boxes (that have to be grounded) at this instance
+
+        if _chloc in SUP_LOC:  # if the human move is from current loc
+            tmp_copy = copy.deepcopy(boxes)
+            tmp_copy.remove(_box_state)
+
+            # create predicates that say on b0 l1 (l1 is the destination in the action)
+            on_preds = [self.pred_int_map[f'(on {bid} {tloc})'] for bid in tmp_copy for tloc in TOP_LOC]
+
+            # check if a box exists on "top" in the curr state lbl or after the completion of the robot action
+            if set(on_preds).intersection(set(curr_state_lbl)):
+                return False
+            
+            if 'release' in robot_action_name:
+                _dloc: str = re.search(_loc_pattern, robot_action_name).group()
+                if _dloc in TOP_LOC:
+                    return False
+
+        return True
 
 
     def add_human_moves(self,
@@ -226,10 +262,11 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
             # check if the preconditions of human action are satisfied or not
             _pre_tuple = self.get_tuple_from_state(haction.preconditions)  # cardinality of human move's precondition is always 1
             _intersect: bool = set(_pre_tuple).issubset(curr_state_tuple)
+            _box_pattern = "[b|B][\d]+"
+            _loc_pattern = "[l|L][\d]+"
 
             # we do not allow the human move the obj the robot is currently grasping
             if 'grasp' in robot_action_name:
-                _box_pattern = "[b|B][\d]+"
                 _box_state: str = re.search(_box_pattern, robot_action_name).group()
                 _hbox_state: str = re.search(_box_pattern, haction.name).group()
 
@@ -238,20 +275,26 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
             
             # We do not allow human to block the destination loc when robot action is release
             if 'release' in robot_action_name:
-                _loc_pattern = "[l|L][\d]+"
                 _dloc: str = re.search(_loc_pattern, robot_action_name).group()
                 _hloc: str = re.findall(_loc_pattern, haction.name)[1]
 
                 if _dloc == _hloc:
                     continue
-            
-            # check the if the destination loc is free or not
+                
+            # check if the destination loc is free or not
             if _intersect:
                 d_loc_available: bool = self._check_exist_human_constraint(boxes=boxes,
                                                                            curr_state_lbl=curr_state_tuple,
                                                                            human_action_name=haction.name)
 
             if _intersect and d_loc_available:
+                valid_move: bool = self.check_support_constraint(boxes=boxes,
+                                                                 curr_state_lbl=curr_state_tuple,
+                                                                 human_action_name=haction.name,
+                                                                 robot_action_name=robot_action_name)
+                if not valid_move:
+                    continue
+                
                 # get add and del tuples 
                 add_tuple = self.get_tuple_from_state(haction.add_effects)
                 del_tuple = self.get_tuple_from_state(haction.del_effects)

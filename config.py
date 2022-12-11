@@ -23,16 +23,21 @@ GRID_WORLD_SIZE: int = 5
 OBSTACLE: bool = False  # flag to load the obstacle gridworld and color the gridworld accordingly
 DYNAMIC_VAR_ORDERING: bool = False
 
+##################### Franka Declare supports and top location for valid Human Int. #########################
+SUP_LOC = ['l0', 'l1']   # support for Arch
+TOP_LOC = ['l2']         # top location for Arch
+
 ######################################################################
 #################### FRANKA TABLE TOP FORMULAS #######################
 ######################################################################
 
 ##### FRANKA ARCH CONF #######
 # formulas = ['F((p00 & p12 & p21 & free) | (p10 & p01 & p22 & free) | (p10 & p21 & p02 & free) | (p20 & p01 & p12 & free) | (p20 & p11 & p02 & free))']
-# formulas = ['F(p00 & p12 & p21 & free) & G((~p00 | ~p21) -> (~p12))']
+# formulas = ['F(p00 & p12 & p21 & free) & G(~(p00 & p21) -> ~(p12))']   # this one works for sure
+formulas = ['F(p00 & p12 & p21 & free) & G(~(p00 & p21) -> ~(p12))']   # correct arch formula
 
 
-formulas = ['F(p01 & free & F(p12 & free & F(p23 & free & F(p34 & free))))']
+# formulas = ['F(p01 & free & F(p12 & free & F(p23 & free & F(p34 & free))))']
 # formulas = ['F(p01 & free & F(p12 & free & F(p23 & free)))']
 # formulas = ['(F((p01 & free)) & F((p12 & free)) & F((p23 & free)) & F((p34 & free)))']
 
