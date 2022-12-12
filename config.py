@@ -10,7 +10,7 @@ STRATEGY_SYNTHESIS: bool = True  # Set this flag to true when  when using manipu
 TWO_PLAYER_GAME: bool = False  # Set this flag to true when you want to contruct a two-player game env.
 TWO_PLAYER_GAME_BND: bool = True  # Set this flag to true when you want to construct som bounded no. off human interventions.
 
-HUMAN_INT_BND: int = 1
+HUMAN_INT_BND: int = 3
 
 DIJKSTRAS: bool = False  # set this flag to true when you want to use Dijkstras
 ASTAR: bool = False # set this flag to true when you want to use A* algorithm 
@@ -24,17 +24,22 @@ OBSTACLE: bool = False  # flag to load the obstacle gridworld and color the grid
 DYNAMIC_VAR_ORDERING: bool = False
 
 ##################### Franka Declare supports and top location for valid Human Int. #########################
-SUP_LOC = ['l0', 'l1']   # support for Arch
-TOP_LOC = ['l2']         # top location for Arch
+# SUP_LOC = ['l0', 'l1']   # support for Arch
+# TOP_LOC = ['l2']         # top location for Arch
+SUP_LOC = []
+TOP_LOC = []
 
 ######################################################################
 #################### FRANKA TABLE TOP FORMULAS #######################
 ######################################################################
 
+###### TESTING 
+formulas = ['F(p10)']
+
 ##### FRANKA ARCH CONF #######
 # formulas = ['F((p00 & p12 & p21 & free) | (p10 & p01 & p22 & free) | (p10 & p21 & p02 & free) | (p20 & p01 & p12 & free) | (p20 & p11 & p02 & free))']
 # formulas = ['F(p00 & p12 & p21 & free) & G(~(p00 & p21) -> ~(p12))']   # this one works for sure
-formulas = ['F(p00 & p12 & p21 & free) & G(~(p00 & p21) -> ~(p12))']   # correct arch formula
+# formulas = ['F(p00 & p12 & p21 & free) & G(~(p00 & p21) -> ~(p12))']   # correct arch formula
 
 
 # formulas = ['F(p01 & free & F(p12 & free & F(p23 & free & F(p34 & free))))']

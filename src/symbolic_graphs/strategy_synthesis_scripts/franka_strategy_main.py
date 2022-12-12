@@ -11,6 +11,7 @@ from typing import Union, List, Tuple
 from cudd import Cudd, BDD, ADD
 
 from src.explicit_graphs import CausalGraph
+from src.explicit_graphs import Ltlf2MonaDFA
 
 from src.algorithms.strategy_synthesis import ReachabilityGame, BndReachabilityGame
 
@@ -87,6 +88,37 @@ class FrankaPartitionedWorld(FrankaWorld):
         if self.dyn_var_ordering:
             self.set_variable_reordering()
 
+    
+    def create_pred_vars(self, add_flag: bool = False):
+        """
+         This function calls the DFA construction code, extracts the propositions and returns only those propositions relevant to the specification.
+        """
+        if self.ltlf_flag:
+            _dfa = Ltlf2MonaDFA(formula=self.formulas[0])
+        else:
+            warnings.warn("For Franka Abstraction, we have not implemented LTL Synthesis! Pass LTLf flag as True to fix this issue.")
+            sys.exit(-1)
+
+        state_lbl_vars: list = []        
+        _num_of_sym_vars = self.manager.size()
+        if isinstance(_dfa.task_labels, tuple):
+            num: int = len(_dfa.task_labels)
+        else:
+            num = 1
+
+        for num_var in range(num):
+            _var_index = num_var + _num_of_sym_vars
+            if add_flag:
+                state_lbl_vars.append(self.manager.addVar(_var_index, f'p{num_var}'))
+            else:
+                state_lbl_vars.append(self.manager.bddVar(_var_index, f'p{num_var}'))
+
+        # get the propositions
+        if isinstance(_dfa.task_labels, tuple):
+            return [str(lbl) for lbl in _dfa.task_labels], state_lbl_vars
+        else:
+            return [str(_dfa.task_labels)], state_lbl_vars
+
 
     def create_symbolic_causal_graph(self, draw_causal_graph: bool = False, add_flag: bool = False, build_human_move: bool = False, print_facts: bool = False) -> Tuple:
         """
@@ -140,16 +172,20 @@ class FrankaPartitionedWorld(FrankaWorld):
 
         
         # box_preds has predicates segregated as per boxes
-        ts_lbl_vars = []
-        for _id, b in enumerate(box_preds.keys()):
-            if b == 'gripper':
-                ts_lbl_vars.extend(self._create_symbolic_lbl_vars(state_lbls=box_preds[b],
-                                                                  state_var_name=f'g_',
-                                                                  add_flag=add_flag))
-            else:
-                ts_lbl_vars.extend(self._create_symbolic_lbl_vars(state_lbls=box_preds[b],
-                                                                  state_var_name=f'b{_id}_',
-                                                                  add_flag=add_flag))
+        ts_lbls, ts_lbl_vars = self.create_pred_vars()
+        # ts_lbl_vars = []
+        # for _id, b in enumerate(box_preds.keys()):
+        #     if b == 'gripper':
+        #         ts_lbl_vars.extend(self._create_symbolic_lbl_vars(state_lbls=box_preds[b],
+        #                                                           state_var_name=f'g_',
+        #                                                           add_flag=add_flag))
+        #     else:
+        #         ts_lbl_vars.extend(self._create_symbolic_lbl_vars(state_lbls=box_preds[b],
+        #                                                           state_var_name=f'b{_id}_',
+        #                                                           add_flag=add_flag))
+        # ts_lbl_vars = self._create_symbolic_lbl_vars(state_lbls=ts_lbls,
+        #                                              state_var_name=f'p',
+        #                                              add_flag=add_flag)
         
         if print_facts:
             print(f"******************# of boolean Vars for TS lbls: {len(ts_lbl_vars)}******************")
@@ -164,7 +200,7 @@ class FrankaPartitionedWorld(FrankaWorld):
         
         if build_human_move:
             return _causal_graph_instance.task, _causal_graph_instance.problem.domain, curr_vars, \
-                 ts_state_tuples, ts_lbl_vars, ts_robot_act_vars, ts_human_act_vars, boxes, box_preds
+                 ts_state_tuples, ts_lbl_vars, ts_robot_act_vars, ts_human_act_vars, boxes, ts_lbls # box_preds
         
         return _causal_graph_instance.task, _causal_graph_instance.problem.domain, curr_vars, ts_state_tuples, ts_lbl_vars, ts_action_vars, boxes, box_preds
     

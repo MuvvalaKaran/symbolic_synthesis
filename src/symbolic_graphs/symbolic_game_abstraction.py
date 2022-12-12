@@ -546,6 +546,7 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
 
         # create adj map. Useful when rolling out strategy with human intervention for sanity checking
         self.adj_map = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda : {'h': [], 'r': []})))
+    
 
     def initialize_sym_tr_action_list(self):
         """
@@ -588,6 +589,35 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
             _node_int_map[_key] = _bool_func_curr
         
         self.predicate_sym_map_hint = bidict(_node_int_map)
+
+    
+    def _create_sym_state_label_map(self, domain_lbls):
+        """
+         Override the parent to create lbls relevant to the spcification
+        """
+        # create all combinations of 1-true and 0-false
+        # boolean_str = list(product([1, 0], repeat=len(self.sym_vars_lbl)))
+
+        # We will add dumy brackets around the label e.g. l4 ---> (l4) becuase promela parse names the edges in that fashion
+        _node_int_map_lbl = bidict({state: self.sym_vars_lbl[index] for index, state in enumerate(domain_lbls)})
+
+        # assert len(boolean_str) >= len(_node_int_map_lbl), "FIX THIS: Looks like there are more lbls that boolean variables!"
+
+        # loop over all the boolean string and convert them to their respective bdd vars
+        # for _key, _value in _node_int_map_lbl.items():
+        #     _lbl_val_list = []
+        #     for _idx, _ele in enumerate(_value):
+        #         if _ele == 1:
+        #             _lbl_val_list.append(self.sym_vars_lbl[_idx])
+        #         else:
+        #             _lbl_val_list.append(~self.sym_vars_lbl[_idx])
+            
+        #     _bool_func_curr = reduce(lambda a, b: a & b, _lbl_val_list)
+
+        #     # update bidict accordingly
+        #     _node_int_map_lbl[_key] = _bool_func_curr
+        
+        self.predicate_sym_map_lbl = bidict(_node_int_map_lbl)
 
 
     def add_edge_to_action_tr(self,

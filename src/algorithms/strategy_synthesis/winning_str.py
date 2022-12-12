@@ -276,11 +276,20 @@ class ReachabilityGame(BaseSymbolicSearch):
             # we need to fix the state labeling
             pre_prod_state = pre_prod_state.existAbstract(self.ts_obs_cube)
 
+            if verbose:
+                print("********************* Before Universal Quantificaion *********************")
+                self.get_prod_states_from_dd(dd_func=(pre_prod_state & self.init_DFA).existAbstract(self.sys_env_cube), obs_flag=False)
+
             # do universal quantification
             pre_univ = (pre_prod_state).univAbstract(self.env_cube)
             
             # add the correct labels back
             pre_univ = pre_univ & self.obs_bdd
+
+            if verbose:
+                print("********************* After Universal Quantification **********************")
+                self.get_prod_states_from_dd(dd_func=(pre_univ & self.init_DFA).existAbstract(self.sys_env_cube), obs_flag=False)
+
 
             # remove self loops
             stra_list[layer + 1] |= stra_list[layer] | (~self.winning_states[layer] & pre_univ)
@@ -348,6 +357,13 @@ class BndReachabilityGame(ReachabilityGame):
         for ts_transition in self.ts_transition_fun_list:
             pre_prod_state |= self.winning_states[layer].vectorCompose([*self.ts_x_list, *self.ts_handle.sym_vars_hint, *self.dfa_x_list],
                                                     [*ts_transition, *self.dfa_transition_fun_list])
+        
+        ##### EXPERIMENTING
+        # pre_prod_state: BDD = self.manager.bddZero()
+        # tmp_states = (self.winning_states[layer] & self.ts_bdd_sym_to_S2obs_map.inv['p01'])
+        # for ts_transition in self.ts_transition_fun_list:
+        #     pre_prod_state |= tmp_states.vectorCompose([*self.ts_x_list, *self.ts_handle.sym_vars_hint, *self.dfa_x_list],
+        #                                             [*ts_transition, *self.dfa_transition_fun_list])
         
         return pre_prod_state
 

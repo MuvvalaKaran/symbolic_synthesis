@@ -543,13 +543,15 @@ class SymbolicDFAFranka(SymbolicDFA):
                 else:
                     cryptic_lbl = labels
                 
-                # get the gripper free predicate if label is `free` and high
-                if 'free' in str(cryptic_lbl):
-                    expr = expr & self.predicate_sym_map_lbl['(gripper free)']
-                else:
-                    # extract the box id and loc as str
-                    box_loc: str = re.search(r'\d+', str(cryptic_lbl)).group()
-                    expr = expr & self.predicate_sym_map_lbl[f'(on b{box_loc[0]} l{box_loc[1]})']
+                # # get the gripper free predicate if label is `free` and high
+                # if 'free' in str(cryptic_lbl):
+                #     expr = expr & self.predicate_sym_map_lbl['(gripper free)']
+                # else:
+                #     # extract the box id and loc as str
+                #     box_loc: str = re.search(r'\d+', str(cryptic_lbl)).group()
+                #     expr = expr & self.predicate_sym_map_lbl[f'(on b{box_loc[0]} l{box_loc[1]})']
+                
+                expr = expr & self.predicate_sym_map_lbl[str(cryptic_lbl)]
             
             elif value == "0":
                 if isinstance(labels, tuple):
@@ -557,13 +559,16 @@ class SymbolicDFAFranka(SymbolicDFA):
                 else:
                     cryptic_lbl = labels
                 
-                 # get the not(gripper free) predicate if label is `free` and low
-                if 'free' in str(cryptic_lbl):
-                    expr = expr & ~self.predicate_sym_map_lbl['(gripper free)']
-                else:
-                    # extract the box id and loc as str
-                    box_loc: str = re.search(r'\d+', str(cryptic_lbl)).group()
-                    expr = expr & ~self.predicate_sym_map_lbl[f'(on b{box_loc[0]} l{box_loc[1]})']
+                #  # get the not(gripper free) predicate if label is `free` and low
+                # if 'free' in str(cryptic_lbl):
+                #     expr = expr & ~self.predicate_sym_map_lbl['(gripper free)']
+                # else:
+                #     # extract the box id and loc as str
+                #     box_loc: str = re.search(r'\d+', str(cryptic_lbl)).group()
+                #     expr = expr & ~self.predicate_sym_map_lbl[f'(on b{box_loc[0]} l{box_loc[1]})']
+                
+                expr = expr & ~self.predicate_sym_map_lbl[str(cryptic_lbl)]
+
             else:
                 assert value == "X", "Error while constructing symbolic LTLF DFA edge. FIX THIS!!!"
         

@@ -392,17 +392,40 @@ class SymbolicFrankaTransitionSystem():
          A function that converts the corresponding state lbl tuple to its explicit predicate form,
           looks up its corresponding boolean formula, and return the conjunction of all the boolean formula
         """
+        _box_pattern = "[b|B][\d]+"
+        _loc_pattern = "[l|L][\d]+"
+
         # get the explicit preds
         exp_lbls = self.get_state_from_tuple(state_tuple=state_lbl_tuple)
+        mod_lbls = []
 
-        _sym_lbls_list = [self.predicate_sym_map_lbl[lbl] for lbl in exp_lbls]
+        for elbl in exp_lbls:
+            if 'gripper' in elbl:
+                continue
+            lj = int(re.search(_loc_pattern, elbl).group()[-1])
+            bi = int(re.search(_box_pattern, elbl).group()[-1])
 
-        # if gripper is not free then explicitly add not(gripper free) to the state lbl
-        if '(gripper free)' not in exp_lbls:
-            _sym_lbls_list.append(~self.predicate_sym_map_lbl['(gripper free)'])
+            # convert the predicated of type (on bi lj) to (pij)
+            mod_lbls.append(f"p{bi}{lj}")
+        
+        # loop over all the task labels and seggragate accoridngly
+        sym_lbl_exists = []
+        sym_lbl_nexists = []
+        for prop in self.predicate_sym_map_lbl.keys():
+            if prop in mod_lbls:
+                sym_lbl_exists.append(self.predicate_sym_map_lbl[prop])
+            else:
+                # append the negative as theis prop does not satisfy the state  conf.
+                sym_lbl_nexists.append(~self.predicate_sym_map_lbl[prop])
 
+        # _sym_lbls_list = [self.predicate_sym_map_lbl[lbl] for lbl in exp_lbls]
 
-        sym_lbl = reduce(lambda x, y: x & y, _sym_lbls_list)
+        # # if gripper is not free then explicitly add not(gripper free) to the state lbl
+        # if '(gripper free)' not in exp_lbls:
+        #     _sym_lbls_list.append(~self.predicate_sym_map_lbl['(gripper free)'])
+
+        # sym_lbl = reduce(lambda x, y: x & y, _sym_lbls_list)
+        sym_lbl = reduce(lambda x, y: x & y, [*sym_lbl_exists, *sym_lbl_nexists])
 
         assert not sym_lbl.isZero(), "Error constrcuting the symbolic lbl associated with each state. FIX THIS!!!"
 
