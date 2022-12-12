@@ -2,6 +2,7 @@ import re
 import sys
 import time
 import math
+import copy
 import warnings
 
 from bidict import bidict
@@ -521,6 +522,27 @@ class FrankaWorld(BaseSymMain):
         
         return _lbls
 
+
+    def post_process_world_conf(self, possible_lbl: dict, locs: List[str]) -> dict:
+        """
+         This function take as input a dict whose values is the list all possible world confg.
+          We need to remove states where two or more boxes that share the same location 
+        """
+        new_possible_lbl = copy.deepcopy(possible_lbl)
+        # dont_add = False
+        for key, value in possible_lbl.items():
+            _valid_lbls = []
+            for lbl in value:
+                dont_add = False
+                for loc in locs:
+                    if len(re.split(loc, str(lbl))) >= 3:
+                        dont_add = True
+                        break
+                if not dont_add:
+                    _valid_lbls.append(lbl)
+            new_possible_lbl[key] = _valid_lbls
+        
+        return new_possible_lbl
     
 
     def compute_valid_predicates(self, predicates: List[str], boxes: List[str]) -> Tuple[List, List, List]:
@@ -549,7 +571,7 @@ class FrankaWorld(BaseSymMain):
         # dictionary where we segreate on predicates based on boxes - all b0, b1 ,... into seperate list 
         boxes_dict = {box: [] for box in boxes} 
 
-        # define pattaerns to find box ids and locations
+        # define patterns to find box ids and locations
         _loc_pattern = "[l|L][\d]+"
         _box_pattern = "[b|B][\d]+"
 
@@ -623,6 +645,8 @@ class FrankaWorld(BaseSymMain):
 
         # update boxes dictionary with gripper 
         boxes_dict.update({'gripper': ['(gripper free)']})
+
+        # _valid_box_preds = self.post_process_world_conf(_valid_box_preds, locations)
         
         return _valid_robot_preds, _valid_box_preds, boxes_dict
 
@@ -646,6 +670,7 @@ class FrankaWorld(BaseSymMain):
 
         task_facts: List[str] = _causal_graph_instance.task.facts
         boxes: List[str] = _causal_graph_instance.task_objects
+        locations: List[str] = _causal_graph_instance.task_locations
 
         # compute all valid preds of the robot conf and box conf.
         robot_preds, on_preds, box_preds = self.compute_valid_predicates(predicates=task_facts, boxes=boxes)
@@ -659,14 +684,9 @@ class FrankaWorld(BaseSymMain):
         # box_preds has predicated segregated as per boxes
         ts_lbl_vars = []
         for _id, b in enumerate(box_preds.keys()):
-            if b == 'gripper':
-                ts_lbl_vars.extend(self._create_symbolic_lbl_vars(state_lbls=box_preds[b],
-                                                                  state_var_name=f'g_',
-                                                                  add_flag=add_flag))
-            else:
-                ts_lbl_vars.extend(self._create_symbolic_lbl_vars(state_lbls=box_preds[b],
-                                                                  state_var_name=f'b{_id}_',
-                                                                  add_flag=add_flag))
+            ts_lbl_vars.extend(self._create_symbolic_lbl_vars(state_lbls=box_preds[b],
+                                                                state_var_name=f'b{_id}_',
+                                                                add_flag=add_flag))
                 
         return _causal_graph_instance.task, _causal_graph_instance.problem.domain, curr_vars, next_vars, ts_state_tuples, ts_lbl_vars, boxes, box_preds
         

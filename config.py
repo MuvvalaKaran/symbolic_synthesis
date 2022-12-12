@@ -7,8 +7,8 @@ EXPLICIT_GRAPH: bool = False  # set this flag to true when you want to construct
 GRIDWORLD: bool = False   # Set this flag to true when using gridworld example for graph search 
 FRANKAWORLD: bool = False  # Set this flag to true when using manipulator scenarios for graph search
 STRATEGY_SYNTHESIS: bool = True  # Set this flag to true when  when using manipulator scenarios for Strategy synthesis
-TWO_PLAYER_GAME: bool = False  # Set this flag to true when you want to contruct a two-player game env.
-TWO_PLAYER_GAME_BND: bool = True  # Set this flag to true when you want to construct som bounded no. off human interventions.
+TWO_PLAYER_GAME: bool = True # Set this flag to true when you want to contruct a two-player game env.
+TWO_PLAYER_GAME_BND: bool = False  # Set this flag to true when you want to construct som bounded no. off human interventions.
 
 HUMAN_INT_BND: int = 1
 
@@ -24,8 +24,10 @@ OBSTACLE: bool = False  # flag to load the obstacle gridworld and color the grid
 DYNAMIC_VAR_ORDERING: bool = False
 
 ##################### Franka Declare supports and top location for valid Human Int. #########################
-SUP_LOC = ['l0', 'l1']   # support for Arch
-TOP_LOC = ['l2']         # top location for Arch
+# SUP_LOC = ['l0', 'l1']   # support for Arch
+# TOP_LOC = ['l2']         # top location for Arch
+SUP_LOC = []
+TOP_LOC = []
 
 ######################################################################
 #################### FRANKA TABLE TOP FORMULAS #######################
@@ -34,7 +36,7 @@ TOP_LOC = ['l2']         # top location for Arch
 ##### FRANKA ARCH CONF #######
 # formulas = ['F((p00 & p12 & p21 & free) | (p10 & p01 & p22 & free) | (p10 & p21 & p02 & free) | (p20 & p01 & p12 & free) | (p20 & p11 & p02 & free))']
 # formulas = ['F(p00 & p12 & p21 & free) & G(~(p00 & p21) -> ~(p12))']   # this one works for sure
-formulas = ['F(p00 & p12 & p21 & free) & G(~(p00 & p21) -> ~(p12))']   # correct arch formula
+# formulas = ['F(p00 & p12 & p21 & free) & G(~(p00 & p21) -> ~(p12))']   # correct arch formula
 
 
 # formulas = ['F(p01 & free & F(p12 & free & F(p23 & free & F(p34 & free))))']
@@ -42,7 +44,7 @@ formulas = ['F(p00 & p12 & p21 & free) & G(~(p00 & p21) -> ~(p12))']   # correct
 # formulas = ['(F((p01 & free)) & F((p12 & free)) & F((p23 & free)) & F((p34 & free)))']
 
 # simple one box formula 
-# formulas = ['F(p01 & free)']
+formulas = ['F(p01 & free)']
 
 # formulas = [
 #             # 'F((p01 & p20 & free))',
