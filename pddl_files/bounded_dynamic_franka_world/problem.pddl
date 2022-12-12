@@ -36,7 +36,7 @@
     (on b0 l0)
     (on b1 l1)
     (on b2 l3)
-    ;(on b3 l3)
+    ;(on b3 l4)
     ;(on b4 l4)
     ;(on b5 l5)
     ;(on b6 l6)

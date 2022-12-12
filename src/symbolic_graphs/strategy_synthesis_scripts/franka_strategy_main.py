@@ -101,9 +101,10 @@ class FrankaPartitionedWorld(FrankaWorld):
 
         task_facts: List[str] = _causal_graph_instance.task.facts
         boxes: List[str] = _causal_graph_instance.task_objects
+        locations: List[str] = _causal_graph_instance.task_locations
 
         # compute all valid preds of the robot conf and box conf.
-        robot_preds, on_preds, box_preds = self.compute_valid_predicates(predicates=task_facts, boxes=boxes)
+        robot_preds, on_preds, box_preds = self.compute_valid_predicates(predicates=task_facts, boxes=boxes, locations=locations)
 
         # compute all the possible states
         ts_state_tuples = self.compute_valid_franka_state_tuples(robot_preds=robot_preds, on_preds=on_preds, verbose=True)
