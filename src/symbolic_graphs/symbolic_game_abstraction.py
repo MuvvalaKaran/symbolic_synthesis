@@ -138,13 +138,27 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
             warnings.warn("Invalid Default args type when constructing the Symbolic Franka Abstraction. FIX THIS!!!")
             sys.exit(-1)
         
-        if human_action_name != '':
-            _tr_idx: int = self.tr_action_idx_map.get(human_action_name)
-        else:
-            _tr_idx: int = self.tr_action_idx_map.get(robot_action_name)
-        
         curr_state_sym: BDD = self.predicate_sym_map_curr[curr_state_tuple]
         nxt_state_sym: BDD = self.predicate_sym_map_curr[next_state_tuple]
+
+        if human_action_name != '':
+            _tr_idx: int = self.tr_action_idx_map.get(human_action_name)
+            if 'debug' in kwargs:
+                edge_exist: bool = (self.mono_tr_bdd & curr_state_sym & self.predicate_sym_map_robot[robot_action_name] & self.predicate_sym_map_human[human_action_name]).isZero()
+                
+                if not edge_exist:
+                    print(f"Nondeterminism due to Human Action: {self.get_state_from_tuple(curr_state_tuple)} ---{human_action_name}---> {self.get_state_from_tuple(next_state_tuple)}")
+                
+                self.mono_tr_bdd |= curr_state_sym & self.predicate_sym_map_robot[robot_action_name] & self.predicate_sym_map_human[human_action_name]
+        else:
+            _tr_idx: int = self.tr_action_idx_map.get(robot_action_name)
+            if 'debug' in kwargs:
+                edge_exist: bool = (self.mono_tr_bdd &  curr_state_sym & self.predicate_sym_map_robot[robot_action_name] & no_human_move).isZero()
+                
+                if not edge_exist:
+                    print(f"Nondeterminism due to Robot Action: {self.get_state_from_tuple(curr_state_tuple)} ---{robot_action_name}---> {self.get_state_from_tuple(next_state_tuple)}")
+                
+                self.mono_tr_bdd |= curr_state_sym & self.predicate_sym_map_robot[robot_action_name] & no_human_move            
 
         # for every boolean var in nxt_state check if it high or low. If high add it curr state and the correpsonding action to its BDD
         for _idx, var in enumerate(nxt_state_sym.cube()):
@@ -400,6 +414,10 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
         
         layer = 0
 
+        # creating monolithinc tr bdd to keep track all the transition we are creating to detect nondeterminism
+        if 'debug' in kwargs:
+            self.mono_tr_bdd = self.manager.bddZero() 
+
         # no need to check if other boxes are placed at the destination loc during transfer and release as there is only one object
         if len(boxes) == 1:
             add_exist_constr = False
@@ -484,13 +502,15 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
                                                                         robot_nxt_tuple=next_tuple,
                                                                         layer=layer,
                                                                         boxes=boxes,
-                                                                        verbose=verbose)
+                                                                        verbose=verbose,
+                                                                        **kwargs)
                             
                             # add The edge to its corresponding action
                             self.add_edge_to_action_tr(robot_action_name=action.name,
                                                        curr_state_tuple=tuple(_valid_pre),
                                                        next_state_tuple=next_tuple,
-                                                       valid_hact_list=env_edge_acts)
+                                                       valid_hact_list=env_edge_acts,
+                                                       **kwargs)
 
                             # get their corresponding lbls 
                             next_tuple_lbl = self.get_conds_from_state(state_tuple=next_tuple, only_world_conf=True)

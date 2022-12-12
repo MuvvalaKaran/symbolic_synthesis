@@ -137,7 +137,7 @@ if __name__ == "__main__":
                                                  max_human_int=HUMAN_INT_BND)
         # sys.exit(-1)                                         
         print("No. of Boolean Variables in the memory:", cudd_manager.size())
-        frankapartition_handle.solve(verbose=True)
+        frankapartition_handle.solve(verbose=False)
 
 
     else:

@@ -438,6 +438,7 @@ class SymbolicFrankaTransitionSystem():
                 if f'{b_id}_' in str(bvar):
                     _tmp_vars_list.append(bvar)
 
+            # TODO: When the boxes are out of sequence, say only b0 abd b2 exists, this for loop fails. FIX THIS!!!
             # create all combinations of 1-true and 0-false
             boolean_str = list(product([1, 0], repeat=len(_tmp_vars_list)))
 

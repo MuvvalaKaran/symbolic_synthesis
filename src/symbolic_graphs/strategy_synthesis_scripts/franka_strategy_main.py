@@ -218,7 +218,8 @@ class FrankaPartitionedWorld(FrankaWorld):
                                                add_exist_constr=True,
                                                verbose=self.verbose,
                                                plot=self.plot_ts,
-                                               print_tr=False)
+                                               print_tr=False,
+                                               debug=True)
         
         stop: float = time.time()
         print("Time took for constructing the abstraction: ", stop - start)

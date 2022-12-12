@@ -176,6 +176,11 @@ class ReachabilityGame(BaseSymbolicSearch):
                 while act_name is None:
                     act_dd: List[int] = random.choice(curr_act_cubes)
                     act_name = self.ts_bdd_sym_to_robot_act_map.get(act_dd, None)
+                    print("*****************************************************")
+                    # testing 
+                    for test_dd in curr_act_cubes:
+                        print(self.ts_bdd_sym_to_robot_act_map.get(test_dd, 'Invalid Action!!!'))
+                    print("*****************************************************")
 
             else:
                 act_name: str = self.ts_bdd_sym_to_robot_act_map[curr_act]
@@ -234,15 +239,30 @@ class ReachabilityGame(BaseSymbolicSearch):
     def get_pre_states(self, layer: int) -> BDD:
         """
          A function to compute all predecessors from the current set of winning states
-        """
-        # pre_prod_state: BDD = self.winning_states[layer].vectorCompose([*self.ts_x_list, *self.dfa_x_list],
-        #                                                [*self.ts_transition_fun_list, *self.dfa_transition_fun_list])
-        
+        """ 
         pre_prod_state: BDD = self.manager.bddZero()
+        # pre_states: BDD = self.manager.bddZero()
+        # ts_state_tuple = self.ts_handle.get_tuple_from_state(['(ready l1)', '(on b0 l1)', '(on b1 l6)', '(gripper free)'])
+        # test_sym = self.ts_bdd_sym_to_curr_state_map.inv[ts_state_tuple]
+
+        # sanity_tuple = self.ts_handle.get_tuple_from_state(['(holding b0 l7)', '(on b1 l6)'])
+        # sanity_sym = self.ts_bdd_sym_to_curr_state_map.inv[sanity_tuple]
+        # for ts_transition in self.ts_transition_fun_list:
+        #     pre_states |= test_sym.vectorCompose(self.ts_x_list, ts_transition)
+
         for ts_transition in self.ts_transition_fun_list:
             pre_prod_state |= self.winning_states[layer].vectorCompose([*self.ts_x_list, *self.dfa_x_list],
                                                     [*ts_transition, *self.dfa_transition_fun_list])
+
+        # error = sanity_sym & pre_states
+        # error_prod = sanity_sym & pre_prod_state
+
+        # if not (error).isZero():
+        #     print("It is Doomed!!!")
         
+        # if not (error_prod).isZero():
+        #     print("Prod is Doomed!!!")
+
         return pre_prod_state
     
     def solve(self, verbose: bool = False) -> BDD:
@@ -344,9 +364,6 @@ class BndReachabilityGame(ReachabilityGame):
         """
          We  have an additional human intervention variables that we need to account 
         """
-        # pre_prod_state: BDD = self.winning_states[layer].vectorCompose([*self.ts_x_list, *self.ts_handle.sym_vars_hint, *self.dfa_x_list],
-        #                                                [*self.ts_transition_fun_list, *self.dfa_transition_fun_list])
-        
         pre_prod_state: BDD = self.manager.bddZero()
         for ts_transition in self.ts_transition_fun_list:
             pre_prod_state |= self.winning_states[layer].vectorCompose([*self.ts_x_list, *self.ts_handle.sym_vars_hint, *self.dfa_x_list],
@@ -473,7 +490,7 @@ class BndReachabilityGame(ReachabilityGame):
                           transducer: BDD,
                           verbose: bool = False) -> None:
         """
-         A function to roll out the synthesize winning strategy
+         A function to roll out the synthesized winning strategy
         """
 
         curr_dfa_state = self.init_DFA

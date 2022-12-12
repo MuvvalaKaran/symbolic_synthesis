@@ -16,7 +16,7 @@
 
     l6 - hbox_loc
     l7 - hbox_loc
-    ;l8 - hbox_loc
+    l8 - hbox_loc
     ;l9 - hbox_loc
     ;l10 - hbox_loc
 
