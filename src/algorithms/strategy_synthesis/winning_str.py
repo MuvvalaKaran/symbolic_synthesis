@@ -1,5 +1,6 @@
 import re 
 import sys
+import time
 import random
 
 from functools import reduce
@@ -100,7 +101,7 @@ class ReachabilityGame(BaseSymbolicSearch):
         ts_states: BDD = self.obs_bdd.existAbstract(self.ts_obs_cube)
         accp_states: BDD = ts_states & self.target_DFA
 
-        self.winning_states[0] |= accp_states & self.obs_bdd
+        self.winning_states[0] |= accp_states #& self.obs_bdd
     
     @deprecated
     def get_state_action(self, dd_func: BDD, **kwargs) -> None:
@@ -257,6 +258,7 @@ class ReachabilityGame(BaseSymbolicSearch):
             closed |= self.winning_states[layer].existAbstract(self.ts_obs_cube)
 
         while True:
+            lsa = time.time()
             if layer > 0 and stra_list[layer].compare(stra_list[layer - 1], 2):
                 print(f"**************************Reached a Fixed Point in {layer} layers**************************")
                 if not ((self.init_TS & self.init_DFA) & stra_list[layer]).isZero():
@@ -270,11 +272,16 @@ class ReachabilityGame(BaseSymbolicSearch):
 
 
             print(f"**************************Layer: {layer}**************************")
-            
+            sa = time.time()
             pre_prod_state = self.get_pre_states(layer=layer)
-            
+            so = time.time()
+            print("Computation for Predecessors: ", so -sa)
+
+            sa = time.time()
             # we need to fix the state labeling
             pre_prod_state = pre_prod_state.existAbstract(self.ts_obs_cube)
+            so = time.time()
+            print("Computation for Existential Abstraction of state lbls: ", so -sa)
 
             if verbose:
                 print("********************* Before Universal Quantificaion *********************")
@@ -284,7 +291,7 @@ class ReachabilityGame(BaseSymbolicSearch):
             pre_univ = (pre_prod_state).univAbstract(self.env_cube)
             
             # add the correct labels back
-            pre_univ = pre_univ & self.obs_bdd
+            pre_univ = pre_univ #& self.obs_bdd
 
             if verbose:
                 print("********************* After Universal Quantification **********************")
@@ -321,6 +328,8 @@ class ReachabilityGame(BaseSymbolicSearch):
                 closed |= pre_univ.existAbstract(self.sys_env_cube & self.ts_obs_cube)
 
             layer +=1
+            lso = time.time()
+            print(f"Computation for the layer: {layer -1:}", lso -lsa)
 
 
 class BndReachabilityGame(ReachabilityGame):
@@ -535,7 +544,7 @@ class BndReachabilityGame(ReachabilityGame):
             # get human intervention.
             if curr_hint > 0:
                 # coin = random.randint(0, 1)
-                heads = 1
+                heads = 0
                 if heads:
                     next_tuple, curr_hint = self.human_intervention(ract_name=ract_name,
                                                                     curr_state_tuple=curr_ts_tuple,

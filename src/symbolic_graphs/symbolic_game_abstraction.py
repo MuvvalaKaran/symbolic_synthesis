@@ -645,6 +645,10 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
         curr_state_sym: BDD = self.predicate_sym_map_curr[curr_state_tuple]
         nxt_state_sym: BDD = self.predicate_sym_map_curr[next_state_tuple]
 
+        # get the label for the step
+        nxt_state_lbl = self.get_conds_from_state(state_tuple=next_state_tuple, only_world_conf=True)
+        nxt_lbl_sym = self.get_sym_state_lbl_from_tuple(nxt_state_lbl)
+
         if human_action_name != '':
             nxt_state_sym = nxt_state_sym & self.predicate_sym_map_hint[curr_hint - 1]
             _tr_idx: int = self.tr_action_idx_map.get(human_action_name)
@@ -677,14 +681,14 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
                 # if human intervenes then the edge looks like (robot-action) & (human move b# l# l#)
                 if human_action_name != '':
                     self.sym_tr_actions[_tr_idx][_state_idx] |= curr_state_sym & self.predicate_sym_map_robot[robot_action_name] & \
-                         self.predicate_sym_map_human[human_action_name] & self.predicate_sym_map_hint[curr_hint]
+                         self.predicate_sym_map_human[human_action_name] & self.predicate_sym_map_hint[curr_hint] & nxt_lbl_sym
 
                     # self.tr_state_bdds[_state_idx] |= curr_state_sym & self.predicate_sym_map_robot[robot_action_name] & \
                     #      self.predicate_sym_map_human[human_action_name] & self.predicate_sym_map_hint[curr_hint]
                 # if human does not intervene then the edge looks like (robot-action) & not(valid human moves)
                 else:
                     self.sym_tr_actions[_tr_idx][_state_idx] |= curr_state_sym & self.predicate_sym_map_robot[robot_action_name] & \
-                         no_human_move & self.predicate_sym_map_hint[curr_hint]
+                         no_human_move & self.predicate_sym_map_hint[curr_hint] & nxt_lbl_sym
 
                     # self.tr_state_bdds[_state_idx] |= curr_state_sym & self.predicate_sym_map_robot[robot_action_name] & \
                     #      no_human_move & self.predicate_sym_map_hint[curr_hint]

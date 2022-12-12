@@ -34,7 +34,7 @@ TOP_LOC = []
 ######################################################################
 
 ###### TESTING 
-formulas = ['F(p10)']
+formulas = ['F(p00 & p11 & p23)']
 
 ##### FRANKA ARCH CONF #######
 # formulas = ['F((p00 & p12 & p21 & free) | (p10 & p01 & p22 & free) | (p10 & p21 & p02 & free) | (p20 & p01 & p12 & free) | (p20 & p11 & p02 & free))']

@@ -278,11 +278,12 @@ class FrankaPartitionedWorld(FrankaWorld):
              ts_lbl_vars, ts_robot_vars, ts_human_vars, boxes, possible_lbls = self.create_symbolic_causal_graph(draw_causal_graph=draw_causal_graph,
                                                                                                                  build_human_move=True,
                                                                                                                  print_facts=print_facts)
+
         # we create human intervention boolean vars right  after the state vars 
         ts_hint_vars = self._create_symbolic_lbl_vars(state_lbls=list(range(max_human_int + 1)),
                                                       state_var_name='k',
                                                       add_flag=False)
-
+        
         if print_facts:
             print(f"******************# of boolean Vars for Human Interventions: {len(ts_hint_vars)}******************")
         

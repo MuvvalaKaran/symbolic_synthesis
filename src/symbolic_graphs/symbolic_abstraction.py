@@ -426,7 +426,10 @@ class SymbolicFrankaTransitionSystem():
 
         # sym_lbl = reduce(lambda x, y: x & y, _sym_lbls_list)
         sym_lbl = reduce(lambda x, y: x & y, [*sym_lbl_exists, *sym_lbl_nexists])
-
+        # if len(sym_lbl_exists) > 0:
+        #     sym_lbl = reduce(lambda x, y: x & y, sym_lbl_exists)
+        # else:
+        #     sym_lbl = ~(reduce(lambda x, y: x & y, self.predicate_sym_map_lbl.values()))
         assert not sym_lbl.isZero(), "Error constrcuting the symbolic lbl associated with each state. FIX THIS!!!"
 
         return sym_lbl
