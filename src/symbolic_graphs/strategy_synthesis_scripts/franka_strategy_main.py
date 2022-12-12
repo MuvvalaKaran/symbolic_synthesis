@@ -142,14 +142,9 @@ class FrankaPartitionedWorld(FrankaWorld):
         # box_preds has predicates segregated as per boxes
         ts_lbl_vars = []
         for _id, b in enumerate(box_preds.keys()):
-            if b == 'gripper':
-                ts_lbl_vars.extend(self._create_symbolic_lbl_vars(state_lbls=box_preds[b],
-                                                                  state_var_name=f'g_',
-                                                                  add_flag=add_flag))
-            else:
-                ts_lbl_vars.extend(self._create_symbolic_lbl_vars(state_lbls=box_preds[b],
-                                                                  state_var_name=f'b{_id}_',
-                                                                  add_flag=add_flag))
+            ts_lbl_vars.extend(self._create_symbolic_lbl_vars(state_lbls=box_preds[b],
+                                                                state_var_name=f'b{_id}_',
+                                                                add_flag=add_flag))
         
         if print_facts:
             print(f"******************# of boolean Vars for TS lbls: {len(ts_lbl_vars)}******************")

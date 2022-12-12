@@ -395,16 +395,11 @@ class SymbolicFrankaTransitionSystem():
         # get the explicit preds
         exp_lbls = self.get_state_from_tuple(state_tuple=state_lbl_tuple)
 
-        _sym_lbls_list = [self.predicate_sym_map_lbl[lbl] for lbl in exp_lbls]
-
-        # if gripper is not free then explicitly add not(gripper free) to the state lbl
-        if '(gripper free)' not in exp_lbls:
-            _sym_lbls_list.append(~self.predicate_sym_map_lbl['(gripper free)'])
-
+        _sym_lbls_list = [self.predicate_sym_map_lbl[lbl] for lbl in exp_lbls if 'gripper' not in lbl]
 
         sym_lbl = reduce(lambda x, y: x & y, _sym_lbls_list)
 
-        assert not sym_lbl.isZero(), "Error constrcuting the symbolic lbl associated with each state. FIX THIS!!!"
+        assert not sym_lbl.isZero(), "Error constructing the symbolic lbl associated with each state. FIX THIS!!!"
 
         return sym_lbl
 
@@ -439,12 +434,9 @@ class SymbolicFrankaTransitionSystem():
         for b_id, preds in domain_lbls.items():
             # get its corresponding boolean vars
             _tmp_vars_list = []
-            if b_id == 'gripper':
-                _tmp_vars_list.append(self.sym_vars_lbl[-1])
-            else:
-                for bvar in self.sym_vars_lbl:
-                    if f'{b_id}_' in str(bvar):
-                        _tmp_vars_list.append(bvar)
+            for bvar in self.sym_vars_lbl:
+                if f'{b_id}_' in str(bvar):
+                    _tmp_vars_list.append(bvar)
 
             # create all combinations of 1-true and 0-false
             boolean_str = list(product([1, 0], repeat=len(_tmp_vars_list)))

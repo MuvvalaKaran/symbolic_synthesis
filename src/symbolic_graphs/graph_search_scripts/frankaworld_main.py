@@ -620,9 +620,6 @@ class FrankaWorld(BaseSymMain):
            _valid_box_preds['b'].extend(predicate_dict['on'])
         
         self.pred_int_map = _pred_map
-
-        # update boxes dictionary with gripper 
-        boxes_dict.update({'gripper': ['(gripper free)']})
         
         return _valid_robot_preds, _valid_box_preds, boxes_dict
 
