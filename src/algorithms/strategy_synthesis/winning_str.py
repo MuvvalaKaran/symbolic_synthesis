@@ -241,28 +241,10 @@ class ReachabilityGame(BaseSymbolicSearch):
          A function to compute all predecessors from the current set of winning states
         """ 
         pre_prod_state: BDD = self.manager.bddZero()
-        # pre_states: BDD = self.manager.bddZero()
-        # ts_state_tuple = self.ts_handle.get_tuple_from_state(['(ready l1)', '(on b0 l1)', '(on b1 l6)', '(gripper free)'])
-        # test_sym = self.ts_bdd_sym_to_curr_state_map.inv[ts_state_tuple]
-
-        # sanity_tuple = self.ts_handle.get_tuple_from_state(['(holding b0 l7)', '(on b1 l6)'])
-        # sanity_sym = self.ts_bdd_sym_to_curr_state_map.inv[sanity_tuple]
-        # for ts_transition in self.ts_transition_fun_list:
-        #     pre_states |= test_sym.vectorCompose(self.ts_x_list, ts_transition)
-
         for ts_transition in self.ts_transition_fun_list:
             pre_prod_state |= self.winning_states[layer].vectorCompose([*self.ts_x_list, *self.dfa_x_list],
                                                     [*ts_transition, *self.dfa_transition_fun_list])
-
-        # error = sanity_sym & pre_states
-        # error_prod = sanity_sym & pre_prod_state
-
-        # if not (error).isZero():
-        #     print("It is Doomed!!!")
         
-        # if not (error_prod).isZero():
-        #     print("Prod is Doomed!!!")
-
         return pre_prod_state
     
     def solve(self, verbose: bool = False) -> BDD:

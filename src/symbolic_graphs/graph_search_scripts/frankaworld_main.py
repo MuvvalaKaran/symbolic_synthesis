@@ -643,6 +643,9 @@ class FrankaWorld(BaseSymMain):
         
         self.pred_int_map = _pred_map
 
+        # update boxes dictionary with gripper 
+        boxes_dict.update({'gripper': ['(gripper free)']})
+
         _valid_box_preds = self.post_process_world_conf(_valid_box_preds, locations)
         
         return _valid_robot_preds, _valid_box_preds, boxes_dict

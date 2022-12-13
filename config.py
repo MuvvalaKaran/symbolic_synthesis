@@ -46,7 +46,7 @@ TOP_LOC = []
 # formulas = ['(F((p01 & free)) & F((p12 & free)) & F((p23 & free)) & F((p34 & free)))']
 
 # simple one box formula 
-formulas = ['F(p01 & p10)']
+formulas = ['F(p01 & p10 & p27 & free)']
 
 # formulas = [
 #             # 'F((p01 & p20 & free))',
