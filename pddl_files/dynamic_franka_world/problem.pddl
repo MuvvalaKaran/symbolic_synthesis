@@ -6,7 +6,7 @@
     ;;;;; Locs where only the robot can operate ;;;;;
     l0 - box_loc
     l1 - box_loc
-    l2 - box_loc
+    ;l2 - box_loc
     ;l3 - box_loc
     ;l4 - box_loc
     ;l5 - box_loc
@@ -22,7 +22,7 @@
 
     b0 - box
     b1 - box
-    b2 - box
+    ;b2 - box
     ;b3 - box
     ;b4 - box
     ;b5 - box
@@ -37,8 +37,8 @@
     (gripper free)
     
     (on b0 l0)
-    (on b1 l1)
-    (on b2 l6)
+    (on b1 l6)
+    ;(on b2 l6)
     ;(on b3 l3)
     ;(on b4 l6)
     ;(on b5 l5)

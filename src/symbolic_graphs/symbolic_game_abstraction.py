@@ -52,6 +52,19 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
         del self.predicate_sym_map_act
 
 
+    # def _initialize_sym_init_goal_states(self):
+    #     """
+    #     Initialize the inital states of the Transition system with their corresponding symbolic init state vairants.
+    #     """
+    #     init_tuple = self.get_tuple_from_state(self.init)
+    #     goal_tuple = self.get_tuple_from_state(self.goal)
+
+    #     # self.sym_init_states = self.predicate_sym_map_curr.get(init_tuple)
+    #     self.sym_init_states = self.get_predicate_sym_map_curr(init_tuple)
+    #     self.sym_goal_states = None
+
+    #     assert self.sym_init_states is not None, "Error extracting the Sym init state. FIX THIS!!!"
+
     
     def _initialize_bdds_for_actions(self):
         """
@@ -95,6 +108,74 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
                 self.predicate_sym_map_robot = bidict(_node_int_map)
         
         self.initialize_sym_tr_action_list()
+    
+    
+    def _create_sym_var_map(self):
+        """
+          Loop through all the facts that are reachable and assign a boolean funtion to it
+        """
+        pred_sym_map = {}
+        # The first 4 vars are robot conf vars (ready, to-obj, to-loc, holding) and afterwards are all world conf vars (on b# l#)
+        count = 0
+        seg_var = defaultdict(lambda: [])
+        # first segregate them into their respective vars
+        for bvar in self.sym_vars_curr:
+            if f'{count}_' in str(bvar):
+                seg_var[count].append(bvar)
+            else:
+                count += 1
+                seg_var[count].append(bvar) 
+        
+        # ts_state_tuple consists of robot conf and world conf 
+        rseq = ['ready_all', 'holding_all', 'to_obj_all', 'to_loc_all']
+        # domain_lbls = self.ts_states[1]
+
+        # now create all combos and create mapping
+        for _id, bvars_list in seg_var.items():
+            # create all combinations of 1-true and 0-false
+            boolean_str = list(product([1, 0], repeat=len(bvars_list)))
+            
+            if _id <= 3:
+                rconf = rseq[_id]
+                _node_int_map_lbl = bidict({state: boolean_str[index] for index, state in enumerate(self.ts_states[0][rconf])})
+            else:
+                # these will be all world conf like on b# l#
+                # get box id
+                tmp_str = re.split('_', str(bvars_list[0]))[0] # gives you string of type xi
+                index = int(re.findall(r'\d+', tmp_str)[0])  # gives you i
+                bid = index - 4
+                _node_int_map_lbl = bidict({state: boolean_str[index] for index, state in enumerate(self.ts_states[1][f'b{bid}'])})
+
+            assert len(boolean_str) >= len(_node_int_map_lbl), "FIX THIS: Looks like there are more lbls that boolean variables!"
+
+            # loop over all the boolean string and convert them to their respective bdd vars
+            for _key, _value in _node_int_map_lbl.items():
+                _lbl_val_list = []
+                for _idx, _ele in enumerate(_value):
+                    if _ele == 1:
+                        _lbl_val_list.append(bvars_list[_idx])
+                    else:
+                        _lbl_val_list.append(~bvars_list[_idx])
+                
+                _bool_func_curr = reduce(lambda a, b: a & b, _lbl_val_list)
+
+                # update bidict accordingly
+                _node_int_map_lbl[_key] = _bool_func_curr
+            
+            pred_sym_map.update(_node_int_map_lbl)
+
+        pred_sym_map = bidict(pred_sym_map)
+
+        # for loop over all the ts_state tuples and create the state tuple to formula map
+        for index, state_tuple in enumerate(self.ts_states[2]):
+            _states = [self.pred_int_map.inv[_s] for _s in state_tuple]
+            _sym_states = [pred_sym_map[_p] for _p in _states if 'gripper' not in _p]
+            _sym_dd = reduce(lambda x, y: x & y, _sym_states)
+            assert not _sym_dd.isZero(), "Error constrcuting the symbolic lbl associated with each state. FIX THIS!!!"
+            self.predicate_sym_map_curr[state_tuple] = _sym_dd
+        
+        self.predicate_sym_map_curr = bidict(self.predicate_sym_map_curr)
+        self.predicate_sym_map_nxt = self.predicate_sym_map_curr
         
     
     def initialize_sym_tr_action_list(self):
@@ -160,9 +241,9 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
                     self.sym_tr_actions[_tr_idx][_state_idx] |= curr_state_sym & self.predicate_sym_map_robot[robot_action_name] & no_human_move
                     # self.tr_state_bdds[_state_idx] |= curr_state_sym & self.predicate_sym_map_robot[robot_action_name] & no_human_move
             
-            elif var == 2 and self.manager.bddVar(_idx) in self.sym_vars_curr:
-                warnings.warn("Encountered an ambiguous varible during TR construction. FIX THIS!!!")
-                sys.exit(-1)
+            # elif var == 2 and self.manager.bddVar(_idx) in self.sym_vars_curr:
+            #     warnings.warn("Encountered an ambiguous varible during TR construction. FIX THIS!!!")
+            #     sys.exit(-1)
         
         if human_action_name != '':
             self.adj_map[curr_state_tuple][robot_action_name]['h'].append(next_state_tuple)
@@ -207,6 +288,19 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
         nstate = self.get_state_from_tuple(state_tuple=hnext_tuple)
         print(f"Adding Human edge: {cstate} -------{robot_action_name} & {haction.name}------> {nstate}")
     
+
+    def get_predicate_sym_map_curr(self, state_tuple) -> BDD:
+        """
+         This function wraps arounf the classical predicate_sym_map_curr dictionary and return the symbolic representation of tuple
+        """
+        _states = [self.pred_int_map.inv[_s] for _s in state_tuple]
+        _sym_states = [self.predicate_sym_map_curr[_p] for _p in _states if 'gripper' not in _p]
+
+        _sym_dd = reduce(lambda x, y: x & y, _sym_states)
+
+        assert not _sym_dd.isZero(), "Error constrcuting the symbolic lbl associated with each state. FIX THIS!!!"
+
+        return _sym_dd
 
     def check_support_constraint(self, boxes: List[str], curr_state_lbl: tuple, human_action_name: str, robot_action_name: str) -> bool:
         """
@@ -360,7 +454,8 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
                     open_list[layer + 1] |= next_sym_state & self.predicate_sym_map_hint[curr_hint - 1]
                 else:
                     # only add state to the next bucket
-                    open_list[layer + 1] |= next_sym_state
+                    # open_list[layer + 1] |= next_sym_state
+                    open_list.append(next_sym_state)
 
                 # get their corresponding lbls 
                 next_tuple_lbl = self.get_conds_from_state(state_tuple=hnext_tuple, only_world_conf=True)
@@ -404,112 +499,129 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
         if len(boxes) == 1:
             add_exist_constr = False
 
-        open_list[layer] |= init_state_sym
+        # open_list[layer] |= init_state_sym
+        open_list = []
+        open_list.append(init_state_sym)
+        closed = set()
 
-        while not open_list[layer].isZero():
+        # while not open_list[layer].isZero():
+        while len(open_list) > 0:
             # remove all states that have been explored
-            open_list[layer] = open_list[layer] & ~closed
+            # open_list[layer] = open_list[layer] & ~closed
+            open_list = list(set(open_list) - closed)
+
+            if verbose:
+                print(f"******************************* Layer: {layer}*******************************")
+
 
             # If unexpanded states exist ...
-            if not open_list[layer].isZero():
+            # if not open_list[layer].isZero():
+            if len(open_list) > 0:
                 # Add states to be expanded next to already expanded states
-                closed |= open_list[layer]
+                # closed |= open_list[layer]
+                # closed.add(open_list)
 
-                if verbose:
-                    print(f"******************************* Layer: {layer}*******************************")
+                # if verbose:
+                #     print(f"******************************* Layer: {layer}*******************************")
 
                 # get all the states
-                sym_state = self._convert_state_lbl_cube_to_func(dd_func= open_list[layer], prod_curr_list=self.sym_vars_curr)
-                for state in sym_state:
-                    curr_state_tuple = self.predicate_sym_map_curr.inv[state]
-                    
-                    _valid_pre_list = []
-                    # compute the image of the TS states
-                    for action in self.task.operators:
-                        # we skip human moves as we manually loop over afterwards 
-                        if 'human' in action.name:
+                # sym_state = self._convert_state_lbl_cube_to_func(dd_func= open_list[layer], prod_curr_list=self.sym_vars_curr)
+                # for state in sym_state:
+                state = open_list.pop(0)
+                # for state in open_list.pop(0):
+                closed.add(state)
+                curr_state_tuple = self.predicate_sym_map_curr.inv[state]
+                
+                _valid_pre_list = []
+                # compute the image of the TS states
+                for action in self.task.operators:
+                    # we skip human moves as we manually loop over afterwards 
+                    if 'human' in action.name:
+                        continue
+
+                    # set action feasbility flag to True - used during transfer and release action to check the des loc is empty
+                    action_feas: bool = True
+                    pre_tuple = self.get_tuple_from_state(action.preconditions)
+                    _necc_robot_conf = self.get_conds_from_state(pre_tuple, only_robot_conf=True)
+
+                    _intersect: bool = set(pre_tuple).issubset(curr_state_tuple)
+
+                    if _intersect:
+                        # get valid pres from current state tuple
+                        pre_robot_conf = self.get_conds_from_state(curr_state_tuple, only_robot_conf=True)
+                        pre_robot_conf = tuple(set(pre_robot_conf).intersection(_necc_robot_conf))
+                        pre_world_conf = self.get_conds_from_state(curr_state_tuple, only_world_conf=True)
+
+                        _valid_pre = sorted(pre_robot_conf + pre_world_conf)
+                        
+                        if tuple(_valid_pre) != curr_state_tuple:
+                            _valid_pre_sym = self.predicate_sym_map_curr[tuple(_valid_pre)]
+                            # check if this state has already being explored or not
+                            # if not (_valid_pre_sym & closed).isZero():
+                            if _valid_pre_sym in closed:
+                                continue
+                            _valid_pre_list.append(_valid_pre_sym)
+
+                        # add existential constraints to transfer and relase action
+                        if add_exist_constr and (('transfer' in action.name) or ('release' in action.name)):
+                            action_feas = self._check_exist_constraint(boxes=boxes,
+                                                                        curr_state_lbl=_valid_pre,
+                                                                        action_name=action.name)
+                        
+                        if not action_feas:
                             continue
 
-                        # set action feasbility flag to True - used during transfer and release action to check the des loc is empty
-                        action_feas: bool = True
-                        pre_tuple = self.get_tuple_from_state(action.preconditions)
-                        _necc_robot_conf = self.get_conds_from_state(pre_tuple, only_robot_conf=True)
+                        # get add and del tuples 
+                        add_tuple = self.get_tuple_from_state(action.add_effects)
+                        del_tuple = self.get_tuple_from_state(action.del_effects)
 
-                        _intersect: bool = set(pre_tuple).issubset(curr_state_tuple)
+                        # construct the tuple for next state
+                        next_tuple = list(set(_valid_pre) - set(del_tuple))
+                        next_tuple = tuple(sorted(list(set(next_tuple + list(add_tuple)))))
 
-                        if _intersect:
-                            # get valid pres from current state tuple
-                            pre_robot_conf = self.get_conds_from_state(curr_state_tuple, only_robot_conf=True)
-                            pre_robot_conf = tuple(set(pre_robot_conf).intersection(_necc_robot_conf))
-                            pre_world_conf = self.get_conds_from_state(curr_state_tuple, only_world_conf=True)
+                        # look up its corresponding formula
+                        next_sym_state: BDD = self.predicate_sym_map_nxt[next_tuple]
 
-                            _valid_pre = sorted(pre_robot_conf + pre_world_conf)
-                            
-                            if tuple(_valid_pre) != curr_state_tuple:
-                                _valid_pre_sym = self.predicate_sym_map_curr[tuple(_valid_pre)]
-                                # check if this state has already being explored or not
-                                if not (_valid_pre_sym & closed).isZero():
-                                    continue
-                                _valid_pre_list.append(_valid_pre_sym)
+                        if verbose:
+                            cstate = self.get_state_from_tuple(state_tuple=tuple(_valid_pre))
+                            nstate = self.get_state_from_tuple(state_tuple=next_tuple)
+                            print(f"Adding Robot edge: {cstate} -------{action.name}------> {nstate}")
+                        
+                        # add human moves, if any. UNder human action we evolve as per the robot action and human action.
+                        env_edge_acts: list =  self.add_human_moves(robot_action_name=action.name,
+                                                                    open_list=open_list,
+                                                                    curr_state_tuple=tuple(_valid_pre),
+                                                                    robot_nxt_tuple=next_tuple,
+                                                                    layer=layer,
+                                                                    boxes=boxes,
+                                                                    verbose=verbose)
+                        
+                        # add The edge to its corresponding action
+                        self.add_edge_to_action_tr(robot_action_name=action.name,
+                                                    curr_state_tuple=tuple(_valid_pre),
+                                                    next_state_tuple=next_tuple,
+                                                    valid_hact_list=env_edge_acts)
 
-                            # add existential constraints to transfer and relase action
-                            if add_exist_constr and (('transfer' in action.name) or ('release' in action.name)):
-                                action_feas = self._check_exist_constraint(boxes=boxes,
-                                                                           curr_state_lbl=_valid_pre,
-                                                                           action_name=action.name)
-                            
-                            if not action_feas:
-                                continue
+                        # get their corresponding lbls 
+                        next_tuple_lbl = self.get_conds_from_state(state_tuple=next_tuple, only_world_conf=True)
+                        next_lbl_sym = self.get_sym_state_lbl_from_tuple(next_tuple_lbl)
+                        self.sym_state_labels |= next_sym_state & next_lbl_sym
 
-                            # get add and del tuples 
-                            add_tuple = self.get_tuple_from_state(action.add_effects)
-                            del_tuple = self.get_tuple_from_state(action.del_effects)
+                        # store the image in the next bucket
+                        # open_list[layer + 1] |= next_sym_state
+                        open_list.append(next_sym_state)
 
-                            # construct the tuple for next state
-                            next_tuple = list(set(_valid_pre) - set(del_tuple))
-                            next_tuple = tuple(sorted(list(set(next_tuple + list(add_tuple)))))
+                for _val_pre_sym in _valid_pre_list:
+                    # add them the observation bdd
+                    _valid_pre_lbl = self.get_conds_from_state(state_tuple=self.predicate_sym_map_curr.inv[_val_pre_sym],
+                                                                only_world_conf=True)
+                    _valid_pre_lbl_sym = self.get_sym_state_lbl_from_tuple(_valid_pre_lbl)
+                    self.sym_state_labels |= _val_pre_sym & _valid_pre_lbl_sym
 
-                            # look up its corresponding formula
-                            next_sym_state: BDD = self.predicate_sym_map_nxt[next_tuple]
-
-                            if verbose:
-                                cstate = self.get_state_from_tuple(state_tuple=tuple(_valid_pre))
-                                nstate = self.get_state_from_tuple(state_tuple=next_tuple)
-                                print(f"Adding Robot edge: {cstate} -------{action.name}------> {nstate}")
-                            
-                            # add human moves, if any. UNder human action we evolve as per the robot action and human action.
-                            env_edge_acts: list =  self.add_human_moves(robot_action_name=action.name,
-                                                                        open_list=open_list,
-                                                                        curr_state_tuple=tuple(_valid_pre),
-                                                                        robot_nxt_tuple=next_tuple,
-                                                                        layer=layer,
-                                                                        boxes=boxes,
-                                                                        verbose=verbose)
-                            
-                            # add The edge to its corresponding action
-                            self.add_edge_to_action_tr(robot_action_name=action.name,
-                                                       curr_state_tuple=tuple(_valid_pre),
-                                                       next_state_tuple=next_tuple,
-                                                       valid_hact_list=env_edge_acts)
-
-                            # get their corresponding lbls 
-                            next_tuple_lbl = self.get_conds_from_state(state_tuple=next_tuple, only_world_conf=True)
-                            next_lbl_sym = self.get_sym_state_lbl_from_tuple(next_tuple_lbl)
-                            self.sym_state_labels |= next_sym_state & next_lbl_sym
-
-                            # store the image in the next bucket
-                            open_list[layer + 1] |= next_sym_state
-
-                    for _val_pre_sym in _valid_pre_list:
-                        # add them the observation bdd
-                        _valid_pre_lbl = self.get_conds_from_state(state_tuple=self.predicate_sym_map_curr.inv[_val_pre_sym],
-                                                                   only_world_conf=True)
-                        _valid_pre_lbl_sym = self.get_sym_state_lbl_from_tuple(_valid_pre_lbl)
-                        self.sym_state_labels |= _val_pre_sym & _valid_pre_lbl_sym
-
-                        closed |= _val_pre_sym
+                    # closed |= _val_pre_sym
+                    closed.add(_val_pre_sym)
                 
-                layer += 1
+            layer += 1
         
         if kwargs['print_tr'] is True:
             self._print_plot_tr(plot=plot)

@@ -648,7 +648,7 @@ class FrankaWorld(BaseSymMain):
 
         _valid_box_preds = self.post_process_world_conf(_valid_box_preds, locations)
         
-        return _valid_robot_preds, _valid_box_preds, boxes_dict
+        return _valid_robot_preds, _valid_box_preds, boxes_dict, predicate_dict
 
 
     def create_symbolic_causal_graph(self, draw_causal_graph: bool = False, add_flag: bool = False) -> Tuple:
@@ -673,7 +673,7 @@ class FrankaWorld(BaseSymMain):
         locations: List[str] = _causal_graph_instance.task_locations
 
         # compute all valid preds of the robot conf and box conf.
-        robot_preds, on_preds, box_preds = self.compute_valid_predicates(predicates=task_facts, boxes=boxes, locations=locations)
+        robot_preds, on_preds, box_preds, pred_dict = self.compute_valid_predicates(predicates=task_facts, boxes=boxes, locations=locations)
         
         # compute all the possible states
         ts_state_tuples = self.compute_valid_franka_state_tuples(robot_preds=robot_preds, on_preds=on_preds, verbose=True)

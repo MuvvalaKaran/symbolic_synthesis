@@ -1,6 +1,7 @@
 '''
 This script implements Winning staregy and regret strategy synthesis code for Franka World 
 '''
+import re
 import sys
 import time
 import warnings
@@ -104,7 +105,7 @@ class FrankaPartitionedWorld(FrankaWorld):
         locations: List[str] = _causal_graph_instance.task_locations
 
         # compute all valid preds of the robot conf and box conf.
-        robot_preds, on_preds, box_preds = self.compute_valid_predicates(predicates=task_facts, boxes=boxes, locations=locations)
+        robot_preds, on_preds, box_preds, pred_dict = self.compute_valid_predicates(predicates=task_facts, boxes=boxes, locations=locations)
 
         # compute all the possible states
         ts_state_tuples = self.compute_valid_franka_state_tuples(robot_preds=robot_preds, on_preds=on_preds, verbose=True)
@@ -156,16 +157,32 @@ class FrankaPartitionedWorld(FrankaWorld):
             print(f"******************# of boolean Vars for TS lbls: {len(ts_lbl_vars)}******************")
 
         # The order for the boolean vara is first actions vars, then lbls, then state vars
-        curr_vars = self._create_symbolic_lbl_vars(state_lbls=ts_state_tuples,
-                                                   state_var_name='x',
-                                                   add_flag=add_flag)
+        # we create indv vars for each type of predicate
+        curr_vars = []
+        robot_conf_num = len(['ready_all', 'holding_all', 'to_obj_all', 'to_loc_all'])
+        for _id, pred in enumerate(['ready_all', 'holding_all', 'to_obj_all', 'to_loc_all']):
+            curr_vars.extend(self._create_symbolic_lbl_vars(state_lbls=pred_dict[pred],
+                                                   state_var_name=f'x{_id}_',
+                                                   add_flag=add_flag))
+        # curr_vars = self._create_symbolic_lbl_vars(state_lbls=ts_state_tuples,
+        #                                            state_var_name='x',
+        #                                            add_flag=add_flag)
+        for bid, bpred in box_preds.items():
+            # for now skipping gripper in state variables
+            if 'gripper' not in bid:
+                bnum: int = robot_conf_num + int(re.findall(r'\d+', bid)[0])
+                curr_vars.extend(self._create_symbolic_lbl_vars(state_lbls=bpred,
+                                                    state_var_name=f'x{bnum}_',
+                                                    add_flag=add_flag))
         
         if print_facts:
             print(f"******************# of boolean Vars for TS states: {len(curr_vars)}******************")
         
         if build_human_move:
             return _causal_graph_instance.task, _causal_graph_instance.problem.domain, curr_vars, \
-                 ts_state_tuples, ts_lbl_vars, ts_robot_act_vars, ts_human_act_vars, boxes, box_preds
+                 (pred_dict, box_preds, ts_state_tuples), ts_lbl_vars, ts_robot_act_vars, ts_human_act_vars, boxes, box_preds
+            # return _causal_graph_instance.task, _causal_graph_instance.problem.domain, curr_vars, \
+            #      ts_state_tuples, ts_lbl_vars, ts_robot_act_vars, ts_human_act_vars, boxes, box_preds
         
         return _causal_graph_instance.task, _causal_graph_instance.problem.domain, curr_vars, ts_state_tuples, ts_lbl_vars, ts_action_vars, boxes, box_preds
     
@@ -202,7 +219,7 @@ class FrankaPartitionedWorld(FrankaWorld):
         """
          Main Function to Build Two-player Transition System without edge weights
         """
-        task, domain, ts_curr_vars, ts_state_tuples, \
+        task, domain, ts_curr_vars, ts_state_tuple, \
              ts_lbl_vars, ts_robot_vars, ts_human_vars, boxes, possible_lbls = self.create_symbolic_causal_graph(draw_causal_graph=draw_causal_graph,
                                                                                                                  build_human_move=True,
                                                                                                                  print_facts=print_facts)
@@ -213,7 +230,8 @@ class FrankaPartitionedWorld(FrankaWorld):
                                                human_action_vars=ts_human_vars,
                                                task=task,
                                                domain=domain,
-                                               ts_states=ts_state_tuples,
+                                            #    ts_states=ts_state_tuples,
+                                               ts_states=ts_state_tuple,
                                                ts_state_map=self.pred_int_map,
                                                manager=self.manager)
         
