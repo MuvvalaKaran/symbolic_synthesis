@@ -545,7 +545,7 @@ class FrankaWorld(BaseSymMain):
         return new_possible_lbl
     
 
-    def compute_valid_predicates(self, predicates: List[str], boxes: List[str]) -> Tuple[List, List, List]:
+    def compute_valid_predicates(self, predicates: List[str], boxes: List[str], locations: List[str]) -> Tuple[List, List, List]:
         """
         A helper function that segretaes the predicates as required by the symbolic transition relation. We separate them based on
 
@@ -646,7 +646,7 @@ class FrankaWorld(BaseSymMain):
         # update boxes dictionary with gripper 
         boxes_dict.update({'gripper': ['(gripper free)']})
 
-        # _valid_box_preds = self.post_process_world_conf(_valid_box_preds, locations)
+        _valid_box_preds = self.post_process_world_conf(_valid_box_preds, locations)
         
         return _valid_robot_preds, _valid_box_preds, boxes_dict
 
@@ -673,7 +673,7 @@ class FrankaWorld(BaseSymMain):
         locations: List[str] = _causal_graph_instance.task_locations
 
         # compute all valid preds of the robot conf and box conf.
-        robot_preds, on_preds, box_preds = self.compute_valid_predicates(predicates=task_facts, boxes=boxes)
+        robot_preds, on_preds, box_preds = self.compute_valid_predicates(predicates=task_facts, boxes=boxes, locations=locations)
         
         # compute all the possible states
         ts_state_tuples = self.compute_valid_franka_state_tuples(robot_preds=robot_preds, on_preds=on_preds, verbose=True)

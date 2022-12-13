@@ -167,12 +167,24 @@ class ReachabilityGame(BaseSymbolicSearch):
             curr_state_act: BDD =  transducer & curr_prod_state
             curr_act: BDD = curr_state_act.existAbstract(self.prod_xcube & self.ts_obs_cube)
 
-            curr_act_cubes = list(curr_act.generate_cubes())
+            # curr_act_cubes = list(curr_act.generate_cubes())
+            curr_act_cubes = self.convert_prod_cube_to_func(dd_func=curr_act, prod_curr_list=self.sys_act_vars)
+
             # if multiple winning actions exisit from same state
             if len(curr_act_cubes) > 1:
-                act_cube: List[int] = random.choice(curr_act_cubes)
-                act_dd = self.manager.fromLiteralList(act_cube)
-                act_name: str = self.ts_bdd_sym_to_robot_act_map[act_dd]
+                # act_cube: List[int] = random.choice(curr_act_cubes)
+                # act_dd = self.manager.fromLiteralList(act_cube)
+                # act_name: str = self.ts_bdd_sym_to_robot_act_map[act_dd]
+                act_name = None
+                while act_name is None:
+                    act_dd: List[int] = random.choice(curr_act_cubes)
+                    act_name = self.ts_bdd_sym_to_robot_act_map.get(act_dd, None)
+                
+                    print("*****************************************************")
+                    # testing 
+                    for test_dd in curr_act_cubes:
+                        print(self.ts_bdd_sym_to_robot_act_map.get(test_dd, 'Invalid Action!!!'))
+                    print("*****************************************************")
 
             else:
                 act_name: str = self.ts_bdd_sym_to_robot_act_map[curr_act]
