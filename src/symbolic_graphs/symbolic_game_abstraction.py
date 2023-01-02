@@ -51,20 +51,6 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
         del self.sym_vars_action
         del self.predicate_sym_map_act
 
-
-    # def _initialize_sym_init_goal_states(self):
-    #     """
-    #     Initialize the inital states of the Transition system with their corresponding symbolic init state vairants.
-    #     """
-    #     init_tuple = self.get_tuple_from_state(self.init)
-    #     goal_tuple = self.get_tuple_from_state(self.goal)
-
-    #     # self.sym_init_states = self.predicate_sym_map_curr.get(init_tuple)
-    #     self.sym_init_states = self.get_predicate_sym_map_curr(init_tuple)
-    #     self.sym_goal_states = None
-
-    #     assert self.sym_init_states is not None, "Error extracting the Sym init state. FIX THIS!!!"
-
     
     def _initialize_bdds_for_actions(self):
         """
@@ -166,6 +152,8 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
 
         pred_sym_map = bidict(pred_sym_map)
 
+        self.ind_pred_sym_map = pred_sym_map
+
         # for loop over all the ts_state tuples and create the state tuple to formula map
         for index, state_tuple in enumerate(self.ts_states[2]):
             _states = [self.pred_int_map.inv[_s] for _s in state_tuple]
@@ -190,6 +178,56 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
         
         self.tr_action_idx_map = action_idx_map
         self.sym_tr_actions = [[self.manager.bddZero() for _ in range(len(self.sym_vars_curr))] for _ in range(len(self.actions))]
+    
+    
+    def get_missing_preds(self, state_tuple) -> BDD:
+        """
+         A hlper function that iterats through the state tuple, identifies the missing predicates and return the negation of the union of that pred type
+        """
+        rseq = ['ready', 'holding', 'to-obj', 'to-loc']
+        bpred = list(self.ts_states[1].keys())
+
+        # manually remove gripper
+        bpred.remove('gripper')
+
+        states = self.get_state_from_tuple(state_tuple)
+        missing_pred = []
+        for conf in rseq:
+            dont_add = False
+            for _s in states:
+                if conf in _s:
+                    dont_add = True
+                    break
+            
+            if not dont_add:
+                missing_pred.append(conf)
+        
+        for b in bpred:
+            dont_add = False
+            for _s in states:
+                if f'on {b}' in _s:
+                    dont_add = True
+                    break
+            
+            if not dont_add:
+                missing_pred.append(b)
+        
+        missing_preds_sym = self.manager.bddOne()
+
+        # create their union return the negative of that
+        for pred in missing_pred:
+            # if 'b0' in pred or 'b1' in pred:
+                # print("Hi!")
+            # try:
+            #     param_missing_preds = self.ts_states[0][f'{pred}_all']
+            # except:
+            #     param_missing_preds = self.ts_states[1][pred]
+            
+            # _sym_states = [self.ind_pred_sym_map[_p] for _p in param_missing_preds]
+            # _sym_dd = reduce(lambda x, y: x | y, _sym_states)
+            missing_preds_sym = missing_preds_sym & self.ind_pred_sym_map[f'(not {pred})']
+        
+        return missing_preds_sym
         
 
     def add_edge_to_action_tr(self,
@@ -227,6 +265,11 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
         curr_state_sym: BDD = self.predicate_sym_map_curr[curr_state_tuple]
         nxt_state_sym: BDD = self.predicate_sym_map_curr[next_state_tuple]
 
+        # create list of missing predicates
+        missing_preds = self.get_missing_preds(next_state_tuple)
+
+        nxt_state_sym = nxt_state_sym & missing_preds
+
         # for every boolean var in nxt_state check if it high or low. If high add it curr state and the correpsonding action to its BDD
         for _idx, var in enumerate(nxt_state_sym.cube()):
             if var == 1 and self.manager.bddVar(_idx) in self.sym_vars_curr:
@@ -241,9 +284,9 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
                     self.sym_tr_actions[_tr_idx][_state_idx] |= curr_state_sym & self.predicate_sym_map_robot[robot_action_name] & no_human_move
                     # self.tr_state_bdds[_state_idx] |= curr_state_sym & self.predicate_sym_map_robot[robot_action_name] & no_human_move
             
-            # elif var == 2 and self.manager.bddVar(_idx) in self.sym_vars_curr:
-            #     warnings.warn("Encountered an ambiguous varible during TR construction. FIX THIS!!!")
-            #     sys.exit(-1)
+            elif var == 2 and self.manager.bddVar(_idx) in self.sym_vars_curr:
+                warnings.warn("Encountered an ambiguous varible during TR construction. FIX THIS!!!")
+                sys.exit(-1)
         
         if human_action_name != '':
             self.adj_map[curr_state_tuple][robot_action_name]['h'].append(next_state_tuple)

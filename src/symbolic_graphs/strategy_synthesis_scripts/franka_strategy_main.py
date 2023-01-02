@@ -3,6 +3,7 @@ This script implements Winning staregy and regret strategy synthesis code for Fr
 '''
 import re
 import sys
+import copy
 import time
 import warnings
 
@@ -160,6 +161,13 @@ class FrankaPartitionedWorld(FrankaWorld):
         # we create indv vars for each type of predicate
         curr_vars = []
         robot_conf_num = len(['ready_all', 'holding_all', 'to_obj_all', 'to_loc_all'])
+
+        # manually add not of the predicate type for all the rconf and wconf
+        pred_dict['ready_all'].append('(not ready)')
+        pred_dict['holding_all'].append('(not holding)')
+        pred_dict['to_obj_all'].append('(not to-obj)')
+        pred_dict['to_loc_all'].append('(not to-loc)')
+
         for _id, pred in enumerate(['ready_all', 'holding_all', 'to_obj_all', 'to_loc_all']):
             curr_vars.extend(self._create_symbolic_lbl_vars(state_lbls=pred_dict[pred],
                                                    state_var_name=f'x{_id}_',
@@ -167,7 +175,13 @@ class FrankaPartitionedWorld(FrankaWorld):
         # curr_vars = self._create_symbolic_lbl_vars(state_lbls=ts_state_tuples,
         #                                            state_var_name='x',
         #                                            add_flag=add_flag)
-        for bid, bpred in box_preds.items():
+        mod_box_pred = copy.deepcopy(box_preds)
+        for b in boxes:
+            mod_box_pred[b].append(f'(not {b})')
+
+        
+        # for bid, bpred in box_preds.items():
+        for bid, bpred in mod_box_pred.items():
             # for now skipping gripper in state variables
             if 'gripper' not in bid:
                 bnum: int = robot_conf_num + int(re.findall(r'\d+', bid)[0])
@@ -180,7 +194,7 @@ class FrankaPartitionedWorld(FrankaWorld):
         
         if build_human_move:
             return _causal_graph_instance.task, _causal_graph_instance.problem.domain, curr_vars, \
-                 (pred_dict, box_preds, ts_state_tuples), ts_lbl_vars, ts_robot_act_vars, ts_human_act_vars, boxes, box_preds
+                 (pred_dict, mod_box_pred, ts_state_tuples), ts_lbl_vars, ts_robot_act_vars, ts_human_act_vars, boxes, box_preds
             # return _causal_graph_instance.task, _causal_graph_instance.problem.domain, curr_vars, \
             #      ts_state_tuples, ts_lbl_vars, ts_robot_act_vars, ts_human_act_vars, boxes, box_preds
         

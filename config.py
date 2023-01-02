@@ -7,10 +7,10 @@ EXPLICIT_GRAPH: bool = False  # set this flag to true when you want to construct
 GRIDWORLD: bool = False   # Set this flag to true when using gridworld example for graph search 
 FRANKAWORLD: bool = False  # Set this flag to true when using manipulator scenarios for graph search
 STRATEGY_SYNTHESIS: bool = True  # Set this flag to true when  when using manipulator scenarios for Strategy synthesis
-TWO_PLAYER_GAME: bool = True # Set this flag to true when you want to contruct a two-player game env.
-TWO_PLAYER_GAME_BND: bool = False  # Set this flag to true when you want to construct som bounded no. off human interventions.
+TWO_PLAYER_GAME: bool = False # Set this flag to true when you want to contruct a two-player game env.
+TWO_PLAYER_GAME_BND: bool = True  # Set this flag to true when you want to construct som bounded no. off human interventions.
 
-HUMAN_INT_BND: int = 1
+HUMAN_INT_BND: int = 3
 
 DIJKSTRAS: bool = False  # set this flag to true when you want to use Dijkstras
 ASTAR: bool = False # set this flag to true when you want to use A* algorithm 
