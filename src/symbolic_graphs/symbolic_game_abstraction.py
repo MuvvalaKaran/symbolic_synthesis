@@ -314,41 +314,45 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
                 del_tuple = self.get_tuple_from_state(haction.del_effects)
 
                 # construct the tuple for next state as per the human action
-                hnext_tuple = list(set(robot_nxt_tuple) - set(del_tuple))
+                # hnext_tuple = list(set(robot_nxt_tuple) - set(del_tuple))
+                # hnext_tuple = tuple(sorted(list(set(hnext_tuple + list(add_tuple)))))
+
+                hnext_tuple = list(set(curr_state_tuple) - set(del_tuple))
                 hnext_tuple = tuple(sorted(list(set(hnext_tuple + list(add_tuple)))))
                 
                 # For transit - if the human's curr loc and the robot's dest loc is the same then do not add to-obj predicate
-                if 'transit' in robot_action_name:
-                    _loc_pattern = "[l|L][\d]+"
-                    _hcloc: str = re.findall(_loc_pattern, haction.name)[0]
-                    try:
-                        # fails when transiting from else loc to l#
-                        _dloc: str = re.findall(_loc_pattern, robot_action_name)[1]
-                    except:
-                        _dloc: str = re.findall(_loc_pattern, robot_action_name)[0]
-                    _box_pattern = "[b|B][\d]+"
-                    _box_state: str = re.search(_box_pattern, robot_action_name).group()
+                # if 'transit' in robot_action_name:
+                #     _loc_pattern = "[l|L][\d]+"
+                #     _hcloc: str = re.findall(_loc_pattern, haction.name)[0]
+                #     try:
+                #         # fails when transiting from else loc to l#
+                #         _dloc: str = re.findall(_loc_pattern, robot_action_name)[1]
+                #     except:
+                #         _dloc: str = re.findall(_loc_pattern, robot_action_name)[0]
+                #     _box_pattern = "[b|B][\d]+"
+                #     _box_state: str = re.search(_box_pattern, robot_action_name).group()
 
-                    if _hcloc == _dloc:
-                        # remove to-obj prediacte
-                        hnext_tuple = set(hnext_tuple) - set([self.pred_int_map[f'(to-obj {_box_state} {_dloc})']]) 
-                        hnext_tuple = tuple(sorted(list(hnext_tuple)))
+                #     if _hcloc == _dloc:
+                #         # remove to-obj prediacte
+                #         hnext_tuple = set(hnext_tuple) - set([self.pred_int_map[f'(to-obj {_box_state} {_dloc})']]) 
+                #         hnext_tuple = tuple(sorted(list(hnext_tuple)))
 
                 # For transfer - if the human's dest. loc and the robot's dest loc is the same then do not add to-loc predicate
-                if 'transfer' in robot_action_name:
-                    _loc_pattern = "[l|L][\d]+"
-                    _hdloc: str = re.findall(_loc_pattern, haction.name)[1]
-                    _dloc: str = re.findall(_loc_pattern, robot_action_name)[1]
-                    _box_pattern = "[b|B][\d]+"
-                    _box_state: str = re.search(_box_pattern, robot_action_name).group()
+                # if 'transfer' in robot_action_name:
+                #     _loc_pattern = "[l|L][\d]+"
+                #     _hdloc: str = re.findall(_loc_pattern, haction.name)[1]
+                #     _dloc: str = re.findall(_loc_pattern, robot_action_name)[1]
+                #     _box_pattern = "[b|B][\d]+"
+                #     _box_state: str = re.search(_box_pattern, robot_action_name).group()
 
-                    if _hdloc == _dloc:
-                        # remove to-loc prediacte
-                        hnext_tuple = set(hnext_tuple) - set([self.pred_int_map[f'(to-loc {_box_state} {_dloc})']]) 
-                        hnext_tuple = tuple(sorted(list(hnext_tuple)))
+                #     if _hdloc == _dloc:
+                #         # remove to-loc prediacte
+                #         hnext_tuple = set(hnext_tuple) - set([self.pred_int_map[f'(to-loc {_box_state} {_dloc})']]) 
+                #         hnext_tuple = tuple(sorted(list(hnext_tuple)))
 
                 # look up its corresponding formula
-                next_sym_state: BDD = self.predicate_sym_map_nxt[hnext_tuple]
+                # next_sym_state: BDD = self.predicate_sym_map_nxt[hnext_tuple]
+                next_sym_state: BDD = self.get_sym_state_from_tuple(hnext_tuple)
 
                 if verbose:
                     self.print_human_edge(curr_state_tuple=curr_state_tuple,
@@ -377,9 +381,9 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
                     open_list[layer + 1] |= next_sym_state
 
                 # get their corresponding lbls 
-                next_tuple_lbl = self.get_conds_from_state(state_tuple=hnext_tuple, only_world_conf=True)
-                next_lbl_sym = self.get_sym_state_lbl_from_tuple(next_tuple_lbl)
-                self.sym_state_labels |= next_sym_state & next_lbl_sym
+                # next_tuple_lbl = self.get_conds_from_state(state_tuple=hnext_tuple, only_world_conf=True)
+                # next_lbl_sym = self.get_sym_state_lbl_from_tuple(next_tuple_lbl)
+                self.sym_state_labels |= next_sym_state #& next_lbl_sym
         
         return _hact_list
     
@@ -758,7 +762,7 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
         
         cstate = self.get_state_from_tuple(state_tuple=tuple(curr_state_tuple))
         nstate = self.get_state_from_tuple(state_tuple=hnext_tuple)
-        print(f"Adding Human edge: {cstate}[{kwargs['curr_hint']}] -------{robot_action_name} & {haction.name}------> {nstate}[{kwargs['curr_hint'] - 1}]")
+        print(f"Adding Human edge: {cstate}[{kwargs['curr_hint']}] -------{haction.name}------> {nstate}[{kwargs['curr_hint'] - 1}]")
 
 
     def create_transition_system_franka(self,

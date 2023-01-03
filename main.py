@@ -124,7 +124,7 @@ if __name__ == "__main__":
                                                         ltlf_flag=USE_LTLF,
                                                         dyn_var_ord=DYNAMIC_VAR_ORDERING,
                                                         algorithm='qual',
-                                                        verbose=True,
+                                                        verbose=False,
                                                         plot_ts=False,
                                                         plot_obs=False,
                                                         plot=False)

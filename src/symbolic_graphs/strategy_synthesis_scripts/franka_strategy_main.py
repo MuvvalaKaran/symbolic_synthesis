@@ -1,7 +1,9 @@
 '''
 This script implements Winning staregy and regret strategy synthesis code for Franka World 
 '''
+import re
 import sys
+import copy
 import time
 import warnings
 
@@ -110,11 +112,20 @@ class FrankaPartitionedWorld(FrankaWorld):
         # compute all the possible states
         # ts_state_tuples = self.compute_valid_franka_state_tuples(robot_preds=robot_preds, on_preds=on_preds, verbose=True)
         
+        # 
+        _new_ops = copy.deepcopy(_causal_graph_instance.task.operators)
+        
         if build_human_move:
             _seg_action = defaultdict(lambda: [])
             # segregate actions in robot actions (controllable vars - `o`) and humans moves (uncontrollable vars - `i`)
-            for act in _causal_graph_instance.task.operators:
+            for act in _new_ops:
                 if 'human' not in act.name:
+                    # Pyperplan does not support equality operatio.
+                    # remove actions like transit b# li li and transfer b# li li
+                    if 'transit' or 'transfer' in act.name: 
+                        _locs = re.findall("[l|L][\d]+", act.name)
+                        if len(_locs) > 1 and _locs[0] == _locs[1]:
+                            _causal_graph_instance.task.operators.remove(act)
                     _seg_action['robot'].append(act)
                 else:
                     _seg_action['human'].append(act)
@@ -144,20 +155,13 @@ class FrankaPartitionedWorld(FrankaWorld):
         # box_preds has predicates segregated as per boxes
         ts_lbl_vars = []
         for _id, b in enumerate(box_preds.keys()):
-            # if b == 'gripper':
-            #     ts_lbl_vars.extend(self._create_symbolic_lbl_vars(state_lbls=box_preds[b],
-            #                                                       state_var_name=f'g_',
-            #                                                       add_flag=add_flag))
-            # else:
-            # ts_lbl_vars.extend(self._create_symbolic_lbl_vars(state_lbls=box_preds[b],
-            #                                                     state_var_name=f'b{_id}_',
-            #                                                     add_flag=add_flag))
             ts_lbl_vars.append(self._create_symbolic_lbl_vars(state_lbls=box_preds[b],
-                                                                state_var_name=f'b{_id}_',
-                                                                add_flag=add_flag))                                                   
+                                                              state_var_name=f'b{_id}_',
+                                                              add_flag=add_flag))                                                   
         
         if print_facts:
-            print(f"******************# of boolean Vars for TS lbls: {len(ts_lbl_vars)}******************")
+            count = sum([len(listElem) for listElem in ts_lbl_vars])
+            print(f"******************# of boolean Vars for TS lbls: {count}******************")
 
         # The order for the boolean vars is first actions vars, then lbls, then state vars
         curr_vars = self._create_symbolic_lbl_vars(state_lbls=robot_preds,

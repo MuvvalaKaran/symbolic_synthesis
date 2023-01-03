@@ -560,7 +560,11 @@ class SymbolicFrankaTransitionSystem():
 
         if 'transfer' in action_name: 
             box_id, locs = finite_ts._get_multiple_box_location(multiple_box_location_str=action_name)
-            dloc = locs[1]
+            # if transfer b# else l#:  
+            if 'else' in action_name:
+                dloc = locs[0]
+            else:
+                dloc = locs[1]
         elif 'release' in action_name:
             box_id, locs = finite_ts._get_box_location(box_location_state_str=action_name)
             dloc = locs

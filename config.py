@@ -10,7 +10,7 @@ STRATEGY_SYNTHESIS: bool = True  # Set this flag to true when  when using manipu
 TWO_PLAYER_GAME: bool = False  # Set this flag to true when you want to contruct a two-player game env.
 TWO_PLAYER_GAME_BND: bool = True  # Set this flag to true when you want to construct som bounded no. off human interventions.
 
-HUMAN_INT_BND: int = 0
+HUMAN_INT_BND: int = 1
 
 DIJKSTRAS: bool = False  # set this flag to true when you want to use Dijkstras
 ASTAR: bool = False # set this flag to true when you want to use A* algorithm 
