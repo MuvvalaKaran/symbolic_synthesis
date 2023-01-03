@@ -106,13 +106,8 @@ class FrankaPartitionedWorld(FrankaWorld):
         locations: List[str] = _causal_graph_instance.task_locations
 
         # compute all valid preds of the robot conf and box conf.
-        # robot_preds, on_preds, box_preds = self.compute_valid_predicates(predicates=task_facts, boxes=boxes, locations=locations)
-        robot_preds, box_preds = self.compute_valid_predicates(predicates=task_facts, boxes=boxes, locations=locations)
+        robot_preds, box_preds = self.compute_valid_predicates(predicates=task_facts, boxes=boxes)
 
-        # compute all the possible states
-        # ts_state_tuples = self.compute_valid_franka_state_tuples(robot_preds=robot_preds, on_preds=on_preds, verbose=True)
-        
-        # 
         _new_ops = copy.deepcopy(_causal_graph_instance.task.operators)
         
         if build_human_move:
@@ -120,7 +115,7 @@ class FrankaPartitionedWorld(FrankaWorld):
             # segregate actions in robot actions (controllable vars - `o`) and humans moves (uncontrollable vars - `i`)
             for act in _new_ops:
                 if 'human' not in act.name:
-                    # Pyperplan does not support equality operatio.
+                    # Pyperplan does not support equality operation. So, I have to manually trim these actions.
                     # remove actions like transit b# li li and transfer b# li li
                     if 'transit' or 'transfer' in act.name: 
                         _locs = re.findall("[l|L][\d]+", act.name)

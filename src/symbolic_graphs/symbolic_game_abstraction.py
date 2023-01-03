@@ -314,44 +314,10 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
                 del_tuple = self.get_tuple_from_state(haction.del_effects)
 
                 # construct the tuple for next state as per the human action
-                # hnext_tuple = list(set(robot_nxt_tuple) - set(del_tuple))
-                # hnext_tuple = tuple(sorted(list(set(hnext_tuple + list(add_tuple)))))
-
                 hnext_tuple = list(set(curr_state_tuple) - set(del_tuple))
                 hnext_tuple = tuple(sorted(list(set(hnext_tuple + list(add_tuple)))))
-                
-                # For transit - if the human's curr loc and the robot's dest loc is the same then do not add to-obj predicate
-                # if 'transit' in robot_action_name:
-                #     _loc_pattern = "[l|L][\d]+"
-                #     _hcloc: str = re.findall(_loc_pattern, haction.name)[0]
-                #     try:
-                #         # fails when transiting from else loc to l#
-                #         _dloc: str = re.findall(_loc_pattern, robot_action_name)[1]
-                #     except:
-                #         _dloc: str = re.findall(_loc_pattern, robot_action_name)[0]
-                #     _box_pattern = "[b|B][\d]+"
-                #     _box_state: str = re.search(_box_pattern, robot_action_name).group()
-
-                #     if _hcloc == _dloc:
-                #         # remove to-obj prediacte
-                #         hnext_tuple = set(hnext_tuple) - set([self.pred_int_map[f'(to-obj {_box_state} {_dloc})']]) 
-                #         hnext_tuple = tuple(sorted(list(hnext_tuple)))
-
-                # For transfer - if the human's dest. loc and the robot's dest loc is the same then do not add to-loc predicate
-                # if 'transfer' in robot_action_name:
-                #     _loc_pattern = "[l|L][\d]+"
-                #     _hdloc: str = re.findall(_loc_pattern, haction.name)[1]
-                #     _dloc: str = re.findall(_loc_pattern, robot_action_name)[1]
-                #     _box_pattern = "[b|B][\d]+"
-                #     _box_state: str = re.search(_box_pattern, robot_action_name).group()
-
-                #     if _hdloc == _dloc:
-                #         # remove to-loc prediacte
-                #         hnext_tuple = set(hnext_tuple) - set([self.pred_int_map[f'(to-loc {_box_state} {_dloc})']]) 
-                #         hnext_tuple = tuple(sorted(list(hnext_tuple)))
 
                 # look up its corresponding formula
-                # next_sym_state: BDD = self.predicate_sym_map_nxt[hnext_tuple]
                 next_sym_state: BDD = self.get_sym_state_from_tuple(hnext_tuple)
 
                 if verbose:
@@ -568,13 +534,14 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
         self._initialize_bdd_for_human_int()
 
         # store the bdd associated with each state vars in this list. The index corresonds to its number
-        self.tr_state_bdds = [self.manager.bddZero() for _ in range(len(self.sym_vars_curr) + len(self.sym_vars_hint))]
+        
+        self.tr_state_bdds = [self.manager.bddZero() for _ in range(sum([len(listElem) for listElem in self.sym_vars_lbl]) + len(self.sym_vars_curr) + len(self.sym_vars_hint))]
 
         # create adj map. Useful when rolling out strategy with human intervention for sanity checking
         self.adj_map = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda : {'h': [], 'r': []})))
 
         # index to determine where the state vars start 
-        self.state_start_idx: int = len([lbl for var_ls in self.sym_vars_lbl for lbl in var_ls]) + len(self.sym_vars_human) + len(self.sym_vars_robot)
+        self.state_start_idx: int =  len(self.sym_vars_human) + len(self.sym_vars_robot)
 
         self.hint_cube = reduce(lambda x, y: x & y, self.sym_vars_hint)
         self.state_cube = reduce(lambda x, y: x & y, self.sym_vars_curr)
@@ -591,7 +558,6 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
         goal_tuple = self.get_tuple_from_state(self.goal)
         
         self.sym_init_states = self.get_sym_state_from_tuple(init_tuple)
-        # self.sym_init_states = self.predicate_sym_map_curr.get(init_tuple)
         self.sym_goal_states = None
 
         assert self.sym_init_states is not None, "Error extracting the Sym init state. FIX THIS!!!"
@@ -609,7 +575,7 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
             action_idx_map[_action] = _idx
         
         self.tr_action_idx_map = action_idx_map
-        self.sym_tr_actions = [[self.manager.bddZero() for _ in range(len(self.sym_vars_curr) + len(self.sym_vars_hint))] for _ in range(len(self.actions))]
+        self.sym_tr_actions = [[self.manager.bddZero() for _ in range(sum([len(listElem) for listElem in self.sym_vars_lbl]) + len(self.sym_vars_curr) + len(self.sym_vars_hint))] for _ in range(len(self.actions))]
 
 
     def _initialize_bdd_for_human_int(self):
@@ -664,8 +630,6 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
         curr_hint: int = kwargs['curr_hint']
         curr_state_sym: BDD = self.get_sym_state_from_tuple(curr_state_tuple)
         nxt_state_sym: BDD = self.get_sym_state_from_tuple(next_state_tuple)
-        # curr_state_sym: BDD = self.predicate_sym_map_curr[curr_state_tuple]
-        # nxt_state_sym: BDD = self.predicate_sym_map_curr[next_state_tuple]
 
         if human_action_name != '':
             nxt_state_sym = nxt_state_sym & self.predicate_sym_map_hint[curr_hint - 1]
@@ -692,25 +656,19 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
 
 
         # for every boolean var in nxt_state check if it high or low. If high add it curr state and the correpsonding action to its BDD
-        # for _idx, var in enumerate(nxt_state_sym.cube()):
-        for _idx, var in enumerate(nxt_state_sym.existAbstract(self.lbl_cube).cube()):
-            if var == 1 and self.manager.bddVar(_idx) in [*self.sym_vars_curr, *self.sym_vars_hint]:
+        for _idx, var in enumerate(nxt_state_sym.cube()):
+            if var == 1 and self.manager.bddVar(_idx) in kwargs['prod_curr_list']:# [*self.sym_vars_curr, *self.sym_vars_hint]:
                 _state_idx: int = _idx - self.state_start_idx
                 assert _state_idx >= 0, "Error constructing the Partitioned Transition Relation."
                 # if human intervenes then the edge looks like (robot-action) & (human move b# l# l#)
                 if human_action_name != '':
                     self.sym_tr_actions[_tr_idx][_state_idx] |= curr_state_sym & self.predicate_sym_map_robot[robot_action_name] & \
                          self.predicate_sym_map_human[human_action_name] & self.predicate_sym_map_hint[curr_hint]
-
-                    # self.tr_state_bdds[_state_idx] |= curr_state_sym & self.predicate_sym_map_robot[robot_action_name] & \
-                    #      self.predicate_sym_map_human[human_action_name] & self.predicate_sym_map_hint[curr_hint]
                 # if human does not intervene then the edge looks like (robot-action) & not(valid human moves)
                 else:
                     self.sym_tr_actions[_tr_idx][_state_idx] |= curr_state_sym & self.predicate_sym_map_robot[robot_action_name] & \
                          no_human_move & self.predicate_sym_map_hint[curr_hint]
 
-                    # self.tr_state_bdds[_state_idx] |= curr_state_sym & self.predicate_sym_map_robot[robot_action_name] & \
-                    #      no_human_move & self.predicate_sym_map_hint[curr_hint]
             
             elif var == 2 and self.manager.bddVar(_idx) in self.sym_vars_curr:
                 warnings.warn("Encountered an ambiguous varible during TR construction. FIX THIS!!!")
@@ -794,15 +752,12 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
         init_state_sym = self.sym_init_states
 
         # get the state lbls and create state and state lbl mappinng
-        # state_lbl = self.get_conds_from_state(state_tuple=self.predicate_sym_map_curr.inv[init_state_sym], only_world_conf=True)
-        # init_lbl_sym = self.get_sym_state_lbl_from_tuple(state_lbl)
         init_hint: BDD = self.predicate_sym_map_hint[self.max_hint - 1]
 
         # update the init state with hint
         self.sym_init_states = self.sym_init_states & init_hint
         
         # each states consists of boolean Vars corresponding to: S, LBL; K
-        # self.sym_state_labels |= init_state_sym & init_lbl_sym
         self.sym_state_labels |= init_state_sym
      
         # human int cube 
@@ -816,8 +771,8 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
         if len(boxes) == 1:
             add_exist_constr = False
         
-        prod_curr_list = [*self.sym_vars_curr, *self.sym_vars_hint]
-        prod_curr_list.extend([lbl for sym_vars_list in self.sym_vars_lbl for lbl in sym_vars_list])
+        prod_curr_list = [lbl for sym_vars_list in self.sym_vars_lbl for lbl in sym_vars_list]
+        prod_curr_list.extend([*self.sym_vars_curr, *self.sym_vars_hint])
 
         # a state is fully defined with 
         open_list[layer] |= init_state_sym & init_hint
@@ -841,12 +796,8 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
                     print(f"******************************* Layer: {layer}*******************************")
 
                 # get all the states and their corresponding remaining human intervention 
-                # sym_state = self._convert_state_lbl_cube_to_func(dd_func= open_list[layer], prod_curr_list=[*self.sym_vars_curr, *self.sym_vars_hint])
                 sym_state = self._convert_state_lbl_cube_to_func(dd_func= open_list[layer], prod_curr_list=prod_curr_list)
                 for state in sym_state:
-                    # curr_state_tuple = self.predicate_sym_map_curr.inv[state.existAbstract(hint_cube & lbl_cube)]
-                    # curr_state_lbl = self.predicate_sym_map_lbl.inv[state.existAbstract(state_cube & hint_cube)]
-                    # curr_hint: int = self.predicate_sym_map_hint.inv[state.existAbstract(state_cube & curr_state_lbl)]
                     curr_state_tuple, curr_hint = self.get_state_tuple_from_sym_state(sym_state=state, sym_lbl_xcube_list=sym_lbl_xcube_list)
 
                     _valid_pre_list = []
@@ -916,6 +867,7 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
                                                                             boxes=boxes,
                                                                             verbose=verbose,
                                                                             curr_hint=curr_hint,
+                                                                            prod_curr_list=prod_curr_list,
                                                                             **kwargs)
                             
                             # add The edge to its corresponding action
@@ -924,6 +876,7 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
                                                        next_state_tuple=next_tuple,
                                                        curr_hint=curr_hint,
                                                        valid_hact_list=env_edge_acts,
+                                                       prod_curr_list=prod_curr_list,
                                                        **kwargs)
 
                             # get their corresponding lbls 

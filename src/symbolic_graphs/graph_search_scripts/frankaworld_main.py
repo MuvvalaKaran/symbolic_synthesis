@@ -545,7 +545,7 @@ class FrankaWorld(BaseSymMain):
         return new_possible_lbl
     
 
-    def compute_valid_predicates(self, predicates: List[str], boxes: List[str], locations: List[str]) -> Tuple[List, List, List]:
+    def compute_valid_predicates(self, predicates: List[str], boxes: List[str]) -> Tuple[List, Dict]:
         """
         A helper function that segretaes the predicates as required by the symbolic transition relation. We separate them based on
 
@@ -620,38 +620,12 @@ class FrankaWorld(BaseSymMain):
         _pred_map = {pred: num for num, pred in enumerate(_ind_pred_list)}
         _pred_map = bidict(_pred_map)
 
-        # get all valid robot conf predicates
-        # _valid_robot_preds = {'gfree': [], 
-        #                       'gocc': []}
-
-        # we store valid robot conf into types, one where robot conf exist when gripper is free and the other robot conf. where gripper is not free
-        # _valid_robot_preds['gfree'].extend(predicate_dict['ready_all'])
-        # _valid_robot_preds['gocc'].extend(predicate_dict['holding_all'])
-
-        # _valid_robot_preds['gfree'].extend(self._create_all_ready_to_obj_combos(predicate_dict))
-        # _valid_robot_preds['gocc'].extend(self._create_all_holding_to_loc_combos(predicate_dict))
-
         # create on predicate map
         len_robot_conf = len(_ind_pred_list)
         _pred_map.update({pred: len_robot_conf + num for num, pred in enumerate(predicate_dict['on'] + predicate_dict['gripper'])})
-
-        # we create all n and n-1 combos
-        # n combos when all boxes and gripper is not free are grounded 
-        # and n-1 when one of the boxes is being manipulated and gripper is not free
-        # _valid_box_preds = self._get_all_box_combos(boxes_dict=boxes_dict, predicate_dict=predicate_dict)
-        
-        # when you have two objects, then individual on predicates are also valid combos 
-        # if len(_valid_box_preds['b']) == 0:
-        #    _valid_box_preds['b'].extend(predicate_dict['on'])
         
         self.pred_int_map = _pred_map
 
-        # update boxes dictionary with gripper 
-        # boxes_dict.update({'gripper': ['(gripper free)']})
-
-        # _valid_box_preds = self.post_process_world_conf(_valid_box_preds, locations)
-        
-        # return _valid_robot_preds, _valid_box_preds, boxes_dict
         return _ind_pred_list, boxes_dict
 
 
@@ -677,7 +651,7 @@ class FrankaWorld(BaseSymMain):
         locations: List[str] = _causal_graph_instance.task_locations
 
         # compute all valid preds of the robot conf and box conf.
-        robot_preds, on_preds, box_preds = self.compute_valid_predicates(predicates=task_facts, boxes=boxes, locations=locations)
+        robot_preds, on_preds, box_preds = self.compute_valid_predicates(predicates=task_facts, boxes=boxes)#, locations=locations)
         
         # compute all the possible states
         ts_state_tuples = self.compute_valid_franka_state_tuples(robot_preds=robot_preds, on_preds=on_preds, verbose=True)
