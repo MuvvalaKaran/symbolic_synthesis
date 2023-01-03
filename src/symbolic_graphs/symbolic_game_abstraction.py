@@ -551,8 +551,10 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
                  ts_state_map: dict,
                  ts_states: list,
                  max_human_int: int,
-                 manager: Cudd):
+                 manager: Cudd,
+                 ts_state_lbls: list):
         self.sym_vars_hint: List[BDD] = human_int_vars
+        self.state_lbls = ts_state_lbls
         super().__init__(curr_vars, lbl_vars, robot_action_vars, human_action_vars, task, domain, ts_state_map, ts_states, manager)
         
         self.max_hint: int = max_human_int
@@ -566,6 +568,30 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
 
         # create adj map. Useful when rolling out strategy with human intervention for sanity checking
         self.adj_map = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda : {'h': [], 'r': []})))
+
+        # index to determine where the state vars start 
+        self.state_start_idx: int = len([lbl for var_ls in self.sym_vars_lbl for lbl in var_ls]) + len(self.sym_vars_human) + len(self.sym_vars_robot)
+
+        self.hint_cube = reduce(lambda x, y: x & y, self.sym_vars_hint)
+        self.state_cube = reduce(lambda x, y: x & y, self.sym_vars_curr)
+        self.lbl_cube = reduce(lambda x, y: x & y, [lbl for sym_vars_list in self.sym_vars_lbl for lbl in sym_vars_list])
+
+    
+
+    def _initialize_sym_init_goal_states(self):
+        """
+        Initialize the inital states of the Transition system with their corresponding symbolic init state vairants.
+        """
+        self._create_sym_state_label_map(domain_lbls=self.state_lbls)
+        init_tuple = self.get_tuple_from_state(self.init)
+        goal_tuple = self.get_tuple_from_state(self.goal)
+        
+        self.sym_init_states = self.get_sym_state_from_tuple(init_tuple)
+        # self.sym_init_states = self.predicate_sym_map_curr.get(init_tuple)
+        self.sym_goal_states = None
+
+        assert self.sym_init_states is not None, "Error extracting the Sym init state. FIX THIS!!!"
+
 
     def initialize_sym_tr_action_list(self):
         """
@@ -632,8 +658,10 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
             sys.exit(-1)
 
         curr_hint: int = kwargs['curr_hint']
-        curr_state_sym: BDD = self.predicate_sym_map_curr[curr_state_tuple]
-        nxt_state_sym: BDD = self.predicate_sym_map_curr[next_state_tuple]
+        curr_state_sym: BDD = self.get_sym_state_from_tuple(curr_state_tuple)
+        nxt_state_sym: BDD = self.get_sym_state_from_tuple(next_state_tuple)
+        # curr_state_sym: BDD = self.predicate_sym_map_curr[curr_state_tuple]
+        # nxt_state_sym: BDD = self.predicate_sym_map_curr[next_state_tuple]
 
         if human_action_name != '':
             nxt_state_sym = nxt_state_sym & self.predicate_sym_map_hint[curr_hint - 1]
@@ -660,7 +688,8 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
 
 
         # for every boolean var in nxt_state check if it high or low. If high add it curr state and the correpsonding action to its BDD
-        for _idx, var in enumerate(nxt_state_sym.cube()):
+        # for _idx, var in enumerate(nxt_state_sym.cube()):
+        for _idx, var in enumerate(nxt_state_sym.existAbstract(self.lbl_cube).cube()):
             if var == 1 and self.manager.bddVar(_idx) in [*self.sym_vars_curr, *self.sym_vars_hint]:
                 _state_idx: int = _idx - self.state_start_idx
                 assert _state_idx >= 0, "Error constructing the Partitioned Transition Relation."
@@ -691,6 +720,36 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
         # update edge count 
         self.ecount += 1
     
+
+    def get_state_tuple_from_sym_state(self, sym_state: BDD, sym_lbl_xcube_list: List[BDD]) -> Tuple[tuple, int]:
+        """
+         A function that loops over the entire sym state, extracts the corresponding predicates, looks up their index and returns the tuple
+        """
+        curr_state_name = self.predicate_sym_map_curr.inv[sym_state.existAbstract(self.hint_cube & self.lbl_cube)]
+        curr_state_int = self.pred_int_map.get(curr_state_name)
+        curr_hint: int = self.predicate_sym_map_hint.inv[sym_state.existAbstract(self.state_cube & self.lbl_cube)]
+        
+        _lbl_list = []
+        # for idx, _var_list in enumerate(self.sym_vars_lbl):
+        for idx in range(len(self.sym_vars_lbl)):
+            # create a cube of the rest of the dfa vars
+            exist_dfa_cube = self.manager.bddOne()
+            for cube_idx, cube in enumerate(sym_lbl_xcube_list):
+                if cube_idx != idx:
+                    exist_dfa_cube = exist_dfa_cube & cube
+
+            _lbl_dd = sym_state.existAbstract(self.state_cube & self.hint_cube & exist_dfa_cube)            
+            _lbl_name = self.predicate_sym_map_lbl.inv[_lbl_dd]
+            _lbl_int = self.pred_int_map.get(_lbl_name)
+            
+            assert _lbl_name is not None, "Couldn't convert LBL Cube to its corresponding State label. FIX THIS!!!"
+            _lbl_list.append(_lbl_int)
+
+        _lbl_list.extend([curr_state_int])
+
+        return tuple(sorted(_lbl_list)), curr_hint
+
+
     
     def print_human_edge(self, curr_state_tuple: tuple, hnext_tuple: tuple, robot_action_name: str, haction, **kwargs):
         """
@@ -722,7 +781,7 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
         if verbose:
             print(f"Creating TR for Actions:", *self.tr_action_idx_map.keys())
 
-        self._create_sym_state_label_map(domain_lbls=state_lbls)
+        # self._create_sym_state_label_map(domain_lbls=state_lbls)
 
         open_list = defaultdict(lambda: self.manager.bddZero())
 
@@ -731,20 +790,18 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
         init_state_sym = self.sym_init_states
 
         # get the state lbls and create state and state lbl mappinng
-        state_lbl = self.get_conds_from_state(state_tuple=self.predicate_sym_map_curr.inv[init_state_sym], only_world_conf=True)
-        init_lbl_sym = self.get_sym_state_lbl_from_tuple(state_lbl)
+        # state_lbl = self.get_conds_from_state(state_tuple=self.predicate_sym_map_curr.inv[init_state_sym], only_world_conf=True)
+        # init_lbl_sym = self.get_sym_state_lbl_from_tuple(state_lbl)
         init_hint: BDD = self.predicate_sym_map_hint[self.max_hint - 1]
 
         # update the init state with hint
         self.sym_init_states = self.sym_init_states & init_hint
         
         # each states consists of boolean Vars corresponding to: S, LBL; K
-        self.sym_state_labels |= init_state_sym & init_lbl_sym
+        # self.sym_state_labels |= init_state_sym & init_lbl_sym
+        self.sym_state_labels |= init_state_sym
      
         # human int cube 
-        hint_cube = reduce(lambda x, y: x & y, self.sym_vars_hint)
-        state_cube = reduce(lambda x, y: x & y, self.sym_vars_curr)
-
         layer = 0
 
         # creating monolithinc tr bdd to keep track all the transition we are creating to detect nondeterminism
@@ -754,9 +811,18 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
         # no need to check if other boxes are placed at the destination loc during transfer and release as there is only one object
         if len(boxes) == 1:
             add_exist_constr = False
+        
+        prod_curr_list = [*self.sym_vars_curr, *self.sym_vars_hint]
+        prod_curr_list.extend([lbl for sym_vars_list in self.sym_vars_lbl for lbl in sym_vars_list])
 
         # a state is fully defined with 
         open_list[layer] |= init_state_sym & init_hint
+
+        # create sym_lbl_cube list
+        sym_lbl_xcube_list = [] 
+        for vars_list in self.sym_vars_lbl:
+            sym_lbl_xcube_list.append(reduce(lambda x, y: x & y, vars_list))
+
 
         while not open_list[layer].isZero():
             # remove all states that have been explored
@@ -771,10 +837,13 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
                     print(f"******************************* Layer: {layer}*******************************")
 
                 # get all the states and their corresponding remaining human intervention 
-                sym_state = self._convert_state_lbl_cube_to_func(dd_func= open_list[layer], prod_curr_list=[*self.sym_vars_curr, *self.sym_vars_hint])
+                # sym_state = self._convert_state_lbl_cube_to_func(dd_func= open_list[layer], prod_curr_list=[*self.sym_vars_curr, *self.sym_vars_hint])
+                sym_state = self._convert_state_lbl_cube_to_func(dd_func= open_list[layer], prod_curr_list=prod_curr_list)
                 for state in sym_state:
-                    curr_state_tuple = self.predicate_sym_map_curr.inv[state.existAbstract(hint_cube)]
-                    curr_hint: int = self.predicate_sym_map_hint.inv[state.existAbstract(state_cube)]
+                    # curr_state_tuple = self.predicate_sym_map_curr.inv[state.existAbstract(hint_cube & lbl_cube)]
+                    # curr_state_lbl = self.predicate_sym_map_lbl.inv[state.existAbstract(state_cube & hint_cube)]
+                    # curr_hint: int = self.predicate_sym_map_hint.inv[state.existAbstract(state_cube & curr_state_lbl)]
+                    curr_state_tuple, curr_hint = self.get_state_tuple_from_sym_state(sym_state=state, sym_lbl_xcube_list=sym_lbl_xcube_list)
 
                     _valid_pre_list = []
                     # compute the image of the TS states
@@ -823,7 +892,8 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
                             next_tuple = tuple(sorted(list(set(next_tuple + list(add_tuple)))))
 
                             # look up its corresponding formula
-                            next_sym_state: BDD = self.predicate_sym_map_nxt[next_tuple]
+                            # next_sym_state: BDD = self.predicate_sym_map_nxt[next_tuple]
+                            next_sym_state: BDD = self.get_sym_state_from_tuple(next_tuple)
 
                             if verbose:
                                 cstate: tuple = self.get_state_from_tuple(state_tuple=tuple(_valid_pre))
@@ -853,9 +923,9 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
                                                        **kwargs)
 
                             # get their corresponding lbls 
-                            next_tuple_lbl = self.get_conds_from_state(state_tuple=next_tuple, only_world_conf=True)
-                            next_lbl_sym = self.get_sym_state_lbl_from_tuple(next_tuple_lbl)
-                            self.sym_state_labels |= next_sym_state & next_lbl_sym
+                            # next_tuple_lbl = self.get_conds_from_state(state_tuple=next_tuple, only_world_conf=True)
+                            # next_lbl_sym = self.get_sym_state_lbl_from_tuple(next_tuple_lbl)
+                            self.sym_state_labels |= next_sym_state #& next_lbl_sym
 
                             # store the image in the next bucket
                             open_list[layer + 1] |= next_sym_state & self.predicate_sym_map_hint[curr_hint]

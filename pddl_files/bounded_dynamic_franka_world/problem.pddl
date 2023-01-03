@@ -1,7 +1,7 @@
 (define (problem bounded_dynamic_only_franka_world) (:domain bounded_dynamic_franka_box_world)
 (:objects
     franka - robot
-    else - robo_loc
+;    else - robo_loc
 
     ;;;;; Locs where human and robot can operate ;;;;;
     l0 - hbox_loc
@@ -11,8 +11,8 @@
     ;l4 - hbox_loc
     ;l5 - hbox_loc
 
-    l6 - hbox_loc
-    l7 - hbox_loc
+    ;l6 - hbox_loc
+    ;l7 - hbox_loc
     ;l8 - hbox_loc
     ;l9 - hbox_loc
     ;l10 - hbox_loc
@@ -31,7 +31,7 @@
 ;todo: put the initial state's facts and numeric values here
 (:init
     (ready else)
-    (gripper free)
+    ;(gripper free)
     
     (on b0 l0)
     (on b1 l1)

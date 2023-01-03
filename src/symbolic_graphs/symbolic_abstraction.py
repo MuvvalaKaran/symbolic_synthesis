@@ -387,6 +387,28 @@ class SymbolicFrankaTransitionSystem():
         return tuple(sorted(_int_tuple))
     
 
+    def get_sym_state_from_tuple(self, state_lbl_tuple: tuple) -> BDD:
+        """
+         A function that converts the corresponding state lbl tuple to its explicit predicate form,
+          looks up its corresponding boolean formula, and return the conjunction of all the boolean formula
+        """
+        # get the explicit preds
+        exp_lbls = self.get_state_from_tuple(state_tuple=state_lbl_tuple)
+
+        _sym_lbls_list = []
+        for lbl in exp_lbls:
+            if lbl in self.predicate_sym_map_lbl:
+                _sym_lbls_list.append(self.predicate_sym_map_lbl[lbl])
+            else:
+                _sym_lbls_list.append(self.predicate_sym_map_curr[lbl])
+        
+        sym_lbl = reduce(lambda x, y: x & y, _sym_lbls_list)
+
+        assert not sym_lbl.isZero(), "Error constructing the symbolic lbl associated with each state. FIX THIS!!!"
+
+        return sym_lbl
+    
+
     def get_sym_state_lbl_from_tuple(self, state_lbl_tuple: tuple) -> BDD:
         """
          A function that converts the corresponding state lbl tuple to its explicit predicate form,
@@ -398,8 +420,8 @@ class SymbolicFrankaTransitionSystem():
         _sym_lbls_list = [self.predicate_sym_map_lbl[lbl] for lbl in exp_lbls]
 
         # if gripper is not free then explicitly add not(gripper free) to the state lbl
-        if '(gripper free)' not in exp_lbls:
-            _sym_lbls_list.append(~self.predicate_sym_map_lbl['(gripper free)'])
+        # if '(gripper free)' not in exp_lbls:
+        #     _sym_lbls_list.append(~self.predicate_sym_map_lbl['(gripper free)'])
         
         sym_lbl = reduce(lambda x, y: x & y, _sym_lbls_list)
 
@@ -437,13 +459,15 @@ class SymbolicFrankaTransitionSystem():
         # loop over each box and create its corresponding boolean formula 
         for b_id, preds in domain_lbls.items():
             # get its corresponding boolean vars
-            _tmp_vars_list = []
-            if b_id == 'gripper':
-                _tmp_vars_list.append(self.sym_vars_lbl[-1])
-            else:
-                for bvar in self.sym_vars_lbl:
-                    if f'{b_id}_' in str(bvar):
-                        _tmp_vars_list.append(bvar)
+            # _tmp_vars_list = []
+            # if b_id == 'gripper':
+            #     _tmp_vars_list.append(self.sym_vars_lbl[-1])
+            # else:
+            _id: int = int(re.search("\d+", b_id).group())
+            # for _id, bvar in enumerate(self.sym_vars_lbl):
+            #     if f'{b_id}_' in str(bvar):
+            #         _tmp_vars_list.append(bvar)
+            _tmp_vars_list = self.sym_vars_lbl[_id]
 
             # TODO: When the boxes are out of sequence, say only b0 abd b2 exists, this for loop fails. FIX THIS!!!
             # create all combinations of 1-true and 0-false
