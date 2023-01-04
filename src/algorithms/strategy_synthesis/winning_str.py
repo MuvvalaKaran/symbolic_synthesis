@@ -98,25 +98,10 @@ class ReachabilityGame(BaseSymbolicSearch):
         
         This function initializes the set of winning states and set of winning states to the set of accepting states
         """
-        # ts_states: BDD = self.obs_bdd.existAbstract(self.ts_obs_cube)
-        # '(ready l1)', '(on b0 l1)'
-        # '(to-obj b0 l1)', '(on b0 l1)'
-        # '(ready else)', '(on b0 l1)'
-        # get their tuples, and initialize this as accpting states
-        # t1 = self.ts_handle.get_tuple_from_state(['(ready l1)', '(on b0 l1)'])
-        # t2 = self.ts_handle.get_tuple_from_state(['(to-obj b0 l1)', '(on b0 l1)'])
-        # t3 = self.ts_handle.get_tuple_from_state(['(ready else)', '(on b0 l1)'])
-
-        # get their symbolic version
-        # st1 = self.ts_handle.get_sym_state_from_tuple(t1)
-        # st2 = self.ts_handle.get_sym_state_from_tuple(t2)
-        # st3 = self.ts_handle.get_sym_state_from_tuple(t3)
-
         ts_states: BDD = self.obs_bdd
-        # ts_states: BDD = st1 | st2 | st3
         accp_states: BDD = ts_states & self.target_DFA
 
-        self.winning_states[0] |= accp_states #& self.obs_bdd
+        self.winning_states[0] |= accp_states
     
     @deprecated
     def get_state_action(self, dd_func: BDD, **kwargs) -> None:
@@ -183,7 +168,6 @@ class ReachabilityGame(BaseSymbolicSearch):
             curr_state_act: BDD =  transducer & curr_prod_state
             curr_act: BDD = curr_state_act.existAbstract(self.prod_xcube & self.ts_obs_cube)
 
-            # curr_act_cubes = list(curr_act.generate_cubes())
             curr_act_cubes = self.convert_prod_cube_to_func(dd_func=curr_act, prod_curr_list=self.sys_act_vars)
 
             # if multiple winning actions exisit from same state
@@ -232,7 +216,6 @@ class ReachabilityGame(BaseSymbolicSearch):
                     curr_dfa_state = dfa_state
                     break 
 
-            # curr_prod_state = curr_ts_state & self.init_DFA
             curr_prod_state = curr_ts_state & curr_dfa_state
 
             counter += 1
@@ -275,15 +258,12 @@ class ReachabilityGame(BaseSymbolicSearch):
 
         stra_list[layer] = self.winning_states[layer]
         if verbose:
-            # closed |= self.winning_states[layer].existAbstract(self.ts_obs_cube)
             closed |= self.winning_states[layer]
         
         # prod_curr_list = [ele for ele in self.dfa_x_list]
         prod_curr_list = []
         prod_curr_list.extend([lbl for sym_vars_list in self.ts_obs_list for lbl in sym_vars_list])
         prod_curr_list.extend([*self.ts_x_list, *self.ts_handle.sym_vars_hint])
-
-        # prod_curr_list.extend([*self.ts_x_list, *self.ts_handle.sym_vars_hint])
 
         sym_lbl_cubes = self._create_lbl_cubes()
 
@@ -303,15 +283,9 @@ class ReachabilityGame(BaseSymbolicSearch):
             print(f"**************************Layer: {layer}**************************")
             
             pre_prod_state = self.get_pre_states(layer=layer, prod_curr_list=prod_curr_list)
-            
-            # we need to fix the state labeling
-            # pre_prod_state = pre_prod_state.existAbstract(self.ts_obs_cube)
 
             # do universal quantification
             pre_univ = (pre_prod_state).univAbstract(self.env_cube)
-            
-            # add the correct labels back
-            # pre_univ = pre_univ & self.obs_bdd
 
             # remove self loops
             stra_list[layer + 1] |= stra_list[layer] | (~self.winning_states[layer] & pre_univ)
@@ -338,11 +312,10 @@ class ReachabilityGame(BaseSymbolicSearch):
             # print new winning states in each iteration
             if verbose:
                 print(f"Winning states at Iter {layer + 1}")
-                # new_states = ~closed & pre_univ.existAbstract(self.sys_env_cube & self.ts_obs_cube)
                 new_states = ~closed & pre_univ.existAbstract(self.sys_env_cube)
                 self.get_prod_states_from_dd(dd_func=new_states, sym_lbl_cubes=sym_lbl_cubes, prod_curr_list=prod_curr_list)
 
-                closed |= pre_univ.existAbstract(self.sys_env_cube)# & self.ts_obs_cube)
+                closed |= pre_univ.existAbstract(self.sys_env_cube)
 
             layer +=1
 
@@ -388,20 +361,13 @@ class BndReachabilityGame(ReachabilityGame):
          We  have an additional human intervention variables that we need to account 
         """
         pre_prod_state: BDD = self.manager.bddZero()
-        c = 0
+
         # first evolve over DFA and then evolve over the TS
         mod_win_state: BDD = self.winning_states[layer].vectorCompose(self.dfa_x_list, [*self.dfa_transition_fun_list])
-        # mod_win_state = mod_win_state & self.init_DFA
+        
         for ts_transition in self.ts_transition_fun_list:
-            # pre_prod_state |= self.winning_states[layer].vectorCompose([*self.ts_x_list, *self.ts_handle.sym_vars_hint, *self.dfa_x_list],
-            #                                         [*ts_transition, *self.dfa_transition_fun_list])
-            # pre_prod_state |= self.winning_states[layer].vectorCompose(prod_curr_list,[*ts_transition, *self.dfa_transition_fun_list])
-            # pre_prod_state |= self.winning_states[layer].vectorCompose(prod_curr_list,[*self.dfa_transition_fun_list, *ts_transition])
-            # pre_prod_state |= self.winning_states[layer].vectorCompose(prod_curr_list,[*ts_transition])
             pre_prod_state |= mod_win_state.vectorCompose(prod_curr_list,[*ts_transition])
-            c += 1
-
-        # pre_dfa_state = self.winning_states[layer].vectorCompose(self.dfa_x_list, [*self.dfa_transition_fun_list])
+            
         
         return pre_prod_state
 
@@ -416,10 +382,7 @@ class BndReachabilityGame(ReachabilityGame):
         prod_curr_list = kwargs['prod_curr_list']
         prod_cube_string: List[BDD] = self.convert_prod_cube_to_func(dd_func=dd_func, prod_curr_list=prod_curr_list) 
         for prod_cube in prod_cube_string:
-            # _ts_dd = prod_cube.existAbstract(self.dfa_xcube & self.ts_obs_cube & self.hint_cube)
             _ts_dd = prod_cube.existAbstract(self.dfa_xcube)
-            # _ts_tuple = self.ts_bdd_sym_to_curr_state_map.get(_ts_dd)
-            # _ts_name = self.ts_handle.get_state_from_tuple(state_tuple=_ts_tuple)
             _ts_tuple, _ts_hint = self.ts_handle.get_state_tuple_from_sym_state(_ts_dd, kwargs['sym_lbl_cubes'])
             _ts_name = self.ts_handle.get_state_from_tuple(_ts_tuple)
             assert _ts_name is not None, "Couldn't convert TS Cube to its corresponding State. FIX THIS!!!"
@@ -429,23 +392,20 @@ class BndReachabilityGame(ReachabilityGame):
                                                ADD_flag=False,
                                                **kwargs)
             
-            # _ts_hint_dd = prod_cube.existAbstract(self.dfa_xcube & self.ts_obs_cube & self.ts_xcube)
-            # _ts_hint: int = self.ts_bdd_sym_to_hint_map.get(_ts_hint_dd)
-            
             print(f"([{_ts_name},{_ts_hint}], {_dfa_name})")
 
 
-    def evolve_as_per_human(self, curr_state_tuple: tuple, curr_dfa_state: BDD, curr_hint: int, ract_name: str) -> Tuple[BDD, tuple]:
+    def evolve_as_per_human(self, curr_state_tuple: tuple, curr_dfa_state: BDD, curr_hint: int) -> Tuple[BDD, tuple]:
         """
          A function that compute the next state tuple given the current state tuple. 
         """
-        nxt_state_tuple = random.choice(self.ts_handle.adj_map[curr_state_tuple][ract_name][curr_hint]['h'])
+        nxt_state_tuple = random.choice(self.ts_handle.adj_map[curr_state_tuple][curr_hint]['h'])
         # look up its corresponding formula
-        nxt_ts_state: BDD = self.ts_bdd_sym_to_curr_state_map.inv[nxt_state_tuple]
+        nxt_ts_state: BDD = self.ts_handle.get_sym_state_from_tuple(nxt_state_tuple)
 
         # update the DFA state as per the human move.
-        nxt_ts_lbl = nxt_ts_state & self.obs_bdd
-        
+        nxt_ts_lbl = nxt_ts_state.existAbstract(self.ts_xcube)
+
         # create DFA edge and check if it satisfies any of the dges or not
         for dfa_state in self.dfa_bdd_sym_to_curr_state_map.keys():
             dfa_pre = dfa_state.vectorCompose(self.dfa_x_list, self.dfa_transition_fun_list)
@@ -459,69 +419,41 @@ class BndReachabilityGame(ReachabilityGame):
     
 
     def human_intervention(self,
-                           ract_name: str,
                            curr_state_tuple: tuple,
                            curr_dfa_state: BDD,
                            curr_hint: int,
-                           nxt_state_tuple: tuple,
                            verbose: bool = True) -> Tuple[tuple, int]:
         """
          Evolve on the game as per human intervention
         """
         # get the next action
         hnext_tuple = curr_state_tuple
-        del_pred: bool = False
-        # # if curr robot action is transit or transfer then remove to-loc and to-obj predicate respectively for human int. 
-        if 'transit' in ract_name:
-            for tidx, pred in enumerate(self.ts_handle.get_state_from_tuple(hnext_tuple)):
-                if 'to-obj' in pred:
-                    del_pred = True
-                    break
-            
-        elif 'transfer' in ract_name:
-            for tidx, pred in enumerate(self.ts_handle.get_state_from_tuple(hnext_tuple)):
-                if 'to-loc' in pred:
-                    del_pred = True
-                    break
-        
-        if del_pred:
-            # remove to-obj prediacte
-            hnext_tuple = set(hnext_tuple) - set([list(curr_state_tuple)[tidx]]) 
-            hnext_tuple = tuple(sorted(list(hnext_tuple))) 
-        
+
         itr = 0
-        if len(self.ts_handle.adj_map[hnext_tuple][ract_name][curr_hint]['h']) > 0:
+        nxt_prod_state, nxt_ts_tuple = self.evolve_as_per_human(curr_state_tuple=hnext_tuple,
+                                                                curr_hint=curr_hint,
+                                                                curr_dfa_state=curr_dfa_state)
+        
+        # forcing human to not make a move that satisfies the specification
+        while not (self.target_DFA & nxt_prod_state).isZero():
             nxt_prod_state, nxt_ts_tuple = self.evolve_as_per_human(curr_state_tuple=hnext_tuple,
                                                                     curr_hint=curr_hint,
-                                                                    curr_dfa_state=curr_dfa_state,
-                                                                    ract_name=ract_name)
-           
-            # forcing human to not make a move that satisfies the specification
-            while not (self.target_DFA & nxt_prod_state).isZero():
-                nxt_prod_state, nxt_ts_tuple = self.evolve_as_per_human(curr_state_tuple=hnext_tuple,
-                                                                        curr_hint=curr_hint,
-                                                                        curr_dfa_state=curr_dfa_state,
-                                                                        ract_name=ract_name)
-                # hacky way to avoid infinite looping
-                itr += 1
-                if itr > 5:
-                    break
+                                                                    curr_dfa_state=curr_dfa_state)
+            # hacky way to avoid infinite looping
+            itr += 1
+            if itr > 5:
+                break
 
-            if verbose:
-                print(f"Human Intervened: New Conf. {self.ts_handle.get_state_from_tuple(nxt_ts_tuple)}")
+        if verbose:
+            diff = list(set(nxt_ts_tuple) - set(curr_state_tuple))
+            assert len(diff) == 1, "Error with Human Intevention. More than one block moved in one Human move. Fix This!!!" 
+            print(f"Human Moved: {self.ts_handle.get_state_from_tuple(diff)}; New Conf. {self.ts_handle.get_state_from_tuple(nxt_ts_tuple)}")
 
-            # reduce the human int count by 1
-            curr_hint -= 1
-            curr_hint_dd = self.ts_bdd_sym_to_hint_map.inv[curr_hint]
+        # reduce the human int count by 1
+        curr_hint -= 1
+        curr_state_tuple = nxt_ts_tuple
 
-            # update hint counter 
-            curr_prod_state = nxt_prod_state & curr_hint_dd
-            curr_state_tuple = nxt_ts_tuple
-
-            return curr_state_tuple, curr_hint
-        
-        else:
-            return nxt_state_tuple, curr_hint
+        return curr_state_tuple, curr_hint
 
 
     def roll_out_strategy(self,
@@ -532,63 +464,73 @@ class BndReachabilityGame(ReachabilityGame):
         """
 
         curr_dfa_state = self.init_DFA
-        curr_prod_state = self.init_TS & curr_dfa_state & self.obs_bdd
-        curr_hint_dd: BDD = self.init_TS.existAbstract(self.ts_xcube)
+        curr_prod_state = self.init_TS & curr_dfa_state
+        curr_hint_dd: BDD = self.init_TS.existAbstract(self.ts_xcube & self.ts_obs_cube)
         curr_hint: int = self.ts_bdd_sym_to_hint_map[curr_hint_dd]
         counter = 0
         ract_name: str = ''
 
+        sym_lbl_cubes = self._create_lbl_cubes()
+        
+        if verbose:
+            init_ts = self.init_TS & curr_hint_dd
+            init_ts_tuple, _  = self.ts_handle.get_state_tuple_from_sym_state(sym_state=init_ts, sym_lbl_xcube_list=sym_lbl_cubes)
+            init_ts = self.ts_handle.get_state_from_tuple(state_tuple=init_ts_tuple)
+            print(f"Init State: {init_ts[1:]}")
+
         # until you reach a goal state. . .
         while (self.target_DFA & curr_prod_state).isZero():
             # current state tuple
-            curr_ts_state: BDD = curr_prod_state.existAbstract(self.dfa_xcube & self.ts_obs_cube & self.sys_env_cube & self.hint_cube)
-            curr_ts_tuple: tuple = self.ts_bdd_sym_to_curr_state_map[curr_ts_state]
+            curr_ts_state: BDD = curr_prod_state.existAbstract(self.dfa_xcube & self.sys_env_cube)
+            curr_ts_tuple, _ = self.ts_handle.get_state_tuple_from_sym_state(sym_state=curr_ts_state, sym_lbl_xcube_list=sym_lbl_cubes)
 
             curr_state_act: BDD =  transducer & curr_prod_state
             curr_act: BDD = curr_state_act.existAbstract(self.prod_xcube & self.ts_obs_cube & self.hint_cube)
 
-            # curr_act_cubes = list(curr_act.generate_cubes())
-            curr_act_cubes = self.convert_prod_cube_to_func(dd_func=curr_act, prod_curr_list=self.sys_act_vars)
-
-            # if multiple winning actions exisit from same state
-            if len(curr_act_cubes) > 1:
-                ract_name = None
-                while ract_name is None:
-                    ract_dd: List[int] = random.choice(curr_act_cubes)
-                    ract_name = self.ts_bdd_sym_to_robot_act_map.get(ract_dd, None)
-
-            else:
-                ract_name = self.ts_bdd_sym_to_robot_act_map[curr_act]
-
-            if verbose:
-                print(f"Step {counter}: {ract_name}; Hint: {curr_hint}")
-            
-            # get add and del tuples
-            for op in self.ts_handle.task.operators:
-                if op.name == ract_name:
-                    add_tuple = self.ts_handle.get_tuple_from_state(op.add_effects)
-                    del_tuple = self.ts_handle.get_tuple_from_state(op.del_effects)
-                    break
-
-            # construct the tuple for next state
-            next_tuple = list(set(curr_ts_tuple) - set(del_tuple))
-            next_tuple = tuple(sorted(list(set(next_tuple + list(add_tuple)))))
-
-            # get human intervention.
-            if curr_hint > 0:
-                # coin = random.randint(0, 1)
-                heads = 1
-                if heads:
-                    next_tuple, curr_hint = self.human_intervention(ract_name=ract_name,
-                                                                    curr_state_tuple=curr_ts_tuple,
+            # flip a coin and choose to intervene or not intervene
+            coin = random.randint(0, 1)
+            # coin = 1
+            human_int: bool = False
+            # Human Intervention
+            if coin and curr_hint > 0:
+                if len(self.ts_handle.adj_map[curr_ts_tuple][curr_hint]['h']) > 0:
+                    human_int = True
+                    next_tuple, curr_hint = self.human_intervention(curr_state_tuple=curr_ts_tuple,
                                                                     curr_dfa_state=curr_dfa_state,
-                                                                    nxt_state_tuple=next_tuple,
-                                                                    curr_hint=curr_hint, verbose=True)
+                                                                    curr_hint=curr_hint,
+                                                                    verbose=True)
+            if not human_int:
+                curr_act_cubes = self.convert_prod_cube_to_func(dd_func=curr_act, prod_curr_list=self.sys_act_vars)
+
+                # if multiple winning actions exisit from same state
+                if len(curr_act_cubes) > 1:
+                    ract_name = None
+                    while ract_name is None:
+                        ract_dd: List[int] = random.choice(curr_act_cubes)
+                        ract_name = self.ts_bdd_sym_to_robot_act_map.get(ract_dd, None)
+
+                else:
+                    ract_name = self.ts_bdd_sym_to_robot_act_map[curr_act]
+
+                if verbose:
+                    print(f"Step {counter}: Hint: {curr_hint}: Act: {ract_name}")
+                
+                # get add and del tuples
+                for op in self.ts_handle.task.operators:
+                    if op.name == ract_name:
+                        add_tuple = self.ts_handle.get_tuple_from_state(op.add_effects)
+                        del_tuple = self.ts_handle.get_tuple_from_state(op.del_effects)
+                        break
+
+                # construct the tuple for next state
+                next_tuple = list(set(curr_ts_tuple) - set(del_tuple))
+                next_tuple = tuple(sorted(list(set(next_tuple + list(add_tuple)))))
 
             # look up its corresponding formula
-            curr_ts_state: BDD = self.ts_bdd_sym_to_curr_state_map.inv[next_tuple]
+            curr_ts_state: BDD = self.ts_handle.get_sym_state_from_tuple(next_tuple)
 
-            curr_ts_lbl = curr_ts_state & self.obs_bdd
+            curr_ts_lbl: BDD = curr_ts_state.existAbstract(self.ts_xcube)
+
             # create DFA edge and check if it satisfies any of the dges or not
             for dfa_state in self.dfa_bdd_sym_to_curr_state_map.keys():
                 dfa_pre = dfa_state.vectorCompose(self.dfa_x_list, self.dfa_transition_fun_list)

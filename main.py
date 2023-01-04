@@ -136,7 +136,7 @@ if __name__ == "__main__":
                                                  bnd_dynamic_env=TWO_PLAYER_GAME_BND,
                                                  max_human_int=HUMAN_INT_BND)
         # sys.exit(-1)                                         
-        print("No. of Boolean Variables in the memory:", cudd_manager.size())
+        print(f"****************** # Total Boolean Variables: { cudd_manager.size()} ******************")
         frankapartition_handle.solve(verbose=False)
 
 

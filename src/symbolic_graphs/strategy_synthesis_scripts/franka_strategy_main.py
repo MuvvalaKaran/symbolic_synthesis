@@ -1,6 +1,3 @@
-'''
-This script implements Winning staregy and regret strategy synthesis code for Franka World 
-'''
 import re
 import sys
 import copy
@@ -65,7 +62,6 @@ class FrankaPartitionedWorld(FrankaWorld):
             else:
                 sym_tr, ts_curr_vars, ts_action_vars, ts_lbl_vars = self.build_bdd_abstraction(draw_causal_graph=draw_causal_graph)
             
-            # dfa_tr, dfa_curr_state = self.build_bdd_symbolic_dfa(sym_tr_handle=sym_tr)
             dfa_tr = self.build_bdd_symbolic_dfa(sym_tr_handle=sym_tr)
         
         else:
@@ -75,7 +71,6 @@ class FrankaPartitionedWorld(FrankaWorld):
         self.dfa_handle: PartitionedDFA = dfa_tr
 
         self.ts_x_list: List[BDD] = ts_curr_vars
-        # self.dfa_x_list: List[BDD] = dfa_curr_state
         self.ts_obs_list: List[BDD] = ts_lbl_vars
 
         if dynamic_env or bnd_dynamic_env:
@@ -104,16 +99,16 @@ class FrankaPartitionedWorld(FrankaWorld):
 
         task_facts: List[str] = _causal_graph_instance.task.facts
         boxes: List[str] = _causal_graph_instance.task_objects
-        locations: List[str] = _causal_graph_instance.task_locations
+
 
         # compute all valid preds of the robot conf and box conf.
         robot_preds, box_preds = self.compute_valid_predicates(predicates=task_facts, boxes=boxes)
 
         _new_ops = copy.deepcopy(_causal_graph_instance.task.operators)
         
+        # segregate actions in robot actions (controllable vars - `o`) and humans moves (uncontrollable vars - `i`)
         if build_human_move:
             _seg_action = defaultdict(lambda: [])
-            # segregate actions in robot actions (controllable vars - `o`) and humans moves (uncontrollable vars - `i`)
             for act in _new_ops:
                 if 'human' not in act.name:
                     # Pyperplan does not support equality operation. So, I have to manually trim these actions.
@@ -296,18 +291,13 @@ class FrankaPartitionedWorld(FrankaWorld):
         return sym_tr, ts_curr_vars, ts_robot_vars, ts_human_vars, ts_lbl_vars
     
 
-    def build_bdd_symbolic_dfa(self, sym_tr_handle: Union[DynamicFrankaTransitionSystem, PartitionedFrankaTransitionSystem]) \
-         -> Tuple[List[PartitionedDFA], List[BDD], List[BDD]]:
+    def build_bdd_symbolic_dfa(self, sym_tr_handle: Union[DynamicFrankaTransitionSystem, PartitionedFrankaTransitionSystem]) -> List[PartitionedDFA]:
         """
          This function constructs the DFA in a partitioned fashion. We do not need two sets of variables to construct the transition relations.
         """
         if len(self.formulas) > 1:
             warnings.warn("Trying to construt Partitioned DFA representation for multiple Formulas. This functionality only works for Monolithic representation.")
             sys.exit(-1)
-
-        # dfa_curr_state, _dfa = self.create_partitioned_symbolic_dfa_graph(formula=self.formulas[0])
-        # dfa_curr_state = kwargs['dfa_state_vars']
-        # _dfa = kwargs['dfa_handle']
 
         start = time.time()
         # create TR corresponding to each DFA - dfa name is only used dumping graph 
@@ -371,7 +361,6 @@ class FrankaPartitionedWorld(FrankaWorld):
         print("Time for solving the game: ", stop - start)
         # sys.exit(-1)
         if win_str:
-            # rollout for sanity checking
             reachability_handle.roll_out_strategy(transducer=win_str, verbose=True)
 
         return win_str

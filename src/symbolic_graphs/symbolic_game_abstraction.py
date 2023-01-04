@@ -539,7 +539,7 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
         self.tr_state_bdds = [self.manager.bddZero() for _ in range(sum([len(listElem) for listElem in self.sym_vars_lbl]) + len(self.sym_vars_curr) + len(self.sym_vars_hint))]
 
         # create adj map. Useful when rolling out strategy with human intervention for sanity checking
-        self.adj_map = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda : {'h': [], 'r': []})))
+        self.adj_map = defaultdict(lambda: defaultdict(lambda : {'h': [], 'r': []}))
 
         # index to determine where the state vars start 
         self.state_start_idx: int =  len(self.sym_vars_human) + len(self.sym_vars_robot) + len(dfa_state_vars)
@@ -676,9 +676,9 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
                 sys.exit(-1)
         
         if human_action_name != '':
-            self.adj_map[curr_state_tuple][robot_action_name][curr_hint]['h'].append(next_state_tuple)
+            self.adj_map[curr_state_tuple][curr_hint]['h'].append(next_state_tuple)
         else:
-            self.adj_map[curr_state_tuple][robot_action_name][curr_hint]['r'].append(next_state_tuple)
+            self.adj_map[curr_state_tuple][curr_hint]['r'].append(next_state_tuple)
         
         # update edge count 
         self.ecount += 1
@@ -693,7 +693,7 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
         curr_hint: int = self.predicate_sym_map_hint.inv[sym_state.existAbstract(self.state_cube & self.lbl_cube)]
         
         _lbl_list = []
-        # for idx, _var_list in enumerate(self.sym_vars_lbl):
+        
         for idx in range(len(self.sym_vars_lbl)):
             # create a cube of the rest of the dfa vars
             exist_dfa_cube = self.manager.bddOne()
@@ -744,8 +744,6 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
         if verbose:
             print(f"Creating TR for Actions:", *self.tr_action_idx_map.keys())
 
-        # self._create_sym_state_label_map(domain_lbls=state_lbls)
-
         open_list = defaultdict(lambda: self.manager.bddZero())
 
         closed = self.manager.bddZero()
@@ -783,7 +781,6 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
         for vars_list in self.sym_vars_lbl:
             sym_lbl_xcube_list.append(reduce(lambda x, y: x & y, vars_list))
 
-
         while not open_list[layer].isZero():
             # remove all states that have been explored
             open_list[layer] = open_list[layer] & ~closed
@@ -801,7 +798,6 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
                 for state in sym_state:
                     curr_state_tuple, curr_hint = self.get_state_tuple_from_sym_state(sym_state=state, sym_lbl_xcube_list=sym_lbl_xcube_list)
 
-                    _valid_pre_list = []
                     # compute the image of the TS states
                     for action in self.task.operators:
                         # we skip human moves as we manually loop over afterwards 
@@ -822,13 +818,6 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
                             pre_world_conf = self.get_conds_from_state(curr_state_tuple, only_world_conf=True)
 
                             _valid_pre: list = sorted(pre_robot_conf + pre_world_conf)
-                            
-                            if tuple(_valid_pre) != curr_state_tuple:
-                                _valid_pre_sym = self.predicate_sym_map_curr[tuple(_valid_pre)]
-                                # check if this state has already being explored or not
-                                if not (_valid_pre_sym & closed).isZero():
-                                    continue
-                                _valid_pre_list.append(_valid_pre_sym)
 
                             # add existential constraints to transfer and relase action
                             if add_exist_constr and (('transfer' in action.name) or ('release' in action.name)):
@@ -848,7 +837,6 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
                             next_tuple = tuple(sorted(list(set(next_tuple + list(add_tuple)))))
 
                             # look up its corresponding formula
-                            # next_sym_state: BDD = self.predicate_sym_map_nxt[next_tuple]
                             next_sym_state: BDD = self.get_sym_state_from_tuple(next_tuple)
 
                             if verbose:
@@ -881,21 +869,10 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
                                                        **kwargs)
 
                             # get their corresponding lbls 
-                            # next_tuple_lbl = self.get_conds_from_state(state_tuple=next_tuple, only_world_conf=True)
-                            # next_lbl_sym = self.get_sym_state_lbl_from_tuple(next_tuple_lbl)
-                            self.sym_state_labels |= next_sym_state #& next_lbl_sym
+                            self.sym_state_labels |= next_sym_state 
 
                             # store the image in the next bucket
                             open_list[layer + 1] |= next_sym_state & self.predicate_sym_map_hint[curr_hint]
-
-                    for _val_pre_sym in _valid_pre_list:
-                        # add them to the observation bdd
-                        _valid_pre_lbl = self.get_conds_from_state(state_tuple=self.predicate_sym_map_curr.inv[_val_pre_sym],
-                                                                   only_world_conf=True)
-                        _valid_pre_lbl_sym = self.get_sym_state_lbl_from_tuple(_valid_pre_lbl)
-                        self.sym_state_labels |= _val_pre_sym & _valid_pre_lbl_sym
-
-                        closed |= _val_pre_sym & self.predicate_sym_map_hint[curr_hint]
                 
                 layer += 1
         

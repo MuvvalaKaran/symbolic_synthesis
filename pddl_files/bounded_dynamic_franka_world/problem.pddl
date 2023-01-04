@@ -18,9 +18,9 @@
     b0 - box
     b1 - box
     b2 - box
-    ;b3 - box
+    b3 - box
     ;b4 - box
-    ;b5 - box
+    ;b5 - boxs
     ;b6 - box
 
 
@@ -28,12 +28,12 @@
 
 ;todo: put the initial state's facts and numeric values here
 (:init
-    (ready else)
+    (ready l0)
     
-    (on b0 l0)
-    (on b1 l1)
-    (on b2 l2)
-    ;(on b3 l4)
+    (on b0 else)
+    (on b1 else)
+    (on b2 else)
+    (on b3 else)
     ;(on b4 l4)
     ;(on b5 l5)
     ;(on b6 l6)
