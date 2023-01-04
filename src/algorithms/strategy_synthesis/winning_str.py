@@ -1,5 +1,6 @@
 import re 
 import sys
+import copy
 import random
 
 from functools import reduce
@@ -69,7 +70,7 @@ class ReachabilityGame(BaseSymbolicSearch):
         # create corresponding cubes to avoid repetition
         self.ts_xcube: BDD = reduce(lambda x, y: x & y, self.ts_x_list)
         self.dfa_xcube: BDD = reduce(lambda x, y: x & y, self.dfa_x_list)
-        self.ts_obs_cube: BDD = reduce(lambda x, y: x & y, self.ts_obs_list)
+        self.ts_obs_cube: BDD = reduce(lambda x, y: x & y, [lbl for sym_vars_list in self.ts_obs_list for lbl in sym_vars_list])
 
         self.sys_cube: BDD = reduce(lambda x, y: x & y, self.sys_act_vars)
         self.env_cube: BDD = reduce(lambda x, y: x & y, self.env_act_vars)
@@ -97,10 +98,25 @@ class ReachabilityGame(BaseSymbolicSearch):
         
         This function initializes the set of winning states and set of winning states to the set of accepting states
         """
-        ts_states: BDD = self.obs_bdd.existAbstract(self.ts_obs_cube)
+        # ts_states: BDD = self.obs_bdd.existAbstract(self.ts_obs_cube)
+        # '(ready l1)', '(on b0 l1)'
+        # '(to-obj b0 l1)', '(on b0 l1)'
+        # '(ready else)', '(on b0 l1)'
+        # get their tuples, and initialize this as accpting states
+        # t1 = self.ts_handle.get_tuple_from_state(['(ready l1)', '(on b0 l1)'])
+        # t2 = self.ts_handle.get_tuple_from_state(['(to-obj b0 l1)', '(on b0 l1)'])
+        # t3 = self.ts_handle.get_tuple_from_state(['(ready else)', '(on b0 l1)'])
+
+        # get their symbolic version
+        # st1 = self.ts_handle.get_sym_state_from_tuple(t1)
+        # st2 = self.ts_handle.get_sym_state_from_tuple(t2)
+        # st3 = self.ts_handle.get_sym_state_from_tuple(t3)
+
+        ts_states: BDD = self.obs_bdd
+        # ts_states: BDD = st1 | st2 | st3
         accp_states: BDD = ts_states & self.target_DFA
 
-        self.winning_states[0] |= accp_states & self.obs_bdd
+        self.winning_states[0] |= accp_states #& self.obs_bdd
     
     @deprecated
     def get_state_action(self, dd_func: BDD, **kwargs) -> None:
@@ -236,7 +252,7 @@ class ReachabilityGame(BaseSymbolicSearch):
         
         return state_action
 
-    def get_pre_states(self, layer: int) -> BDD:
+    def get_pre_states(self, layer: int, prod_curr_list=None) -> BDD:
         """
          A function to compute all predecessors from the current set of winning states
         """ 
@@ -259,7 +275,17 @@ class ReachabilityGame(BaseSymbolicSearch):
 
         stra_list[layer] = self.winning_states[layer]
         if verbose:
-            closed |= self.winning_states[layer].existAbstract(self.ts_obs_cube)
+            # closed |= self.winning_states[layer].existAbstract(self.ts_obs_cube)
+            closed |= self.winning_states[layer]
+        
+        # prod_curr_list = [ele for ele in self.dfa_x_list]
+        prod_curr_list = []
+        prod_curr_list.extend([lbl for sym_vars_list in self.ts_obs_list for lbl in sym_vars_list])
+        prod_curr_list.extend([*self.ts_x_list, *self.ts_handle.sym_vars_hint])
+
+        # prod_curr_list.extend([*self.ts_x_list, *self.ts_handle.sym_vars_hint])
+
+        sym_lbl_cubes = self._create_lbl_cubes()
 
         while True:
             if layer > 0 and stra_list[layer].compare(stra_list[layer - 1], 2):
@@ -276,16 +302,16 @@ class ReachabilityGame(BaseSymbolicSearch):
 
             print(f"**************************Layer: {layer}**************************")
             
-            pre_prod_state = self.get_pre_states(layer=layer)
+            pre_prod_state = self.get_pre_states(layer=layer, prod_curr_list=prod_curr_list)
             
             # we need to fix the state labeling
-            pre_prod_state = pre_prod_state.existAbstract(self.ts_obs_cube)
+            # pre_prod_state = pre_prod_state.existAbstract(self.ts_obs_cube)
 
             # do universal quantification
             pre_univ = (pre_prod_state).univAbstract(self.env_cube)
             
             # add the correct labels back
-            pre_univ = pre_univ & self.obs_bdd
+            # pre_univ = pre_univ & self.obs_bdd
 
             # remove self loops
             stra_list[layer + 1] |= stra_list[layer] | (~self.winning_states[layer] & pre_univ)
@@ -299,10 +325,11 @@ class ReachabilityGame(BaseSymbolicSearch):
                 # return winning_str
                 if verbose:
                     print(f"Winning states at Iter {layer + 1}")
-                    new_states = ~closed & pre_univ.existAbstract(self.sys_env_cube & self.ts_obs_cube)
-                    self.get_prod_states_from_dd(dd_func=new_states)
+                    # new_states = ~closed & pre_univ.existAbstract(self.sys_env_cube & self.ts_obs_cube)
+                    new_states = ~closed & pre_univ.existAbstract(self.sys_env_cube)
+                    self.get_prod_states_from_dd(dd_func=new_states, sym_lbl_cubes=sym_lbl_cubes, prod_curr_list=prod_curr_list)
 
-                    closed |= pre_univ.existAbstract(self.sys_env_cube & self.ts_obs_cube)
+                    closed |= pre_univ.existAbstract(self.sys_env_cube)# & self.ts_obs_cube)
                 return stra_list[layer + 1]
 
             # do existentail quantification
@@ -311,10 +338,11 @@ class ReachabilityGame(BaseSymbolicSearch):
             # print new winning states in each iteration
             if verbose:
                 print(f"Winning states at Iter {layer + 1}")
-                new_states = ~closed & pre_univ.existAbstract(self.sys_env_cube & self.ts_obs_cube)
-                self.get_prod_states_from_dd(dd_func=new_states)
+                # new_states = ~closed & pre_univ.existAbstract(self.sys_env_cube & self.ts_obs_cube)
+                new_states = ~closed & pre_univ.existAbstract(self.sys_env_cube)
+                self.get_prod_states_from_dd(dd_func=new_states, sym_lbl_cubes=sym_lbl_cubes, prod_curr_list=prod_curr_list)
 
-                closed |= pre_univ.existAbstract(self.sys_env_cube & self.ts_obs_cube)
+                closed |= pre_univ.existAbstract(self.sys_env_cube)# & self.ts_obs_cube)
 
             layer +=1
 
@@ -342,14 +370,38 @@ class BndReachabilityGame(ReachabilityGame):
                          env_act_vars,
                          cudd_manager)
     
-    def get_pre_states(self, layer: int) -> BDD:
+
+    def _create_lbl_cubes(self):
+        """
+        A helper function that create cubses of each lbl and store them in a list in the same order as the original order.
+         These cubes are used when we convert a BDD to lbl state where we need to extract each lbl.
+        """
+        sym_lbl_xcube_list = [] 
+        for vars_list in self.ts_obs_list:
+            sym_lbl_xcube_list.append(reduce(lambda x, y: x & y, vars_list))
+        
+        return sym_lbl_xcube_list
+
+    
+    def get_pre_states(self, layer: int, prod_curr_list=None) -> BDD:
         """
          We  have an additional human intervention variables that we need to account 
         """
         pre_prod_state: BDD = self.manager.bddZero()
+        c = 0
+        # first evolve over DFA and then evolve over the TS
+        mod_win_state: BDD = self.winning_states[layer].vectorCompose(self.dfa_x_list, [*self.dfa_transition_fun_list])
+        # mod_win_state = mod_win_state & self.init_DFA
         for ts_transition in self.ts_transition_fun_list:
-            pre_prod_state |= self.winning_states[layer].vectorCompose([*self.ts_x_list, *self.ts_handle.sym_vars_hint, *self.dfa_x_list],
-                                                    [*ts_transition, *self.dfa_transition_fun_list])
+            # pre_prod_state |= self.winning_states[layer].vectorCompose([*self.ts_x_list, *self.ts_handle.sym_vars_hint, *self.dfa_x_list],
+            #                                         [*ts_transition, *self.dfa_transition_fun_list])
+            # pre_prod_state |= self.winning_states[layer].vectorCompose(prod_curr_list,[*ts_transition, *self.dfa_transition_fun_list])
+            # pre_prod_state |= self.winning_states[layer].vectorCompose(prod_curr_list,[*self.dfa_transition_fun_list, *ts_transition])
+            # pre_prod_state |= self.winning_states[layer].vectorCompose(prod_curr_list,[*ts_transition])
+            pre_prod_state |= mod_win_state.vectorCompose(prod_curr_list,[*ts_transition])
+            c += 1
+
+        # pre_dfa_state = self.winning_states[layer].vectorCompose(self.dfa_x_list, [*self.dfa_transition_fun_list])
         
         return pre_prod_state
 
@@ -360,12 +412,16 @@ class BndReachabilityGame(ReachabilityGame):
           pred int map dictionary rather than the state tuple. 
         """
 
-        prod_curr_list=self.ts_x_list + self.dfa_x_list + self.hint_list
+        # prod_curr_list=self.ts_x_list + self.dfa_x_list + self.hint_list
+        prod_curr_list = kwargs['prod_curr_list']
         prod_cube_string: List[BDD] = self.convert_prod_cube_to_func(dd_func=dd_func, prod_curr_list=prod_curr_list) 
         for prod_cube in prod_cube_string:
-            _ts_dd = prod_cube.existAbstract(self.dfa_xcube & self.ts_obs_cube & self.hint_cube)
-            _ts_tuple = self.ts_bdd_sym_to_curr_state_map.get(_ts_dd)
-            _ts_name = self.ts_handle.get_state_from_tuple(state_tuple=_ts_tuple)
+            # _ts_dd = prod_cube.existAbstract(self.dfa_xcube & self.ts_obs_cube & self.hint_cube)
+            _ts_dd = prod_cube.existAbstract(self.dfa_xcube)
+            # _ts_tuple = self.ts_bdd_sym_to_curr_state_map.get(_ts_dd)
+            # _ts_name = self.ts_handle.get_state_from_tuple(state_tuple=_ts_tuple)
+            _ts_tuple, _ts_hint = self.ts_handle.get_state_tuple_from_sym_state(_ts_dd, kwargs['sym_lbl_cubes'])
+            _ts_name = self.ts_handle.get_state_from_tuple(_ts_tuple)
             assert _ts_name is not None, "Couldn't convert TS Cube to its corresponding State. FIX THIS!!!"
 
             _dfa_name = self._look_up_dfa_name(prod_dd=prod_cube.existAbstract(self.hint_cube),
@@ -373,8 +429,8 @@ class BndReachabilityGame(ReachabilityGame):
                                                ADD_flag=False,
                                                **kwargs)
             
-            _ts_hint_dd = prod_cube.existAbstract(self.dfa_xcube & self.ts_obs_cube & self.ts_xcube)
-            _ts_hint: int = self.ts_bdd_sym_to_hint_map.get(_ts_hint_dd)
+            # _ts_hint_dd = prod_cube.existAbstract(self.dfa_xcube & self.ts_obs_cube & self.ts_xcube)
+            # _ts_hint: int = self.ts_bdd_sym_to_hint_map.get(_ts_hint_dd)
             
             print(f"([{_ts_name},{_ts_hint}], {_dfa_name})")
 

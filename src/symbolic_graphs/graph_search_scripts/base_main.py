@@ -82,11 +82,11 @@ class BaseSymMain():
             _state = _dfa.get_states()
             _num_of_states = len(_state)
 
-        curr_state = self.create_symbolic_vars_single(num_of_facts=_num_of_states,
+        curr_states_var = self.create_symbolic_vars_single(num_of_facts=_num_of_states,
                                                       curr_state_var_name=f'a0_',
                                                       add_flag=add_flag)
 
-        return curr_state, _dfa
+        return curr_states_var, _dfa
     
 
     def create_symbolic_dfa_graph(self, 

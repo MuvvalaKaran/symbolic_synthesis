@@ -12,7 +12,7 @@ from typing import Union, List, Tuple
 
 from cudd import Cudd, BDD, ADD
 
-from src.explicit_graphs import CausalGraph
+from src.explicit_graphs import CausalGraph, Ltlf2MonaDFA
 
 from src.algorithms.strategy_synthesis import ReachabilityGame, BndReachabilityGame
 
@@ -65,7 +65,8 @@ class FrankaPartitionedWorld(FrankaWorld):
             else:
                 sym_tr, ts_curr_vars, ts_action_vars, ts_lbl_vars = self.build_bdd_abstraction(draw_causal_graph=draw_causal_graph)
             
-            dfa_tr, dfa_curr_state = self.build_bdd_symbolic_dfa(sym_tr_handle=sym_tr)
+            # dfa_tr, dfa_curr_state = self.build_bdd_symbolic_dfa(sym_tr_handle=sym_tr)
+            dfa_tr = self.build_bdd_symbolic_dfa(sym_tr_handle=sym_tr)
         
         else:
             warnings.warn("Please enter a valid graph search algorthim. Currently Available - Quanlitative")
@@ -74,7 +75,7 @@ class FrankaPartitionedWorld(FrankaWorld):
         self.dfa_handle: PartitionedDFA = dfa_tr
 
         self.ts_x_list: List[BDD] = ts_curr_vars
-        self.dfa_x_list: List[BDD] = dfa_curr_state
+        # self.dfa_x_list: List[BDD] = dfa_curr_state
         self.ts_obs_list: List[BDD] = ts_lbl_vars
 
         if dynamic_env or bnd_dynamic_env:
@@ -145,6 +146,14 @@ class FrankaPartitionedWorld(FrankaWorld):
             
             if print_facts:
                 print(f"******************# of boolean Vars for Robot actions: {len(ts_action_vars)}******************")
+
+        # build DFA State vars
+        dfa_state_vars, dfa_tr = self.create_partitioned_symbolic_dfa_graph(formula=self.formulas[0])
+        self.dfa_ltlf_handle: Ltlf2MonaDFA = dfa_tr
+        self.dfa_x_list = dfa_state_vars
+
+        if print_facts:
+            print(f"******************# of boolean Vars for DFA state: {len(dfa_state_vars)}******************")
 
         
         # box_preds has predicates segregated as per boxes
@@ -266,6 +275,7 @@ class FrankaPartitionedWorld(FrankaWorld):
                                                   ts_state_map=self.pred_int_map,
                                                   max_human_int=max_human_int + 1,
                                                   ts_state_lbls=possible_lbls,
+                                                  dfa_state_vars=self.dfa_x_list,
                                                   manager=self.manager)
         
         start: float = time.time()
@@ -295,15 +305,17 @@ class FrankaPartitionedWorld(FrankaWorld):
             warnings.warn("Trying to construt Partitioned DFA representation for multiple Formulas. This functionality only works for Monolithic representation.")
             sys.exit(-1)
 
-        dfa_curr_state, _dfa = self.create_partitioned_symbolic_dfa_graph(formula=self.formulas[0])
+        # dfa_curr_state, _dfa = self.create_partitioned_symbolic_dfa_graph(formula=self.formulas[0])
+        # dfa_curr_state = kwargs['dfa_state_vars']
+        # _dfa = kwargs['dfa_handle']
 
         start = time.time()
         # create TR corresponding to each DFA - dfa name is only used dumping graph 
-        dfa_tr = PartitionedDFA(curr_states=dfa_curr_state,
+        dfa_tr = PartitionedDFA(curr_states=self.dfa_x_list,
                                 predicate_sym_map_lbl=sym_tr_handle.predicate_sym_map_lbl,
                                 sym_tr=sym_tr_handle,
                                 manager=self.manager,
-                                dfa=_dfa,
+                                dfa=self.dfa_ltlf_handle,
                                 ltlf_flag=self.ltlf_flag,
                                 dfa_name='dfa_0')
         if self.ltlf_flag:
@@ -313,7 +325,7 @@ class FrankaPartitionedWorld(FrankaWorld):
         stop = time.time()
         print("Time for Constructing the LTLF DFA: ", stop - start)
 
-        return dfa_tr, dfa_curr_state
+        return dfa_tr
     
 
     def set_variable_reordering(self, make_tree_node: bool = False, **kwargs):
@@ -336,13 +348,13 @@ class FrankaPartitionedWorld(FrankaWorld):
         start = time.time()
         if isinstance(self.ts_handle, BndDynamicFrankaTransitionSystem):
             reachability_handle =  BndReachabilityGame(ts_handle=self.ts_handle,
-                                                    dfa_handle=self.dfa_handle,
-                                                    ts_curr_vars=self.ts_x_list,
-                                                    dfa_curr_vars=self.dfa_x_list,
-                                                    ts_obs_vars=self.ts_obs_list,
-                                                    sys_act_vars=self.ts_robot_vars,
-                                                    env_act_vars=self.ts_human_vars,
-                                                    cudd_manager=self.manager)
+                                                       dfa_handle=self.dfa_handle,
+                                                       ts_curr_vars=self.ts_x_list,
+                                                       dfa_curr_vars=self.dfa_x_list,
+                                                       ts_obs_vars=self.ts_obs_list,
+                                                       sys_act_vars=self.ts_robot_vars,
+                                                       env_act_vars=self.ts_human_vars,
+                                                       cudd_manager=self.manager)
         
         else:
             reachability_handle =  ReachabilityGame(ts_handle=self.ts_handle,
@@ -357,7 +369,7 @@ class FrankaPartitionedWorld(FrankaWorld):
         win_str: BDD = reachability_handle.solve(verbose=verbose)
         stop = time.time()
         print("Time for solving the game: ", stop - start)
-
+        # sys.exit(-1)
         if win_str:
             # rollout for sanity checking
             reachability_handle.roll_out_strategy(transducer=win_str, verbose=True)

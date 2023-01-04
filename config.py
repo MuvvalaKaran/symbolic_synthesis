@@ -10,7 +10,7 @@ STRATEGY_SYNTHESIS: bool = True  # Set this flag to true when  when using manipu
 TWO_PLAYER_GAME: bool = False  # Set this flag to true when you want to contruct a two-player game env.
 TWO_PLAYER_GAME_BND: bool = True  # Set this flag to true when you want to construct som bounded no. off human interventions.
 
-HUMAN_INT_BND: int = 1
+HUMAN_INT_BND: int = 3
 
 DIJKSTRAS: bool = False  # set this flag to true when you want to use Dijkstras
 ASTAR: bool = False # set this flag to true when you want to use A* algorithm 
@@ -46,7 +46,7 @@ TOP_LOC = []
 # formulas = ['(F((p01 & free)) & F((p12 & free)) & F((p23 & free)) & F((p34 & free)))']
 
 # simple one box formula 
-formulas = ['F(p01 & p10 & p27 & free)']
+formulas = ['F(p01 & p12 & p23)']
 
 # formulas = [
 #             # 'F((p01 & p20 & free))',

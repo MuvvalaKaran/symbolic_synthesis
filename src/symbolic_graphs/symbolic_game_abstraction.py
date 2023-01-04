@@ -522,7 +522,8 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
                  ts_states: list,
                  max_human_int: int,
                  manager: Cudd,
-                 ts_state_lbls: list):
+                 ts_state_lbls: list,
+                 dfa_state_vars: List[BDD]):
         self.sym_vars_hint: List[BDD] = human_int_vars
         self.state_lbls = ts_state_lbls
         super().__init__(curr_vars, lbl_vars, robot_action_vars, human_action_vars, task, domain, ts_state_map, ts_states, manager)
@@ -541,7 +542,7 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
         self.adj_map = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda : {'h': [], 'r': []})))
 
         # index to determine where the state vars start 
-        self.state_start_idx: int =  len(self.sym_vars_human) + len(self.sym_vars_robot)
+        self.state_start_idx: int =  len(self.sym_vars_human) + len(self.sym_vars_robot) + len(dfa_state_vars)
 
         self.hint_cube = reduce(lambda x, y: x & y, self.sym_vars_hint)
         self.state_cube = reduce(lambda x, y: x & y, self.sym_vars_curr)

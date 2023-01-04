@@ -679,7 +679,9 @@ class PartitionedDFA(SymbolicDFAFranka):
 
         # index to determine where the state vars start 
         if isinstance(sym_tr, BndDynamicFrankaTransitionSystem):
-            self.state_start_idx: int = len(sym_tr.sym_vars_lbl) +  len(sym_tr.sym_vars_human) + len(sym_tr.sym_vars_robot)  + len(sym_tr.sym_vars_curr) + len(sym_tr.sym_vars_hint)
+            # self.state_start_idx: int = len(sym_tr.sym_vars_lbl) +  len(sym_tr.sym_vars_human) + len(sym_tr.sym_vars_robot)  + len(sym_tr.sym_vars_curr) + len(sym_tr.sym_vars_hint)
+            # self.state_start_idx: int = sum([len(listElem) for listElem in sym_tr.sym_vars_lbl]) +  len(sym_tr.sym_vars_human) + len(sym_tr.sym_vars_robot)  + len(sym_tr.sym_vars_curr) + len(sym_tr.sym_vars_hint)
+            self.state_start_idx: int = len(sym_tr.sym_vars_human) + len(sym_tr.sym_vars_robot)
         else:
             self.state_start_idx: int = len(sym_tr.sym_vars_lbl) +  len(sym_tr.sym_vars_human) + len(sym_tr.sym_vars_robot)  + len(sym_tr.sym_vars_curr)
     
