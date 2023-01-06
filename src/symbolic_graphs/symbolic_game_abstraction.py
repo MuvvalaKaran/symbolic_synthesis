@@ -14,6 +14,8 @@ from config import *
 
 from bidict import bidict
 
+from src.explicit_graphs import FiniteTransitionSystem
+
 from src.symbolic_graphs import PartitionedFrankaTransitionSystem
 
 
@@ -30,14 +32,15 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
                  task, domain,
                  ts_state_map: dict,
                  ts_states: list,
-                 manager: Cudd):
+                 manager: Cudd,
+                 **kwargs):
         self.sym_vars_human: List[BDD] = human_action_vars
         self.sym_vars_robot: List[BDD] = robot_action_vars
 
         self.predicate_sym_map_human: bidict = {}
         self.predicate_sym_map_robot: bidict = {}
 
-        super().__init__(curr_vars, lbl_vars, robot_action_vars, task, domain, ts_state_map, ts_states, manager)
+        super().__init__(curr_vars, lbl_vars, robot_action_vars, task, domain, ts_state_map, ts_states, manager, **kwargs)
 
         # index to determine where the state vars start 
         self.state_start_idx: int = len(self.sym_vars_lbl) + len(self.sym_vars_human) + len(self.sym_vars_robot)
@@ -109,6 +112,35 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
         
         self.tr_action_idx_map = action_idx_map
         self.sym_tr_actions = [[self.manager.bddZero() for _ in range(len(self.sym_vars_curr))] for _ in range(len(self.actions))]
+    
+
+    def get_modified_robot_act_name(self, org_robot_act_name: str) -> str:
+        """
+         A helper function that takes in as input the original name of the paramterized actions as parse by pyperplan, modifies it to
+          the modified actions we manually create and returns that name
+        """
+
+        finite_ts = FiniteTransitionSystem(None)
+
+        if 'release' in org_robot_act_name:
+            return 'release'
+        elif 'grasp' in org_robot_act_name:
+            return 'grasp'
+        # transfer action are of type transfer l2 
+        elif 'transfer' in org_robot_act_name:
+            box_id, locs = finite_ts._get_multiple_box_location(multiple_box_location_str=org_robot_act_name)
+            if 'else' in org_robot_act_name:
+                dloc = locs[0]
+            else:
+                dloc = locs[1]
+            return f'transfer {dloc}'
+        # transit action are of type transit b#
+        elif 'transit' in org_robot_act_name:
+            box_id, locs = finite_ts._get_multiple_box_location(multiple_box_location_str=org_robot_act_name)
+            return f'transit b{box_id}'
+        else:
+            warnings.warn("Could not look up the corresponding modified robot action name")
+            sys.exit(-1)
         
 
     def add_edge_to_action_tr(self,
@@ -519,10 +551,11 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
                  max_human_int: int,
                  manager: Cudd,
                  ts_state_lbls: list,
-                 dfa_state_vars: List[BDD]):
+                 dfa_state_vars: List[BDD],
+                 **kwargs):
         self.sym_vars_hint: List[BDD] = human_int_vars
         self.state_lbls = ts_state_lbls
-        super().__init__(curr_vars, lbl_vars, robot_action_vars, human_action_vars, task, domain, ts_state_map, ts_states, manager)
+        super().__init__(curr_vars, lbl_vars, robot_action_vars, human_action_vars, task, domain, ts_state_map, ts_states, manager, **kwargs)
         
         self.max_hint: int = max_human_int
 
@@ -544,7 +577,14 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
         self.state_cube = reduce(lambda x, y: x & y, self.sym_vars_curr)
         self.lbl_cube = reduce(lambda x, y: x & y, [lbl for sym_vars_list in self.sym_vars_lbl for lbl in sym_vars_list])
 
-    
+    def set_actions(self, **kwargs):
+        """
+         Override parent function to initialize valid set of actions to be a restrcited set
+          of the original set of all parameterized actions.
+        """
+        acts = kwargs['modified_actions']['human'] + kwargs['modified_actions']['robot']
+        self.actions: dict = [action for action in acts]
+
 
     def _initialize_sym_init_goal_states(self):
         """
@@ -628,28 +668,33 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
         curr_state_sym: BDD = self.get_sym_state_from_tuple(curr_state_tuple)
         nxt_state_sym: BDD = self.get_sym_state_from_tuple(next_state_tuple)
 
+        # get the modified robot action name
+        mod_raction_name: str = self.get_modified_robot_act_name(org_robot_act_name=robot_action_name)
+
         if human_action_name != '':
             nxt_state_sym = nxt_state_sym & self.predicate_sym_map_hint[curr_hint - 1]
             _tr_idx: int = self.tr_action_idx_map.get(human_action_name)
             if 'debug' in kwargs:
-                edge_exist: bool = (self.mono_tr_bdd & curr_state_sym & self.predicate_sym_map_robot[robot_action_name] & \
+                edge_exist: bool = (self.mono_tr_bdd & curr_state_sym & self.predicate_sym_map_robot[mod_raction_name] & \
                             self.predicate_sym_map_human[human_action_name] & self.predicate_sym_map_hint[curr_hint]).isZero()
                 if not edge_exist:
                     print(f"Nondeterminism due to Human Action: {self.get_state_from_tuple(curr_state_tuple)}[{curr_hint}] ---{human_action_name}---> {self.get_state_from_tuple(next_state_tuple)}[{curr_hint - 1}]")
                     
-                self.mono_tr_bdd |= curr_state_sym & self.predicate_sym_map_robot[robot_action_name] & \
+                self.mono_tr_bdd |= curr_state_sym & self.predicate_sym_map_robot[mod_raction_name] & \
                             self.predicate_sym_map_human[human_action_name] & self.predicate_sym_map_hint[curr_hint]
         else:
             nxt_state_sym = nxt_state_sym & self.predicate_sym_map_hint[curr_hint]
-            _tr_idx: int = self.tr_action_idx_map.get(robot_action_name)
+            # _tr_idx: int = self.tr_action_idx_map.get(robot_action_name)
+            _tr_idx: int = self.tr_action_idx_map.get(mod_raction_name)
+
             if 'debug' in kwargs:
-                edge_exist: bool = (self.mono_tr_bdd &  curr_state_sym & self.predicate_sym_map_robot[robot_action_name] & \
+                edge_exist: bool = (self.mono_tr_bdd &  curr_state_sym & self.predicate_sym_map_robot[mod_raction_name] & \
                             no_human_move & self.predicate_sym_map_hint[curr_hint]).isZero()
                 
                 if not edge_exist:
                     print(f"Nondeterminism due to Robot Action: {self.get_state_from_tuple(curr_state_tuple)}[{curr_hint}] ---{robot_action_name}---> {self.get_state_from_tuple(next_state_tuple)}[{curr_hint}]")
                 
-                self.mono_tr_bdd |= curr_state_sym & self.predicate_sym_map_robot[robot_action_name] & \
+                self.mono_tr_bdd |= curr_state_sym & self.predicate_sym_map_robot[mod_raction_name] & \
                             no_human_move & self.predicate_sym_map_hint[curr_hint]             
 
 
@@ -660,11 +705,11 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
                 assert _state_idx >= 0, "Error constructing the Partitioned Transition Relation."
                 # if human intervenes then the edge looks like (robot-action) & (human move b# l# l#)
                 if human_action_name != '':
-                    self.sym_tr_actions[_tr_idx][_state_idx] |= curr_state_sym & self.predicate_sym_map_robot[robot_action_name] & \
+                    self.sym_tr_actions[_tr_idx][_state_idx] |= curr_state_sym & self.predicate_sym_map_robot[mod_raction_name] & \
                          self.predicate_sym_map_human[human_action_name] & self.predicate_sym_map_hint[curr_hint]
                 # if human does not intervene then the edge looks like (robot-action) & not(valid human moves)
                 else:
-                    self.sym_tr_actions[_tr_idx][_state_idx] |= curr_state_sym & self.predicate_sym_map_robot[robot_action_name] & \
+                    self.sym_tr_actions[_tr_idx][_state_idx] |= curr_state_sym & self.predicate_sym_map_robot[mod_raction_name] & \
                          no_human_move & self.predicate_sym_map_hint[curr_hint]
 
             

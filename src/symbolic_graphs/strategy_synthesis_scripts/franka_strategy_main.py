@@ -84,6 +84,32 @@ class FrankaPartitionedWorld(FrankaWorld):
         
         if self.dyn_var_ordering:
             self.set_variable_reordering()
+    
+
+    def get_seg_human_robot_action(self, causal_graph_instance: CausalGraph) -> dict:
+        """
+         A function that loops over all the actions and store them in a dict. 
+        """
+        _seg_action = defaultdict(lambda: [])
+        # segregate actions in robot actions (controllable vars - `o`) and humans moves (uncontrollable vars - `i`)
+        boxes: List[str] = causal_graph_instance.task_objects
+        locs: List[str] = causal_graph_instance.task_locations
+
+        for act in causal_graph_instance.task.operators:
+            if 'human' in act.name:
+                _seg_action['human'].append(act.name)
+            # else:
+                # for release and grasp, we only create one action
+                # for transit we only create transit b# and for transfer l2#
+        _seg_action['robot'].append('release') 
+        _seg_action['robot'].append('grasp')
+        for b in boxes:
+            _seg_action['robot'].append(f'transit {b}')
+
+        for l in locs:
+            _seg_action['robot'].append(f'transfer {l}')       
+        
+        return _seg_action
 
 
     def create_symbolic_causal_graph(self, draw_causal_graph: bool = False, add_flag: bool = False, build_human_move: bool = False, print_facts: bool = False) -> Tuple:
@@ -100,26 +126,18 @@ class FrankaPartitionedWorld(FrankaWorld):
         task_facts: List[str] = _causal_graph_instance.task.facts
         boxes: List[str] = _causal_graph_instance.task_objects
 
-
         # compute all valid preds of the robot conf and box conf.
         robot_preds, box_preds = self.compute_valid_predicates(predicates=task_facts, boxes=boxes)
-
-        _new_ops = copy.deepcopy(_causal_graph_instance.task.operators)
         
         # segregate actions in robot actions (controllable vars - `o`) and humans moves (uncontrollable vars - `i`)
         if build_human_move:
-            _seg_action = defaultdict(lambda: [])
-            for act in _new_ops:
-                if 'human' not in act.name:
-                    # Pyperplan does not support equality operation. So, I have to manually trim these actions.
-                    # remove actions like transit b# li li and transfer b# li li
-                    # if 'transit' or 'transfer' in act.name: 
-                    #     _locs = re.findall("[l|L][\d]+", act.name)
-                    #     if len(_locs) > 1 and _locs[0] == _locs[1]:
-                    #         _causal_graph_instance.task.operators.remove(act)
-                    _seg_action['robot'].append(act)
-                else:
-                    _seg_action['human'].append(act)
+            # _seg_action = defaultdict(lambda: [])
+            # for act in _causal_graph_instance.task.operators:
+            #     if 'human' not in act.name:
+            #         _seg_action['robot'].append(act)
+            #     else:
+            #         _seg_action['human'].append(act)
+            _seg_action = self.get_seg_human_robot_action(_causal_graph_instance)
         
         if build_human_move:
             ts_human_act_vars = self._create_symbolic_lbl_vars(state_lbls=_seg_action['human'],
@@ -172,7 +190,7 @@ class FrankaPartitionedWorld(FrankaWorld):
         
         if build_human_move:
             return _causal_graph_instance.task, _causal_graph_instance.problem.domain, curr_vars, \
-                 robot_preds, ts_lbl_vars, ts_robot_act_vars, ts_human_act_vars, boxes, box_preds
+                 robot_preds, ts_lbl_vars, ts_robot_act_vars, ts_human_act_vars, _seg_action, boxes, box_preds
         
         return _causal_graph_instance.task, _causal_graph_instance.problem.domain, curr_vars, robot_preds, ts_lbl_vars, ts_action_vars, boxes, box_preds
     
@@ -248,7 +266,7 @@ class FrankaPartitionedWorld(FrankaWorld):
           The # of remainig Human interventions is added as a counter to each state.
         """
         task, domain, ts_curr_vars, ts_state_tuples, \
-             ts_lbl_vars, ts_robot_vars, ts_human_vars, boxes, possible_lbls = self.create_symbolic_causal_graph(draw_causal_graph=draw_causal_graph,
+             ts_lbl_vars, ts_robot_vars, ts_human_vars, modified_actions, boxes, possible_lbls = self.create_symbolic_causal_graph(draw_causal_graph=draw_causal_graph,
                                                                                                                  build_human_move=True,
                                                                                                                  print_facts=print_facts)
         # we create human intervention boolean vars right  after the state vars 
@@ -271,7 +289,8 @@ class FrankaPartitionedWorld(FrankaWorld):
                                                   max_human_int=max_human_int + 1,
                                                   ts_state_lbls=possible_lbls,
                                                   dfa_state_vars=self.dfa_x_list,
-                                                  manager=self.manager)
+                                                  manager=self.manager,
+                                                  modified_actions=modified_actions)
         
         start: float = time.time()
         sym_tr.create_transition_system_franka(boxes=boxes,
