@@ -418,10 +418,6 @@ class SymbolicFrankaTransitionSystem():
         exp_lbls = self.get_state_from_tuple(state_tuple=state_lbl_tuple)
 
         _sym_lbls_list = [self.predicate_sym_map_lbl[lbl] for lbl in exp_lbls]
-
-        # if gripper is not free then explicitly add not(gripper free) to the state lbl
-        # if '(gripper free)' not in exp_lbls:
-        #     _sym_lbls_list.append(~self.predicate_sym_map_lbl['(gripper free)'])
         
         sym_lbl = reduce(lambda x, y: x & y, _sym_lbls_list)
 
@@ -459,14 +455,7 @@ class SymbolicFrankaTransitionSystem():
         # loop over each box and create its corresponding boolean formula 
         for b_id, preds in domain_lbls.items():
             # get its corresponding boolean vars
-            # _tmp_vars_list = []
-            # if b_id == 'gripper':
-            #     _tmp_vars_list.append(self.sym_vars_lbl[-1])
-            # else:
             _id: int = int(re.search("\d+", b_id).group())
-            # for _id, bvar in enumerate(self.sym_vars_lbl):
-            #     if f'{b_id}_' in str(bvar):
-            #         _tmp_vars_list.append(bvar)
             _tmp_vars_list = self.sym_vars_lbl[_id]
 
             # TODO: When the boxes are out of sequence, say only b0 abd b2 exists, this for loop fails. FIX THIS!!!

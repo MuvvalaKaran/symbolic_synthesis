@@ -102,34 +102,6 @@ class ReachabilityGame(BaseSymbolicSearch):
         accp_states: BDD = ts_states & self.target_DFA
 
         self.winning_states[0] |= accp_states
-    
-    @deprecated
-    def get_state_action(self, dd_func: BDD, **kwargs) -> None:
-        """
-         A function  to print a strategy from each state in the dd_func
-
-         This functionality is not working We need to fix it!
-        """
-        prod_cube_string: List[BDD] = self.convert_prod_cube_to_func(dd_func=dd_func,
-                                                                     prod_curr_list=self.ts_x_list + self.dfa_x_list + self.sys_act_vars)
-        for prod_cube in prod_cube_string:
-            _ts_dd = prod_cube.existAbstract(self.dfa_xcube & self.ts_obs_cube & self.sys_cube)
-            _ts_tuple = self.ts_bdd_sym_to_curr_state_map.get(_ts_dd)
-            if _ts_tuple:
-                _ts_name = self.ts_handle.get_state_from_tuple(state_tuple=_ts_tuple)
-                assert _ts_name is not None, "Couldn't convert TS Cube to its corresponding State. FIX THIS!!!"
-
-                _dfa_name = self._look_up_dfa_name(prod_dd=prod_cube.existAbstract(self.sys_cube),
-                                                dfa_dict=self.dfa_bdd_sym_to_curr_state_map,
-                                                ADD_flag=False,
-                                                **kwargs)
-                
-                # get the sys action
-                _sys_act_dd = prod_cube.existAbstract(self.ts_xcube & self.dfa_xcube & self.ts_obs_cube)
-                _act_name = self.ts_bdd_sym_to_robot_act_map.get(_sys_act_dd)
-
-                assert _act_name is not None, "Couldn't convert Strategy cube to its corresponding state-action pair. FIX THIS!!!"
-                print(f"({_ts_name}, {_dfa_name})  -----> {_act_name} ")
 
 
     # overriding base class

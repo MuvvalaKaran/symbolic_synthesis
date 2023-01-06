@@ -400,77 +400,6 @@ class FrankaWorld(BaseSymMain):
         
         return state_lbl_vars
 
-    
-    def _create_all_holding_to_loc_combos(self, predicate_dict: dict)-> List[tuple]:
-        """
-         A helper function that creates all the valid combinations of holding and to-loc predicates. 
-
-         A valid combination is one where holding's box and location arguements are same as
-         to-loc's box and location arguement. 
-        """
-        _valid_combos = []
-        for b in predicate_dict['holding'].keys():
-            for l in predicate_dict['holding'][b].keys():
-                _valid_combos.extend(list(product(predicate_dict['holding'][b][l], predicate_dict['to_loc'][b][l])))
-        
-        return _valid_combos
-
-
-    def _create_all_ready_to_obj_combos(self, predicate_dict: dict) -> List[tuple]:
-        """
-         A helper function that creates all the valid combinations of ready and to-obj predicates. 
-
-         A valid combination is one where ready location arguement is same as to-obj location arguement. 
-        """
-        _valid_combos = []
-        for key in predicate_dict['ready'].keys():
-            if key != 'else':
-                _valid_combos.extend(list(product(predicate_dict['ready'][key], predicate_dict['to_obj'][key])))
-
-        return _valid_combos
-    
-
-    def _get_all_box_combos(self, boxes_dict: dict, predicate_dict: dict) -> Dict[str, list]:
-        """
-        The franka world has the world configuration (on b# l#) embedded into it's state defination. 
-        Also, we could have all n but 1 boxes grounded with that single box (not grounded) being currently manipulated.
-        
-        Thus, a valid set of state labels be
-            1) all boxes grounded - (on b0 l0)(on b1 l1)...
-            2) all but 1 grounded - (on b0 l0)(~(on b1 l1))(on b2 l2)...
-        
-        Hence, we need to create enough Boolean variables to accomodate all these possible configurations.
-        """
-        parent_combo_list = {'nb': [],   # preds where all boxes are grounded ad gripper free
-                             'b': []     # preds where n-1 boxes are grounded
-                             }
-
-        # create all grounded configurations
-        all_preds = [val for _, val in boxes_dict.items()]
-        all_preds += [predicate_dict['gripper']]
-        all_combos = list(product(*all_preds, repeat=1))
-
-        # when all the boxes are grouded then the gripper predicate is set to free
-        parent_combo_list['nb'].extend(all_combos)
-
-
-        # create n-1 combos
-        num_of_boxes = len(boxes_dict)
-
-        if num_of_boxes - 1 == 1:
-            return parent_combo_list
-        
-        # create all possible n-1 combinations of all boxes thhat can be grounded
-        combos = combinations([*boxes_dict.keys()], num_of_boxes - 1)
-
-        # iterate through every possible combo
-        for combo in combos:
-            # iterate through the tuple of boxes and create their combos
-            box_loc_list = [boxes_dict[box] for box in combo]
-            parent_combo_list['b'].extend(list(product(*box_loc_list, repeat=1)))
-
-        return parent_combo_list
-    
 
     def compute_valid_franka_state_tuples(self, robot_preds: Dict[str, list], on_preds: Dict[str, list], verbose: bool = False) -> list:
         """
@@ -505,44 +434,7 @@ class FrankaWorld(BaseSymMain):
             _state_tuples.append(tuple(sorted(_state_tpl)))
 
         return _state_tuples
-    
 
-    def compute_franka_state_lbl_tuple(self, on_preds: Dict[str, list]) -> list:
-        """
-         A function that compute tuples corresponding to possible valid state lbls by iteration through each explicit state
-          and constructing its tuple 
-        """
-        _lbls = []
-        for _exp_lbl in on_preds:
-            if isinstance(_exp_lbl, tuple):
-                _lbl_tpl = [self.pred_int_map[lbl] for lbl in _exp_lbl]
-                _lbls.append(tuple(sorted(_lbl_tpl)))
-            else:
-                _lbls.append(self.pred_int_map[_exp_lbl])
-        
-        return _lbls
-
-
-    def post_process_world_conf(self, possible_lbl: dict, locs: List[str]) -> dict:
-        """
-         This function take as input a dict whose values is the list all possible world confg.
-          We need to remove states where two or more boxes that share the same location 
-        """
-        new_possible_lbl = copy.deepcopy(possible_lbl)
-        # dont_add = False
-        for key, value in possible_lbl.items():
-            _valid_lbls = []
-            for lbl in value:
-                dont_add = False
-                for loc in locs:
-                    if len(re.split(loc, str(lbl))) >= 3:
-                        dont_add = True
-                        break
-                if not dont_add:
-                    _valid_lbls.append(lbl)
-            new_possible_lbl[key] = _valid_lbls
-        
-        return new_possible_lbl
     
 
     def compute_valid_predicates(self, predicates: List[str], boxes: List[str]) -> Tuple[List, Dict]:
@@ -556,16 +448,15 @@ class FrankaWorld(BaseSymMain):
         """
 
         predicate_dict = {
-            'ready': defaultdict(lambda: []),
-            'to_obj': defaultdict(lambda: []),
-            'to_loc': defaultdict(lambda: defaultdict(lambda: [])),
-            'holding': defaultdict(lambda: defaultdict(lambda: [])),
+            # 'ready': defaultdict(lambda: []),
+            # 'to_obj': defaultdict(lambda: []),
+            # 'to_loc': defaultdict(lambda: defaultdict(lambda: [])),
+            # 'holding': defaultdict(lambda: defaultdict(lambda: [])),
             'ready_all': [],
             'holding_all': [],
             'to_obj_all': [],
             'to_loc_all': [],
             'on': [],
-            'gripper': []
         }
 
         # dictionary where we segreate on predicates based on boxes - all b0, b1 ,... into seperate list 
@@ -582,37 +473,33 @@ class FrankaWorld(BaseSymMain):
                     if b in pred:
                         boxes_dict[b].append(pred)
                         break
-            
-            elif 'gripper' in pred:
-                predicate_dict['gripper'].append(pred)
-
             else:
                 # ready predicate is not parameterized by box
-                if not 'ready' in pred:
-                    _box_state: str = re.search(_box_pattern, pred).group()
-                    if 'else' in pred:
-                        _loc_state = 'else'
-                    else:
-                        _loc_state: str = re.search(_loc_pattern, pred).group()
-                else:
-                    # ready predicate can have else as a valid location 
-                    if 'else' in pred:
-                        _loc_state = 'else'
-                    else:
-                        _loc_state: str = re.search(_loc_pattern, pred).group()
+                # if not 'ready' in pred:
+                #     _box_state: str = re.search(_box_pattern, pred).group()
+                #     if 'else' in pred:
+                #         _loc_state = 'else'
+                #     else:
+                #         _loc_state: str = re.search(_loc_pattern, pred).group()
+                # else:
+                #     # ready predicate can have else as a valid location 
+                #     if 'else' in pred:
+                #         _loc_state = 'else'
+                #     else:
+                #         _loc_state: str = re.search(_loc_pattern, pred).group()
 
                 if 'holding' in pred:
                     predicate_dict['holding_all'].append(pred)
-                    predicate_dict['holding'][_box_state][_loc_state].append(pred)
-                elif 'ready' in pred:
+                    # predicate_dict['holding'][_box_state][_loc_state].append(pred)
+                if 'ready' in pred:
                     predicate_dict['ready_all'].append(pred)
-                    predicate_dict['ready'][_loc_state].append(pred)
+                    # predicate_dict['ready'][_loc_state].append(pred)
                 elif 'to-obj' in pred:
                     predicate_dict['to_obj_all'].append(pred)
-                    predicate_dict['to_obj'][_loc_state].append(pred)
+                    # predicate_dict['to_obj'][_loc_state].append(pred)
                 elif 'to-loc' in  pred:
                     predicate_dict['to_loc_all'].append(pred)
-                    predicate_dict['to_loc'][_box_state][_loc_state].append(pred)
+                    # predicate_dict['to_loc'][_box_state][_loc_state].append(pred)
         
         # create predicate int map
         _ind_pred_list = predicate_dict['ready_all'] + \
@@ -622,7 +509,7 @@ class FrankaWorld(BaseSymMain):
 
         # create on predicate map
         len_robot_conf = len(_ind_pred_list)
-        _pred_map.update({pred: len_robot_conf + num for num, pred in enumerate(predicate_dict['on'] + predicate_dict['gripper'])})
+        _pred_map.update({pred: len_robot_conf + num for num, pred in enumerate(predicate_dict['on'])})
         
         self.pred_int_map = _pred_map
 

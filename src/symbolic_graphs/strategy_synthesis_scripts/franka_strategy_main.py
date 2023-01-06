@@ -113,10 +113,10 @@ class FrankaPartitionedWorld(FrankaWorld):
                 if 'human' not in act.name:
                     # Pyperplan does not support equality operation. So, I have to manually trim these actions.
                     # remove actions like transit b# li li and transfer b# li li
-                    if 'transit' or 'transfer' in act.name: 
-                        _locs = re.findall("[l|L][\d]+", act.name)
-                        if len(_locs) > 1 and _locs[0] == _locs[1]:
-                            _causal_graph_instance.task.operators.remove(act)
+                    # if 'transit' or 'transfer' in act.name: 
+                    #     _locs = re.findall("[l|L][\d]+", act.name)
+                    #     if len(_locs) > 1 and _locs[0] == _locs[1]:
+                    #         _causal_graph_instance.task.operators.remove(act)
                     _seg_action['robot'].append(act)
                 else:
                     _seg_action['human'].append(act)
@@ -284,7 +284,7 @@ class FrankaPartitionedWorld(FrankaWorld):
         
         stop: float = time.time()
         print("Time took for constructing the abstraction: ", stop - start)
-
+        # sys.exit(-1)
         if print_facts:
             print(f"******************# of Edges in Franka Abstraction: {sym_tr.ecount}******************")
 

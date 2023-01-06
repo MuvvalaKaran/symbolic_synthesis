@@ -364,10 +364,6 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
         """
          This method overrides the parent method. For every robot action, we loop over all the human actions.
         """
-        
-        if verbose:
-            print(f"Creating TR for Actions:", *self.tr_action_idx_map.keys())
-
         self._create_sym_state_label_map(domain_lbls=state_lbls)
 
         open_list = defaultdict(lambda: self.manager.bddZero())
@@ -640,8 +636,9 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
                             self.predicate_sym_map_human[human_action_name] & self.predicate_sym_map_hint[curr_hint]).isZero()
                 if not edge_exist:
                     print(f"Nondeterminism due to Human Action: {self.get_state_from_tuple(curr_state_tuple)}[{curr_hint}] ---{human_action_name}---> {self.get_state_from_tuple(next_state_tuple)}[{curr_hint - 1}]")
-                    self.mono_tr_bdd |= curr_state_sym & self.predicate_sym_map_robot[robot_action_name] & \
-                                self.predicate_sym_map_human[human_action_name] & self.predicate_sym_map_hint[curr_hint]
+                    
+                self.mono_tr_bdd |= curr_state_sym & self.predicate_sym_map_robot[robot_action_name] & \
+                            self.predicate_sym_map_human[human_action_name] & self.predicate_sym_map_hint[curr_hint]
         else:
             nxt_state_sym = nxt_state_sym & self.predicate_sym_map_hint[curr_hint]
             _tr_idx: int = self.tr_action_idx_map.get(robot_action_name)
@@ -652,8 +649,8 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
                 if not edge_exist:
                     print(f"Nondeterminism due to Robot Action: {self.get_state_from_tuple(curr_state_tuple)}[{curr_hint}] ---{robot_action_name}---> {self.get_state_from_tuple(next_state_tuple)}[{curr_hint}]")
                 
-                    self.mono_tr_bdd |= curr_state_sym & self.predicate_sym_map_robot[robot_action_name] & \
-                                no_human_move & self.predicate_sym_map_hint[curr_hint]             
+                self.mono_tr_bdd |= curr_state_sym & self.predicate_sym_map_robot[robot_action_name] & \
+                            no_human_move & self.predicate_sym_map_hint[curr_hint]             
 
 
         # for every boolean var in nxt_state check if it high or low. If high add it curr state and the correpsonding action to its BDD
@@ -741,9 +738,6 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
                by Zhu et al. (LTLF Syft) does not work when you have nondeterminism, i.e., for same (State, Action) pair, you cannot evolve to two distinct successors.
                By setting debug to True, we keep track of all the edge created during the Abstarction Construction process.  
         """
-        if verbose:
-            print(f"Creating TR for Actions:", *self.tr_action_idx_map.keys())
-
         open_list = defaultdict(lambda: self.manager.bddZero())
 
         closed = self.manager.bddZero()

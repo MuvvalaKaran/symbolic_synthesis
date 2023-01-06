@@ -6,7 +6,6 @@
 (:requirements :strips :typing)
 
 (:types
-    robot - object
     box - object
     location - object
     general_loc - location
@@ -19,11 +18,17 @@
 (:constants else - general_loc ee - ee_loc) 
 
 (:predicates
-    (holding ?b - box ?l - general_loc)
+    ;(holding ?b - box ?l - general_loc)
+    (holding ?l - general_loc)
+
+    ;(ready ?o - object)
     (ready ?l - general_loc)
 
-    (to-obj ?b - box ?l - general_loc)
-    (to-loc ?b - box ?l - box_loc)
+    ;(to-obj ?b - box ?l - general_loc)
+    (to-obj ?b - box)
+
+    ;(to-loc ?b - box ?l - box_loc)
+    (to-loc ?l - box_loc)
 
     (on ?b - box ?l - location)
     
@@ -41,7 +46,8 @@
         (on ?b ?l2)
     )
     :effect (and 
-        (to-obj ?b ?l2)
+        (to-obj ?b)
+        ;(ready ?b)
         (not (ready ?l1))
     )
 )
@@ -50,14 +56,16 @@
 (:action grasp
     :parameters (?b - box ?l - general_loc)
     :precondition (and 
-        (to-obj ?b ?l)
+        (to-obj ?b)
+        ;(ready ?b)
         (on ?b ?l)
     )
     :effect (and 
-        (holding ?b ?l)
+        (holding ?l)
+        ;(ready ?l)
         (on ?b ee)
-        (not (ready ?l))
-        (not (to-obj ?b ?l))
+        ;(not (ready ?l))
+        (not (to-obj ?b))
         (not (on ?b ?l))
     )
 )
@@ -65,13 +73,16 @@
 (:action transfer
     :parameters (?b - box ?l1 - general_loc ?l2 - box_loc)
     :precondition (and 
-        (holding ?b ?l1)
+        (holding ?l1)
+        ;(ready ?l1)
         (on ?b ee)
     )
     :effect (and 
-        (to-loc ?b ?l2)
+        (to-loc ?l2)
+        ;(ready ?l2)
         (on ?b ee)
-        (not (holding ?b ?l1))
+        ;(not (ready ?l1))
+        (not (holding ?l1))
 
     )
 )
@@ -79,13 +90,14 @@
 (:action release
     :parameters (?b - box ?l - box_loc)
     :precondition (and
-        (to-loc ?b ?l)
+        (to-loc ?l)
+        ;(ready ?l)
         (on ?b ee)
     )
     :effect (and
         (ready ?l)
         (on ?b ?l)
-        (not (to-loc ?b ?l))
+        (not (to-loc ?l))
         (not (on ?b ee))
     )
 )
