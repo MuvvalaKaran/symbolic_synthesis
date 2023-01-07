@@ -448,23 +448,14 @@ class FrankaWorld(BaseSymMain):
         """
 
         predicate_dict = {
-            # 'ready': defaultdict(lambda: []),
-            # 'to_obj': defaultdict(lambda: []),
-            # 'to_loc': defaultdict(lambda: defaultdict(lambda: [])),
-            # 'holding': defaultdict(lambda: defaultdict(lambda: [])),
             'ready_all': [],
             'holding_all': [],
             'to_obj_all': [],
-            'to_loc_all': [],
             'on': [],
         }
 
         # dictionary where we segreate on predicates based on boxes - all b0, b1 ,... into seperate list 
         boxes_dict = {box: [] for box in boxes} 
-
-        # define patterns to find box ids and locations
-        _loc_pattern = "[l|L][\d]+"
-        _box_pattern = "[b|B][\d]+"
 
         for pred in predicates:
             if 'on' in pred:
@@ -474,36 +465,15 @@ class FrankaWorld(BaseSymMain):
                         boxes_dict[b].append(pred)
                         break
             else:
-                # ready predicate is not parameterized by box
-                # if not 'ready' in pred:
-                #     _box_state: str = re.search(_box_pattern, pred).group()
-                #     if 'else' in pred:
-                #         _loc_state = 'else'
-                #     else:
-                #         _loc_state: str = re.search(_loc_pattern, pred).group()
-                # else:
-                #     # ready predicate can have else as a valid location 
-                #     if 'else' in pred:
-                #         _loc_state = 'else'
-                #     else:
-                #         _loc_state: str = re.search(_loc_pattern, pred).group()
-
                 if 'holding' in pred:
                     predicate_dict['holding_all'].append(pred)
-                    # predicate_dict['holding'][_box_state][_loc_state].append(pred)
                 if 'ready' in pred:
                     predicate_dict['ready_all'].append(pred)
-                    # predicate_dict['ready'][_loc_state].append(pred)
                 elif 'to-obj' in pred:
                     predicate_dict['to_obj_all'].append(pred)
-                    # predicate_dict['to_obj'][_loc_state].append(pred)
-                elif 'to-loc' in  pred:
-                    predicate_dict['to_loc_all'].append(pred)
-                    # predicate_dict['to_loc'][_box_state][_loc_state].append(pred)
         
         # create predicate int map
-        _ind_pred_list = predicate_dict['ready_all'] + \
-             predicate_dict['holding_all'] + predicate_dict['to_obj_all'] + predicate_dict['to_loc_all']
+        _ind_pred_list = predicate_dict['ready_all'] + predicate_dict['holding_all'] + predicate_dict['to_obj_all']
         _pred_map = {pred: num for num, pred in enumerate(_ind_pred_list)}
         _pred_map = bidict(_pred_map)
 
@@ -535,10 +505,9 @@ class FrankaWorld(BaseSymMain):
 
         task_facts: List[str] = _causal_graph_instance.task.facts
         boxes: List[str] = _causal_graph_instance.task_objects
-        locations: List[str] = _causal_graph_instance.task_locations
 
         # compute all valid preds of the robot conf and box conf.
-        robot_preds, on_preds, box_preds = self.compute_valid_predicates(predicates=task_facts, boxes=boxes)#, locations=locations)
+        robot_preds, on_preds, box_preds = self.compute_valid_predicates(predicates=task_facts, boxes=boxes)
         
         # compute all the possible states
         ts_state_tuples = self.compute_valid_franka_state_tuples(robot_preds=robot_preds, on_preds=on_preds, verbose=True)

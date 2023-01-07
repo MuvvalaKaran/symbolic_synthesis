@@ -18,18 +18,9 @@
 (:constants else - general_loc ee - ee_loc) 
 
 (:predicates
-    ;(holding ?b - box ?l - general_loc)
     (holding ?l - general_loc)
-
-    ;(ready ?o - object)
     (ready ?l - general_loc)
-
-    ;(to-obj ?b - box ?l - general_loc)
     (to-obj ?b - box)
-
-    ;(to-loc ?b - box ?l - box_loc)
-    (to-loc ?l - box_loc)
-
     (on ?b - box ?l - location)
     
 )
@@ -47,7 +38,6 @@
     )
     :effect (and 
         (to-obj ?b)
-        ;(ready ?b)
         (not (ready ?l1))
     )
 )
@@ -57,14 +47,11 @@
     :parameters (?b - box ?l - general_loc)
     :precondition (and 
         (to-obj ?b)
-        ;(ready ?b)
         (on ?b ?l)
     )
     :effect (and 
         (holding ?l)
-        ;(ready ?l)
         (on ?b ee)
-        ;(not (ready ?l))
         (not (to-obj ?b))
         (not (on ?b ?l))
     )
@@ -74,14 +61,11 @@
     :parameters (?b - box ?l1 - general_loc ?l2 - box_loc)
     :precondition (and 
         (holding ?l1)
-        ;(ready ?l1)
         (on ?b ee)
     )
     :effect (and 
-        (to-loc ?l2)
-        ;(ready ?l2)
+        (holding ?l2)
         (on ?b ee)
-        ;(not (ready ?l1))
         (not (holding ?l1))
 
     )
@@ -90,14 +74,13 @@
 (:action release
     :parameters (?b - box ?l - box_loc)
     :precondition (and
-        (to-loc ?l)
-        ;(ready ?l)
+        (holding ?l)
         (on ?b ee)
     )
     :effect (and
         (ready ?l)
         (on ?b ?l)
-        (not (to-loc ?l))
+        (not (holding ?l))
         (not (on ?b ee))
     )
 )

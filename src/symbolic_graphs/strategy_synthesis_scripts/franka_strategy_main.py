@@ -95,12 +95,12 @@ class FrankaPartitionedWorld(FrankaWorld):
         boxes: List[str] = causal_graph_instance.task_objects
         locs: List[str] = causal_graph_instance.task_locations
 
-        for act in causal_graph_instance.task.operators:
-            if 'human' in act.name:
-                _seg_action['human'].append(act.name)
-            # else:
-                # for release and grasp, we only create one action
-                # for transit we only create transit b# and for transfer l2#
+        for b in boxes:
+            for l in locs:
+                _seg_action['human'].append(f'human-move {b} {l}')
+
+        # for release and grasp, we only create one action
+        # for transit we only create transit b# and for transfer l2#
         _seg_action['robot'].append('release') 
         _seg_action['robot'].append('grasp')
         for b in boxes:
@@ -131,12 +131,6 @@ class FrankaPartitionedWorld(FrankaWorld):
         
         # segregate actions in robot actions (controllable vars - `o`) and humans moves (uncontrollable vars - `i`)
         if build_human_move:
-            # _seg_action = defaultdict(lambda: [])
-            # for act in _causal_graph_instance.task.operators:
-            #     if 'human' not in act.name:
-            #         _seg_action['robot'].append(act)
-            #     else:
-            #         _seg_action['human'].append(act)
             _seg_action = self.get_seg_human_robot_action(_causal_graph_instance)
         
         if build_human_move:

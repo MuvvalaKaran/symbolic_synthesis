@@ -447,7 +447,7 @@ class SymbolicFrankaTransitionSystem():
 
     def get_state_from_tuple(self, state_tuple: tuple) -> List[str]:
         """
-         Given, a predicate tuple, this function return the corresponding state tuple
+         Given a predicate tuple, this function returns the corresponding state tuple
         """
         if isinstance(state_tuple, tuple):
             _states = [self.pred_int_map.inv[state] for state in state_tuple]

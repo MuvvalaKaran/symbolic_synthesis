@@ -1,7 +1,5 @@
 (define (problem bounded_dynamic_only_franka_world) (:domain bounded_dynamic_franka_box_world)
 (:objects
-    franka - robot
-
     l0 - hbox_loc
     l1 - hbox_loc
     l2 - hbox_loc
@@ -18,9 +16,9 @@
     b0 - box
     b1 - box
     b2 - box
-    b3 - box
+    ;b3 - box
     ;b4 - box
-    ;b5 - boxs
+    ;b5 - box
     ;b6 - box
 
 
@@ -33,7 +31,7 @@
     (on b0 else)
     (on b1 else)
     (on b2 else)
-    (on b3 else)
+    ;(on b3 else)
     ;(on b4 l4)
     ;(on b5 l5)
     ;(on b6 l6)

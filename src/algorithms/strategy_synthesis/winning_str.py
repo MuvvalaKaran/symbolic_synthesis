@@ -465,7 +465,7 @@ class BndReachabilityGame(ReachabilityGame):
             human_int: bool = False
             # Human Intervention
             if coin and curr_hint > 0:
-                if len(self.ts_handle.adj_map[curr_ts_tuple][curr_hint]['h']) > 0:
+                if self.ts_handle.adj_map.get(curr_ts_tuple, {}).get(curr_hint, {}).get('h'):
                     human_int = True
                     next_tuple, curr_hint = self.human_intervention(curr_state_tuple=curr_ts_tuple,
                                                                     curr_dfa_state=curr_dfa_state,
@@ -485,18 +485,10 @@ class BndReachabilityGame(ReachabilityGame):
                     ract_name = self.ts_bdd_sym_to_robot_act_map[curr_act]
 
                 if verbose:
-                    print(f"Step {counter}: Hint: {curr_hint}: Act: {ract_name}")
+                    print(f"Step {counter}: Hint: {curr_hint}: Conf: {self.ts_handle.get_state_from_tuple(curr_ts_tuple)} Act: {ract_name}")
                 
-                # get add and del tuples
-                for op in self.ts_handle.task.operators:
-                    if op.name == ract_name:
-                        add_tuple = self.ts_handle.get_tuple_from_state(op.add_effects)
-                        del_tuple = self.ts_handle.get_tuple_from_state(op.del_effects)
-                        break
-
-                # construct the tuple for next state
-                next_tuple = list(set(curr_ts_tuple) - set(del_tuple))
-                next_tuple = tuple(sorted(list(set(next_tuple + list(add_tuple)))))
+                # look up the next tuple 
+                next_tuple = self.ts_handle.adj_map[curr_ts_tuple][curr_hint][ract_name]
 
             # look up its corresponding formula
             curr_ts_state: BDD = self.ts_handle.get_sym_state_from_tuple(next_tuple)
