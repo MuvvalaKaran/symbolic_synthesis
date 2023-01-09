@@ -15,8 +15,6 @@ from config import *
 
 from bidict import bidict
 
-from src.explicit_graphs import FiniteTransitionSystem
-
 from src.symbolic_graphs import PartitionedFrankaTransitionSystem
 
 
@@ -120,29 +118,32 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
          A helper function that takes in as input the original name of the paramterized actions as parse by pyperplan, modifies it to
           the modified actions we manually create and returns that name
         """
-
-        finite_ts = FiniteTransitionSystem(None)
+        _loc_pattern = "[l|L][\d]+"
+        _box_pattern = "[b|B][\d]+"
 
         if 'release' in org_act_name:
             return 'release'
         elif 'grasp' in org_act_name:
             return 'grasp'
+        
         # transfer action are of type transfer l2 
         elif 'transfer' in org_act_name:
-            box_id, locs = finite_ts._get_multiple_box_location(multiple_box_location_str=org_act_name)
+            locs: List[str] = re.findall(_loc_pattern, org_act_name)
             if 'else' in org_act_name:
-                dloc = locs[0]
+                return f'transfer {locs[0]}'
             else:
-                dloc = locs[1]
-            return f'transfer {dloc}'
+                return f'transfer {locs[1]}'
+            
         # transit action are of type transit b#
         elif 'transit' in org_act_name:
-            box_id, locs = finite_ts._get_multiple_box_location(multiple_box_location_str=org_act_name)
-            return f'transit b{box_id}'
+            _box_state: str = re.search(_box_pattern, org_act_name).group()
+            return f'transit {_box_state}'
+
         elif 'human' in org_act_name:
-            box_id, locs = finite_ts._get_multiple_box_location(multiple_box_location_str=org_act_name)
-            dloc = locs[1]
-            return f'human-move b{box_id} {dloc}'
+            locs: List[str] = re.findall(_loc_pattern, org_act_name)
+            _box_state: str = re.search(_box_pattern, org_act_name).group()
+
+            return f'human-move {_box_state} {locs[1]}'
         else:
             warnings.warn("Could not look up the corresponding modified robot action name")
             sys.exit(-1)
@@ -151,6 +152,8 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
     def add_edge_to_action_tr(self,
                               curr_state_tuple: tuple,
                               next_state_tuple: tuple,
+                              curr_state_sym: BDD,
+                              nxt_state_sym: BDD,
                               robot_action_name: str = '',
                               human_action_name: str = '',
                               valid_hact_list: List[str] = None,
@@ -178,8 +181,6 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
         if human_action_name != '':
             assert robot_action_name == '', "Error While constructing Human Edge, FIX THIS!!!"
         
-        curr_state_sym: BDD = self.predicate_sym_map_curr[curr_state_tuple]
-        nxt_state_sym: BDD = self.predicate_sym_map_curr[next_state_tuple]
 
         if human_action_name != '':
             _tr_idx: int = self.tr_action_idx_map.get(human_action_name)
@@ -188,6 +189,7 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
                 edge_exist: bool = (self.mono_tr_bdd & curr_state_sym & self.predicate_sym_map_human[human_action_name]).isZero()
                 
                 if not edge_exist:
+                    # print(f"Nondeterminism due to Human Action: {curr_state} ---{human_action_name}---> {next_state}")
                     print(f"Nondeterminism due to Human Action: {self.get_state_from_tuple(curr_state_tuple)} ---{human_action_name}---> {self.get_state_from_tuple(next_state_tuple)}")
                 
                 self.mono_tr_bdd |= curr_state_sym & self.predicate_sym_map_human[human_action_name]
@@ -198,7 +200,8 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
                 
                 if not edge_exist:
                     print(f"Nondeterminism due to Robot Action: {self.get_state_from_tuple(curr_state_tuple)} ---{robot_action_name}---> {self.get_state_from_tuple(next_state_tuple)}")
-                
+                    # print(f"Nondeterminism due to Human Action: {curr_state} ---{robot_action_name}---> {next_state}")
+
                 self.mono_tr_bdd |= curr_state_sym & self.predicate_sym_map_robot[robot_action_name] & no_human_move            
 
         # for every boolean var in nxt_state check if it high or low. If high add it curr state and the correpsonding action to its BDD
@@ -243,24 +246,19 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
             return False
 
         # if box1 is being manipulated, get the list of rest of boxes (that have to be grounded) at this instance
-        tmp_copy = copy.deepcopy(boxes)
-        tmp_copy.remove(_box_state)
-
         # create predicates that say on b0 l1 (l1 is the destination in the action)
-        on_preds = [self.pred_int_map[f'(on {bid} {dloc})'] for bid in tmp_copy]
+        on_preds = [self.pred_int_map[f'(on {bid} {dloc})'] for bid in boxes if bid != _box_state]
         
         if set(on_preds).intersection(set(curr_state_lbl)):
             return False
 
         return True
     
-    def print_human_edge(self, curr_state_tuple: tuple, hnext_tuple: tuple, robot_action_name: str, haction, **kwargs):
+    def print_human_edge(self, curr_exp_states: List[str], hnext_exp_states: List[str], robot_action_name: str, haction, **kwargs):
         """
          A helper function solely for printing an human intervention edge.
         """
-        cstate = self.get_state_from_tuple(state_tuple=tuple(curr_state_tuple))
-        nstate = self.get_state_from_tuple(state_tuple=hnext_tuple)
-        print(f"Adding Human edge: {cstate} -------{robot_action_name} & {haction.name}------> {nstate}")
+        print(f"Adding Human edge: {curr_exp_states} -------{robot_action_name} & {haction.name}------> {hnext_exp_states}")
     
 
     def check_support_constraint(self, boxes: List[str], curr_state_lbl: tuple, human_action_name: str) -> bool:
@@ -284,11 +282,6 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
             # check if a box exists on "top" in the curr state lbl or after the completion of the robot action
             if set(on_preds).intersection(set(curr_state_lbl)):
                 return False
-            
-            # if 'release' in robot_action_name:
-            #     _dloc: str = re.search(_loc_pattern, robot_action_name).group()
-            #     if _dloc in TOP_LOC:
-            #         return False
 
         return True
 
@@ -297,8 +290,9 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
                         haction,
                         open_list: dict,
                         curr_state_tuple: tuple,
-                        curr_rob_conf_tuple: tuple,
-                        curr_world_conf_tuple:tuple,
+                        curr_exp_states: List[str],
+                        curr_state_sym: BDD,
+                        curr_rob_conf: str,
                         layer: int,
                         boxes: List[str],
                         verbose: bool = False,
@@ -310,14 +304,9 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
          Robot add effect will (should) not clash with human's del effect
         """
         _box_pattern = "[b|B][\d]+"
-
-        curr_rstate = self.get_state_from_tuple(curr_rob_conf_tuple)
-
-        assert len(curr_rstate) == 1, "Error computing Robot Configuration. Fix This!!!"
-
         # we do not allow the human move the obj the robot is currently grasping
-        if 'to-obj' in curr_rstate[0]:
-            _box_state: str = re.search(_box_pattern, curr_rstate[0]).group()
+        if 'to-obj' in curr_rob_conf:
+            _box_state: str = re.search(_box_pattern, curr_rob_conf).group()
             _hbox_state: str = re.search(_box_pattern, haction.name).group()
 
             if _box_state == _hbox_state:
@@ -329,33 +318,28 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
                                                                    human_action_name=haction.name)
 
         if d_loc_available:
-            valid_move: bool = self.check_support_constraint(boxes=boxes,
-                                                             curr_state_lbl=curr_state_tuple,
-                                                             human_action_name=haction.name)
-            if not valid_move:
-                return False
-            
-            # get add and del tuples 
-            add_tuple = self.get_tuple_from_state(haction.add_effects)
-            del_tuple = self.get_tuple_from_state(haction.del_effects)
-
-            # construct the tuple for next state as per the human action
-            hnext_tuple = list(set(curr_state_tuple) - set(del_tuple))
-            hnext_tuple = tuple(sorted(list(set(hnext_tuple + list(add_tuple)))))
+            # valid_move: bool = self.check_support_constraint(boxes=boxes,
+            #                                                  curr_state_lbl=curr_state_tuple,
+            #                                                  human_action_name=haction.name)
+            # if not valid_move:
+            #     return False
 
             # look up its corresponding formula
-            next_sym_state: BDD = self.get_sym_state_from_tuple(hnext_tuple)
+            next_exp_state = list(haction.apply(state=frozenset(curr_exp_states)))
+            next_sym_state: BDD = self.get_sym_state_from_exp_states(exp_states=next_exp_state)
+
 
             if verbose:
-                self.print_human_edge(curr_state_tuple=curr_state_tuple,
-                                      hnext_tuple=hnext_tuple,
-                                      robot_action_name='',
-                                      haction=haction,
+                self.print_human_edge(curr_exp_states=curr_exp_states,
+                                      hnext_exp_states=next_exp_state,
+                                      haction=haction.name,
                                       **kwargs)
 
             # add The edge to its corresponding action
             self.add_edge_to_action_tr(curr_state_tuple=curr_state_tuple,
-                                       next_state_tuple=hnext_tuple,
+                                       curr_state_sym=curr_state_sym,
+                                       next_state_tuple=next_exp_state,
+                                       nxt_state_sym=next_sym_state,
                                        human_action_name=haction.name,
                                        **kwargs)
 
@@ -383,7 +367,7 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
                            open_list: List[BDD],
                            boxes: List[str],
                            layer: int,
-                           valid_hact_list: list,
+                           human_edge: BDD,
                            add_exist_constr: bool,
                            prod_curr_list: List[BDD],
                            verbose: bool = False,
@@ -391,58 +375,40 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
         """
          A function that loop create the valid robot edges given the current state and set the of valid edges from the current state.
         """
+        
         curr_state_tuple, curr_hint = self.get_state_tuple_from_sym_state(sym_state=curr_sym_state, sym_lbl_xcube_list=sym_lbl_cubes)
+        curr_exp_states = frozenset(self.get_state_from_tuple(curr_state_tuple))
         # compute the image of the TS states
         for action in robot_actions:
             # set action feasbility flag to True - used during transfer and release action to check the des loc is empty
             action_feas: bool = True
-            pre_tuple = self.get_tuple_from_state(action.preconditions)
-            _necc_robot_conf = self.get_conds_from_state(pre_tuple, only_robot_conf=True)
-            
-            # we first compute all Valid Human action from a give state
-            _intersect: bool = set(pre_tuple).issubset(curr_state_tuple)
 
-            if _intersect:
-                # get valid pres from current state tuple
-                pre_robot_conf = self.get_conds_from_state(curr_state_tuple, only_robot_conf=True)
-                pre_robot_conf = tuple(set(pre_robot_conf).intersection(_necc_robot_conf))
-                pre_world_conf = self.get_conds_from_state(curr_state_tuple, only_world_conf=True)
-
-                _valid_pre: list = sorted(pre_robot_conf + pre_world_conf)
-
+            if action.applicable(state=curr_exp_states):
                 # add existential constraints to transfer and relase action
                 if add_exist_constr and (('transfer' in action.name) or ('release' in action.name)):
                     action_feas = self._check_exist_constraint(boxes=boxes,
-                                                               curr_state_lbl=_valid_pre,
+                                                               curr_state_lbl=curr_state_tuple,
                                                                action_name=action.name)
                 
                 if not action_feas:
                     continue
 
-                # get add and del tuples 
-                add_tuple = self.get_tuple_from_state(action.add_effects)
-                del_tuple = self.get_tuple_from_state(action.del_effects)
-
-                # construct the tuple for next state
-                next_tuple = list(set(_valid_pre) - set(del_tuple))
-                next_tuple = tuple(sorted(list(set(next_tuple + list(add_tuple)))))
-
-                # look up its corresponding formula
-                next_sym_state: BDD = self.get_sym_state_from_tuple(next_tuple)
+                next_exp_state = list(action.apply(state=frozenset(curr_exp_states)))
+                next_sym_state: BDD = self.get_sym_state_from_exp_states(exp_states=next_exp_state)
 
                 # add The edge to its corresponding action
                 self.add_edge_to_action_tr(robot_action_name=action.name,
-                                            curr_state_tuple=tuple(_valid_pre),
-                                            next_state_tuple=next_tuple,
-                                            curr_hint=curr_hint,
-                                            valid_hact_list=valid_hact_list,
-                                            prod_curr_list=prod_curr_list,
-                                            **kwargs)
+                                           curr_state_tuple=curr_state_tuple,
+                                           next_state_tuple=next_exp_state,
+                                           curr_state_sym=curr_sym_state,
+                                           nxt_state_sym=next_sym_state,
+                                           curr_hint=curr_hint,
+                                           valid_hact_list=human_edge,
+                                           prod_curr_list=prod_curr_list,
+                                           **kwargs)
                 
                 if verbose:
-                    cstate: tuple = self.get_state_from_tuple(state_tuple=tuple(_valid_pre))
-                    nstate: tuple = self.get_state_from_tuple(state_tuple=next_tuple)
-                    print(f"Adding Robot edge: {cstate}[{curr_hint}] -------{action.name}------> {nstate}[{curr_hint}]")
+                    print(f"Adding Robot edge: {list(curr_exp_states)}[{curr_hint}] -------{action.name}------> {next_exp_state}[{curr_hint}]")
                 
                 # get their corresponding lbls 
                 self.sym_state_labels |= next_sym_state 
@@ -466,31 +432,26 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
          We then return the list of valid TS actions to create the valid robot edges from the symbolic state.  
         """
         curr_state_tuple, curr_hint = self.get_state_tuple_from_sym_state(sym_state=curr_sym_state, sym_lbl_xcube_list=sym_lbl_cubes)
+        curr_exp_states = frozenset(self.get_state_from_tuple(curr_state_tuple))
+        # get valid pres from current state tuple
+        pre_robot_conf = self.get_conds_from_state(curr_state_tuple, only_robot_conf=True)
+        curr_rstate = self.get_state_from_tuple(pre_robot_conf)
+
+        assert len(curr_rstate) == 1, "Error computing Robot Configuration. Fix This!!!"
+
         env_edge_acts = []
         # compute the image of the TS states
         for action in human_actions:
             valid_act: bool = False
-            pre_tuple = self.get_tuple_from_state(action.preconditions)
-            
-            # we first compute all Valid Human action from a give state
-            _intersect: bool = set(pre_tuple).issubset(curr_state_tuple)
-
-            if _intersect:
-                # get valid pres from current state tuple
-                pre_robot_conf = self.get_conds_from_state(curr_state_tuple, only_robot_conf=True)
-                pre_world_conf = self.get_conds_from_state(curr_state_tuple, only_world_conf=True)
-
-                _valid_pre: list = sorted(pre_robot_conf + pre_world_conf)
-
-                assert curr_state_tuple == tuple(_valid_pre), 'Error Computing Human Edge. FIX THIS!!!'
-
+            if action.applicable(state=curr_exp_states):
                 # Add human moves
                 if curr_hint > 0:
                     valid_act =  self.add_human_moves(haction=action,
                                                       open_list=open_list,
-                                                      curr_state_tuple=tuple(_valid_pre),
-                                                      curr_rob_conf_tuple=pre_robot_conf, 
-                                                      curr_world_conf_tuple=pre_world_conf,
+                                                      curr_state_tuple=curr_state_tuple,
+                                                      curr_exp_states=curr_exp_states,
+                                                      curr_state_sym=curr_sym_state,
+                                                      curr_rob_conf=curr_rstate[0],
                                                       layer=layer,
                                                       boxes=boxes,
                                                       verbose=verbose,
@@ -762,23 +723,20 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
     def add_edge_to_action_tr(self,
                               curr_state_tuple: tuple,
                               next_state_tuple: tuple,
+                              curr_state_sym: BDD,
+                              nxt_state_sym: BDD,
+                              curr_str_state: List[str]='',
+                              next_str_state: List[str]='',
                               robot_action_name: str = '',
                               human_action_name: str = '',
-                              valid_hact_list: List[str] = None,
+                              valid_hact_list: BDD = None,
                               **kwargs) -> None:
         if valid_hact_list is None:
             valid_hact_list = []
-        elif isinstance(valid_hact_list, list):
-            # if there are any valid human edges from curr state
-            if len(valid_hact_list) > 0:
-                valid_hact: List[BDD] = [self.predicate_sym_map_human[self.get_mod_act_name(ha)] for ha in valid_hact_list]
-                no_human_move: BDD = ~(reduce(lambda x, y: x | y, valid_hact))
-            else:
-                no_human_move: BDD = self.manager.bddOne()
 
         else:
-            warnings.warn("Invalid Default args type when constructing the Symbolic Franka Abstraction. FIX THIS!!!")
-            sys.exit(-1)
+            assert isinstance(valid_hact_list, BDD), "Error Constructing TR Edges. Fix This!!!"
+            no_human_move = valid_hact_list
 
         if human_action_name != '':
             assert robot_action_name == '', "Error While constructing Human Edge, FIX THIS!!!"
@@ -790,8 +748,6 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
             robot_move: BDD = self.predicate_sym_map_robot[mod_raction_name]
 
         curr_hint: int = kwargs['curr_hint']
-        curr_state_sym: BDD = self.get_sym_state_from_tuple(curr_state_tuple)
-        nxt_state_sym: BDD = self.get_sym_state_from_tuple(next_state_tuple)
         
         if human_action_name != '':
             # get the modified human action name
@@ -803,8 +759,9 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
                 edge_exist: bool = (self.mono_tr_bdd & curr_state_sym & robot_move & self.predicate_sym_map_human[mod_haction_name] & self.predicate_sym_map_hint[curr_hint]).isZero()
                 
                 if not edge_exist:
-                    print(f"Nondeterminism due to Human Action: {self.get_state_from_tuple(curr_state_tuple)}[{curr_hint}] ---{human_action_name}---> {self.get_state_from_tuple(next_state_tuple)}[{curr_hint - 1}]")
-                    
+                    # print(f"Nondeterminism due to Human Action: {self.get_state_from_tuple(curr_state_tuple)}[{curr_hint}] ---{human_action_name}---> {self.get_state_from_tuple(next_state_tuple)}[{curr_hint - 1}]")
+                    print(f"Nondeterminism due to Human Action: {curr_str_state} ---{human_action_name}---> {next_str_state}")
+
                 self.mono_tr_bdd |= curr_state_sym & self.predicate_sym_map_human[mod_haction_name] & self.predicate_sym_map_hint[curr_hint]
         else:
             nxt_state_sym = nxt_state_sym & self.predicate_sym_map_hint[curr_hint]
@@ -814,8 +771,10 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
                 edge_exist: bool = (self.mono_tr_bdd &  curr_state_sym & robot_move & no_human_move & self.predicate_sym_map_hint[curr_hint]).isZero()
                 
                 if not edge_exist:
-                    print(f"Nondeterminism due to Robot Action: {self.get_state_from_tuple(curr_state_tuple)}[{curr_hint}] ---{robot_action_name}---> {self.get_state_from_tuple(next_state_tuple)}[{curr_hint}]")
+                    # print(f"Nondeterminism due to Robot Action: {self.get_state_from_tuple(curr_state_tuple)}[{curr_hint}] ---{robot_action_name}---> {self.get_state_from_tuple(next_state_tuple)}[{curr_hint}]")
+                    print(f"Nondeterminism due to Robot Action: {curr_str_state}[{curr_hint}] ---{robot_action_name}---> {next_str_state}[{curr_hint}]")
                 
+
                 self.mono_tr_bdd |= curr_state_sym & robot_move & no_human_move & self.predicate_sym_map_hint[curr_hint]             
 
 
@@ -883,14 +842,11 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
 
 
     
-    def print_human_edge(self, curr_state_tuple: tuple, hnext_tuple: tuple, robot_action_name: str, haction, **kwargs):
+    def print_human_edge(self, curr_exp_states: List[str], hnext_exp_states: List[BDD], haction_name, **kwargs):
         """
          Override base printing method to include remaining human intervention associated with each state.
         """
-        
-        cstate = self.get_state_from_tuple(state_tuple=tuple(curr_state_tuple))
-        nstate = self.get_state_from_tuple(state_tuple=hnext_tuple)
-        print(f"Adding Human edge: {cstate}[{kwargs['curr_hint']}] -------{haction.name}------> {nstate}[{kwargs['curr_hint'] - 1}]")
+        print(f"Adding Human edge: {curr_exp_states}[{kwargs['curr_hint']}] -------{haction_name}------> {hnext_exp_states}[{kwargs['curr_hint'] - 1}]")
 
 
     def create_transition_system_franka(self,
@@ -968,11 +924,11 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
                 print(f"******************************* Layer: {layer}*******************************")
 
                 # get all the states and their corresponding remaining human intervention
-                sta = time.time()
+                # sta = time.time()
                 sym_state = self._convert_state_lbl_cube_to_func(dd_func=open_list[layer], prod_curr_list=prod_curr_list)
-                sto = time.time()
-                print("Time spent computing the cubes: ", sto -sta)
-                sta = time.time()
+                # sto = time.time()
+                # print("Time spent computing the cubes: ", sto -sta)
+                # sta = time.time()
                 for state in sym_state:
                     # create human edges
                     valid_human_edges = self.create_human_edges(human_actions=_seg_actions['human'],
@@ -984,6 +940,12 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
                                                                 prod_curr_list=prod_curr_list,
                                                                 verbose=verbose,
                                                                 **kwargs)
+                    # if there are any valid human edges from curr state
+                    if len(valid_human_edges) > 0:
+                        valid_hact: List[BDD] = [self.predicate_sym_map_human[self.get_mod_act_name(ha)] for ha in valid_human_edges]
+                        no_human_move_edge: BDD = ~(reduce(lambda x, y: x | y, valid_hact))
+                    else:
+                        no_human_move_edge: BDD = self.manager.bddOne()
                     
                     
                     # create robot edges
@@ -993,14 +955,14 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
                                             open_list=open_list,
                                             layer=layer,
                                             boxes=boxes,
-                                            valid_hact_list=valid_human_edges,
+                                            human_edge=no_human_move_edge,
                                             add_exist_constr=add_exist_constr,
                                             prod_curr_list=prod_curr_list,
                                             verbose=verbose,
                                             **kwargs)
                     
-                sto = time.time()
-                print("Time spent costructing the Edges: ", sto -sta)
+                # sto = time.time()
+                # print("Time spent costructing the Edges: ", sto -sta)
                 layer += 1
         
         if kwargs['print_tr'] is True:

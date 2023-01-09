@@ -244,7 +244,6 @@ class ReachabilityGame(BaseSymbolicSearch):
                 print(f"**************************Reached a Fixed Point in {layer} layers**************************")
                 if not ((self.init_TS & self.init_DFA) & stra_list[layer]).isZero():
                     print("A Winning Strategy Exists!!")
-                    # winning_str: BDD = self.get_strategy(transducer=stra_list[layer], verbose=True)
 
                     return stra_list[layer]
                 else:
@@ -266,12 +265,10 @@ class ReachabilityGame(BaseSymbolicSearch):
             if not ((self.init_TS & self.init_DFA) & stra_list[layer + 1]).isZero():
                 print(f"************************** Reached the Initial State at layer: {layer + 1} **************************")
                 print("A Winning Strategy Exists!!")
-                # winning_str: BDD = self.get_strategy(transducer=stra_list[layer], verbose=True)
 
                 # return winning_str
                 if verbose:
                     print(f"Winning states at Iter {layer + 1}")
-                    # new_states = ~closed & pre_univ.existAbstract(self.sys_env_cube & self.ts_obs_cube)
                     new_states = ~closed & pre_univ.existAbstract(self.sys_env_cube)
                     self.get_prod_states_from_dd(dd_func=new_states, sym_lbl_cubes=sym_lbl_cubes, prod_curr_list=prod_curr_list)
 
@@ -349,8 +346,6 @@ class BndReachabilityGame(ReachabilityGame):
          This base class overrides the base method by return the Actual state name using the
           pred int map dictionary rather than the state tuple. 
         """
-
-        # prod_curr_list=self.ts_x_list + self.dfa_x_list + self.hint_list
         prod_curr_list = kwargs['prod_curr_list']
         prod_cube_string: List[BDD] = self.convert_prod_cube_to_func(dd_func=dd_func, prod_curr_list=prod_curr_list) 
         for prod_cube in prod_cube_string:
@@ -371,7 +366,9 @@ class BndReachabilityGame(ReachabilityGame):
         """
          A function that compute the next state tuple given the current state tuple. 
         """
-        nxt_state_tuple = random.choice(self.ts_handle.adj_map[curr_state_tuple][curr_hint]['h'])
+        next_exp_states = random.choice(self.ts_handle.adj_map[curr_state_tuple][curr_hint]['h'])
+        nxt_state_tuple = self.ts_handle.get_tuple_from_state(next_exp_states)
+        
         # look up its corresponding formula
         nxt_ts_state: BDD = self.ts_handle.get_sym_state_from_tuple(nxt_state_tuple)
 
@@ -488,7 +485,8 @@ class BndReachabilityGame(ReachabilityGame):
                     print(f"Step {counter}: Hint: {curr_hint}: Conf: {self.ts_handle.get_state_from_tuple(curr_ts_tuple)} Act: {ract_name}")
                 
                 # look up the next tuple 
-                next_tuple = self.ts_handle.adj_map[curr_ts_tuple][curr_hint][ract_name]
+                next_exp_states = self.ts_handle.adj_map[curr_ts_tuple][curr_hint][ract_name]
+                next_tuple = self.ts_handle.get_tuple_from_state(next_exp_states)
 
             # look up its corresponding formula
             curr_ts_state: BDD = self.ts_handle.get_sym_state_from_tuple(next_tuple)

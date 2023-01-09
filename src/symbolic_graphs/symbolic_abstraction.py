@@ -283,7 +283,7 @@ class SymbolicFrankaTransitionSystem():
         self.task: dict = task
         self.domain: dict = domain
         self.manager = manager
-        # self.actions: dict = [action.name for action in task.operators]
+        
         self.actions: list = None
         self.tr_action_idx_map: dict = {}
         self.sym_init_states: BDD = manager.bddZero()
@@ -387,11 +387,11 @@ class SymbolicFrankaTransitionSystem():
         _int_tuple = []
         for pred in preds:
             if only_world_conf:
-                if ('on' in pred) or ('gripper' in pred):
+                if 'on' in pred:
                     _int_tuple.append(self.pred_int_map[pred])
 
             elif only_robot_conf:
-                if not(('on' in pred) or ('gripper' in pred)):
+                if 'on' not in pred:
                     _int_tuple.append(self.pred_int_map[pred])
         
         return tuple(sorted(_int_tuple))
@@ -418,6 +418,25 @@ class SymbolicFrankaTransitionSystem():
 
         return sym_lbl
     
+
+    def get_sym_state_from_exp_states(self, exp_states: List[BDD]) -> BDD:
+        """
+         A function that iterates over the list of explicit states, looks up its corresponding boolean formula,
+          and returns the conjunction of all the boolean formula
+        """
+        _sym_lbls_list = []
+        for lbl in exp_states:
+            if lbl in self.predicate_sym_map_lbl:
+                _sym_lbls_list.append(self.predicate_sym_map_lbl[lbl])
+            else:
+                _sym_lbls_list.append(self.predicate_sym_map_curr[lbl])
+        
+        sym_lbl = reduce(lambda x, y: x & y, _sym_lbls_list)
+
+        assert not sym_lbl.isZero(), "Error constructing the symbolic lbl associated with each state. FIX THIS!!!"
+
+        return sym_lbl
+
 
     def get_sym_state_lbl_from_tuple(self, state_lbl_tuple: tuple) -> BDD:
         """
@@ -555,22 +574,20 @@ class SymbolicFrankaTransitionSystem():
          
         Return False if intersection is non-empty else True
         """
-        finite_ts = FiniteTransitionSystem(None)
+        _loc_pattern = "[l|L][\d]+"
+        _box_pattern = "[b|B][\d]+"
 
         if 'transfer' in action_name: 
-            box_id, locs = finite_ts._get_multiple_box_location(multiple_box_location_str=action_name)
-            # if transfer b# else l#:  
+            locs: List[str] = re.findall(_loc_pattern, action_name)
             if 'else' in action_name:
-                dloc = locs[0]
+                return f'transfer {locs[0]}'
             else:
-                dloc = locs[1]
+                return f'transfer {locs[1]}'
         elif 'release' in action_name:
-            box_id, locs = finite_ts._get_box_location(box_location_state_str=action_name)
-            dloc = locs
-        
-        # if box1 is being manipulated, get the list of rest of boxes (that have to be grounded) at this instance
-        tmp_copy = copy.deepcopy(boxes)
-        tmp_copy.remove(f'b{box_id}')
+            box_state: str = re.search(_box_pattern, action_name).group()
+            dloc: str = re.search(_loc_pattern, action_name).group()
+            
+        tmp_copy = [_b for _b in boxes if _b != box_state]
 
         # create predicates that say on b0 l1 (l1 is the destination in the action)
         on_preds = [self.pred_int_map[f'(on {bid} {dloc})'] for bid in tmp_copy]
