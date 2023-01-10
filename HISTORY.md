@@ -1,11 +1,51 @@
 This file keep tracks of various version of this source code
 
-### V2.1
+### V4.0
 
-- This tag implements a working Franka abstraction construction code using a mixture of conjuction (`&`) and disjusction (`|`) of boolean variables to represent each symbolic node in the graph.
-	- I use `x` for boolean variables that represent robot status. For actions like `release` and `grasp` (domain - simple_franka_box_world), I take the union (`|`) of the boolean formulas of the form `(~x1 & ~x2) | (x1 & ~x2)` where `(~x1 & ~x2)` and `(x1 & ~x2)` could represent `(to-loc b0 l0)` and `(holding b0 l0)` as preconditions for `release` motion primitive (Note: `~` is the negation operator).
-	- I use `b` for boolean variables that represent current world configuration. So, a world conf. where `(on b0 l0)`, `(on b1 l1)`, and `(gripper free)`  is true, I represent it as `(~b1 & ~b2) | (b1 & ~b2) | (~b1 & b2)`. 
-	- Thus, a symbolic state can be fully defined as the conjunction of `((~x1 & ~x2) | (x1 & ~x2)) & ((~b1 & ~b2) | (b1 & ~b2) | (~b1 & b2))`. While this representation requires few boolean variables as compared to a monolithic representation (the whole state is expressed using one boolean variable say `x`), the algorithms like `image` and `pre-image` have to be modified to accomodate the `|` operator. 
+This tag implements a faster and smaller abstraction construction and quicker winning strategy synthesis code.
+
+Major improvements - 
+ 1. Updated Domain file for Bounded and Unbounded Abstraction - fewer predicates leading to fewer states in TS and thus fewer boolean variables.  
+ 2. Instead of creating all possible configurations, we break the state encoding into Robot Conf and World Conf expressed using `X`and B<sub>i</sub> boolean variables. 
+ 3. Modified Robot and Human actions. 
+ 4. The variables are created in the order `I`,  `O`, `Z`, B<sub>i</sub>, `X`, `K`. 
+ 5. In the strategy synthesis, we first evolve over DFA variables `Z`, then compute the pre of the TS states. This eliminates the need for "Hook" and thus remove state label issue. 
+
+Bounded Abstraction: The abstraction is similar to the one used by Keliang. From each state in the TS, you have a robot edge and a human edge. You either evolve accoridng to human edge or robot edge. During roll out, I toss a coin and choose for either the human to intervene or not intervene (evolve accoridng to Robot's action).
+
+Unbounded Abstraction: The above abstraction interpretation does not work due to the unbounded nature of human interventions. For e.g., at a given TS state say the robot wants to `release` the box in End Effector but the human keeps moving some other block. Using the above interpretation, the graph will always evolve as per the human move and thus the robot won't be able to `release` the box. 
+
+To resolve this, in this abstraction, the graph evolves as per the combined robot and human action, i.e., (TS-state) ---- (release) & (human move) ---> (TS-state)'. Here (TS-state)' reflects robot's intention to perform an action (release) and the actual evolution as per the human's action (move some other block). Refer to [Commit](https://github.com/MuvvalaKaran/symbolic_synthesis/commit/0684e4f5e18aa6dbc86dbb929bbda2d27617057c) for more details.
+
+### State Encoding
+
+### V3.0
+
+This Tag implements a slow winning strategy synthesis code for Bounded and Unbounded Franka abstraction.
+	
+* ### State Encoding
+
+	In this implementation, eash state in the TS is composed of the following Boolean variables - `I`; `O`; B<sub>i</sub>; `G`; `X`; `K`;`Z`. Here, 
+
+		1. `I` - Human Action Vars
+		2. `O` - Robot Action vars
+		3. `X` - State Vars
+		4. `B_i` - Propositional Vars for each box 
+		5. `G` - Gripper status Var
+		6. `Z`- DFA state vars
+		7. `K` - Vars that keep track of # of human actions remaining
+	
+	We precompute all the possible Configurations (Robot + World Conf.), assign each state a boolean formula (made up of X vars), create TR in a compositional fashion ([link](https://drive.google.com/file/d/1UUW-HgJ_CgiMFufWic1C5Z842nRMuaUZ/view?usp=sharing)). Each edge in TS includes variables (I & O & B<sub>i</sub> & G & X & K & Z) in that specific variable order.
+
+* ### Strategy Synthesis 
+
+We use the state labels expressed as Boolean formulas made up of B<sub>i</sub> & G as "hooks". During the predecessor computation, the pre of the winning states is computed. The labels of the current states are used as hooks to evolve on the DFA, i.e., to update DFA variables `Z`. Due to this "hook" based implementation, after every predecessor computatuion, we need to update the state labels of each state to be the correct one. This issue is resolved in the next implementation.
+
+### V2.1
+ This tag implements a working Franka abstraction construction code using a mixture of conjuction (`&`) and disjusction (`|`) of boolean variables to represent each symbolic node in the graph.
+- I use `x` for boolean variables that represent robot status. For actions like `release` and `grasp` (domain - simple_franka_box_world), I take the union (`|`) of the boolean formulas of the form `(~x1 & ~x2) | (x1 & ~x2)` where `(~x1 & ~x2)` and `(x1 & ~x2)` could represent `(to-loc b0 l0)` and `(holding b0 l0)` as preconditions for `release` motion primitive (Note: `~` is the negation operator).
+- I use `b` for boolean variables that represent current world configuration. So, a world conf. where `(on b0 l0)`, `(on b1 l1)`, and `(gripper free)`  is true, I represent it as `(~b1 & ~b2) | (b1 & ~b2) | (~b1 & b2)`. 
+- Thus, a symbolic state can be fully defined as the conjunction of `((~x1 & ~x2) | (x1 & ~x2)) & ((~b1 & ~b2) | (b1 & ~b2) | (~b1 & b2))`. While this representation requires few boolean variables as compared to a monolithic representation (the whole state is expressed using one boolean variable say `x`), the algorithms like `image` and `pre-image` have to be modified to accomodate the `|` operator. 
 
 ### V2.0
 
