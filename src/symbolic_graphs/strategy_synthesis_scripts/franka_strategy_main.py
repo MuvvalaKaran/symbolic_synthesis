@@ -91,22 +91,19 @@ class FrankaPartitionedWorld(FrankaWorld):
          A function that loops over all the actions and store them in a dict. 
         """
         _seg_action = defaultdict(lambda: [])
-        # segregate actions in robot actions (controllable vars - `o`) and humans moves (uncontrollable vars - `i`)
-        boxes: List[str] = causal_graph_instance.task_objects
-        locs: List[str] = causal_graph_instance.task_locations
 
-        for b in boxes:
-            for l in locs:
+        for b in causal_graph_instance.task_objects:
+            for l in causal_graph_instance.task_intervening_locations:
                 _seg_action['human'].append(f'human-move {b} {l}')
 
         # for release and grasp, we only create one action
         # for transit we only create transit b# and for transfer l2#
         _seg_action['robot'].append('release') 
         _seg_action['robot'].append('grasp')
-        for b in boxes:
+        for b in causal_graph_instance.task_objects:
             _seg_action['robot'].append(f'transit {b}')
 
-        for l in locs:
+        for l in causal_graph_instance.task_locations:
             _seg_action['robot'].append(f'transfer {l}')       
         
         return _seg_action
@@ -217,14 +214,15 @@ class FrankaPartitionedWorld(FrankaWorld):
         return sym_tr, ts_curr_vars, ts_action_vars, ts_lbl_vars
     
 
-    def build_bdd_abstraction_dynamic(self, draw_causal_graph: bool = False, print_facts: bool = True) -> Tuple[DynamicFrankaTransitionSystem, List[BDD], List[BDD], List[BDD], List[BDD]]:
+    def build_bdd_abstraction_dynamic(self, draw_causal_graph: bool = False, print_facts: bool = True) \
+         -> Tuple[DynamicFrankaTransitionSystem, List[BDD], List[BDD], List[BDD], List[BDD]]:
         """
-         Main Function to Build Two-player Transition System without edge weights
+         Main Function to Build Two-player Transition System without edge weights.
         """
         task, domain, ts_curr_vars, ts_state_tuples, \
-             ts_lbl_vars, ts_robot_vars, ts_human_vars, boxes, possible_lbls = self.create_symbolic_causal_graph(draw_causal_graph=draw_causal_graph,
-                                                                                                                 build_human_move=True,
-                                                                                                                 print_facts=print_facts)
+             ts_lbl_vars, ts_robot_vars, ts_human_vars, modified_actions, boxes, possible_lbls = self.create_symbolic_causal_graph(draw_causal_graph=draw_causal_graph,
+                                                                                                                                   build_human_move=True,
+                                                                                                                                   print_facts=print_facts)
         
         sym_tr = DynamicFrankaTransitionSystem(curr_vars=ts_curr_vars,
                                                lbl_vars=ts_lbl_vars,
@@ -233,12 +231,14 @@ class FrankaPartitionedWorld(FrankaWorld):
                                                task=task,
                                                domain=domain,
                                                ts_states=ts_state_tuples,
+                                               ts_state_lbls=possible_lbls,
+                                               dfa_state_vars=self.dfa_x_list,
                                                ts_state_map=self.pred_int_map,
-                                               manager=self.manager)
+                                               manager=self.manager,
+                                               modified_actions=modified_actions)
         
         start: float = time.time()
         sym_tr.create_transition_system_franka(boxes=boxes,
-                                               state_lbls=possible_lbls,
                                                add_exist_constr=True,
                                                verbose=self.verbose,
                                                plot=self.plot_ts,
@@ -254,15 +254,16 @@ class FrankaPartitionedWorld(FrankaWorld):
         return sym_tr, ts_curr_vars, ts_robot_vars, ts_human_vars, ts_lbl_vars
     
 
-    def build_bdd_bnd_abstraction_dynamic(self, max_human_int: int, draw_causal_graph: bool = False, print_facts: bool = True) -> Tuple[BndDynamicFrankaTransitionSystem, List[BDD], List[BDD], List[BDD], List[BDD]]:
+    def build_bdd_bnd_abstraction_dynamic(self, max_human_int: int, draw_causal_graph: bool = False, print_facts: bool = True) \
+         -> Tuple[BndDynamicFrankaTransitionSystem, List[BDD], List[BDD], List[BDD], List[BDD]]:
         """
          Main function to Build Two-player Game without edge weights and with bounded human intervention.
           The # of remainig Human interventions is added as a counter to each state.
         """
         task, domain, ts_curr_vars, ts_state_tuples, \
              ts_lbl_vars, ts_robot_vars, ts_human_vars, modified_actions, boxes, possible_lbls = self.create_symbolic_causal_graph(draw_causal_graph=draw_causal_graph,
-                                                                                                                 build_human_move=True,
-                                                                                                                 print_facts=print_facts)
+                                                                                                                                   build_human_move=True,
+                                                                                                                                   print_facts=print_facts)
         # we create human intervention boolean vars right  after the state vars 
         ts_hint_vars = self._create_symbolic_lbl_vars(state_lbls=list(range(max_human_int + 1)),
                                                       state_var_name='k',
@@ -288,7 +289,6 @@ class FrankaPartitionedWorld(FrankaWorld):
         
         start: float = time.time()
         sym_tr.create_transition_system_franka(boxes=boxes,
-                                               state_lbls=possible_lbls,
                                                add_exist_constr=True,
                                                verbose=self.verbose,
                                                plot=self.plot_ts,

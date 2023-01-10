@@ -135,10 +135,9 @@ if __name__ == "__main__":
         frankapartition_handle.build_abstraction(dynamic_env=TWO_PLAYER_GAME,
                                                  bnd_dynamic_env=TWO_PLAYER_GAME_BND,
                                                  max_human_int=HUMAN_INT_BND)
-        # sys.exit(-1)                                         
+        # sys.exit(-1)                                      
         print(f"****************** # Total Boolean Variables: { cudd_manager.size()} ******************")
         frankapartition_handle.solve(verbose=False)
-
 
     else:
         warnings.warn("Please set atleast one flag to True - FRANKAWORLD or GRIDWORLD!")

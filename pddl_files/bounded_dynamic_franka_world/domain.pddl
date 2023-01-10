@@ -22,7 +22,6 @@
     (ready ?l - general_loc)
     (to-obj ?b - box)
     (on ?b - box ?l - location)
-    
 )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -67,7 +66,6 @@
         (holding ?l2)
         (on ?b ee)
         (not (holding ?l1))
-
     )
 )
 

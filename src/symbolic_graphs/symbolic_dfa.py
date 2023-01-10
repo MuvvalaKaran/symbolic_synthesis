@@ -661,11 +661,8 @@ class PartitionedDFA(SymbolicDFAFranka):
         # store the bdd associated with each state vars in this list. The index corresonds to its number
         self.tr_state_bdds = [self.manager.bddZero() for _ in range(len(self.sym_vars_curr))]
 
-        # index to determine where the state vars start 
-        if isinstance(sym_tr, BndDynamicFrankaTransitionSystem):
-            self.state_start_idx: int = len(sym_tr.sym_vars_human) + len(sym_tr.sym_vars_robot)
-        else:
-            self.state_start_idx: int = len(sym_tr.sym_vars_lbl) +  len(sym_tr.sym_vars_human) + len(sym_tr.sym_vars_robot)  + len(sym_tr.sym_vars_curr)
+        # index to determine where the state vars start
+        self.state_start_idx: int = len(sym_tr.sym_vars_human) + len(sym_tr.sym_vars_robot)
     
 
     def ltlf_add_edge_to_tr(self, curr_sym: BDD, nxt_sym: BDD, edge_sym: BDD) -> None:
