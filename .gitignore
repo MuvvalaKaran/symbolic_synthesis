@@ -1,3 +1,7 @@
+# ignore proprietary pydd and cudd stuff
+cudd/
+PyDD/
+
 # ignore pdf files generated
 *.pdf
 
