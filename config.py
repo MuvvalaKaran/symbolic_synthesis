@@ -7,8 +7,9 @@ EXPLICIT_GRAPH: bool = False  # set this flag to true when you want to construct
 GRIDWORLD: bool = False   # Set this flag to true when using gridworld example for graph search 
 FRANKAWORLD: bool = False  # Set this flag to true when using manipulator scenarios for graph search
 STRATEGY_SYNTHESIS: bool = True  # Set this flag to true when  when using manipulator scenarios for Strategy synthesis
-TWO_PLAYER_GAME: bool = False # Set this flag to true when you want to contruct a two-player game env.
-TWO_PLAYER_GAME_BND: bool = True  # Set this flag to true when you want to construct som bounded no. off human interventions.
+TWO_PLAYER_GAME: bool = True # Set this flag to true when you want to contruct a two-player game env.
+TWO_PLAYER_GAME_BND: bool = False  # Set this flag to true when you want to construct som bounded no. off human interventions.
+GAME_ALGORITHM = 'quant' # choose qual for qualitative game and quant for quantitative games
 
 HUMAN_INT_BND: int = 3
 
@@ -45,8 +46,13 @@ TOP_LOC = []
 # formulas = ['(F((p01 & free)) & F((p12 & free)) & F((p23 & free)) & F((p34 & free)))']
 
 # simple one box formula 
-formulas = ['F(p00 & p11 & !p22 & XF(p22))']
+# formulas = ['F(p00 & p11 & !p22 & XF(p22))']
 # formulas = ['F(p00 & p11 & p22 & p33 & p44)']
+
+### BENCHMARKING formulas
+# formulas = ['F(p00 & p11 & p22 & p33 & p44)']
+formulas = ['F(p00)']
+
 
 # formulas = [
 #             # 'F((p01 & p20 & free))',

@@ -113,7 +113,15 @@ if __name__ == "__main__":
             problem_file_path = PROJECT_ROOT + "/pddl_files/simple_franka_world/problem.pddl"
 
 
-        wgt_dict = {}
+        wgt_dict = {
+            "transit" : 1,
+            "grasp"   : 1,
+            "transfer": 1,
+            "release" : 1,
+            "human": 0
+            }
+        
+
 
         # partitioned frankaworld stuff
         frankapartition_handle = FrankaPartitionedWorld(domain_file=domain_file_path,
@@ -123,19 +131,21 @@ if __name__ == "__main__":
                                                         weight_dict=wgt_dict,
                                                         ltlf_flag=USE_LTLF,
                                                         dyn_var_ord=DYNAMIC_VAR_ORDERING,
-                                                        algorithm='qual',
+                                                        algorithm=GAME_ALGORITHM,
                                                         verbose=False,
                                                         plot_ts=False,
                                                         plot_obs=False,
                                                         plot=False)
         
+        assert GAME_ALGORITHM == 'quant' and TWO_PLAYER_GAME_BND is False, "We do not have symbolic bounded quantitative synthesis implemented yet. Please set TWO_PLAYER_GAME flag to True"
+
         assert TWO_PLAYER_GAME is not TWO_PLAYER_GAME_BND, "Please set only one flag to True - BND_TWO_PLAYER_GAME or TWO_PLAYER_GAME!"
 
         # build the abstraction
         frankapartition_handle.build_abstraction(dynamic_env=TWO_PLAYER_GAME,
                                                  bnd_dynamic_env=TWO_PLAYER_GAME_BND,
                                                  max_human_int=HUMAN_INT_BND)
-        # sys.exit(-1)                                      
+        sys.exit(-1)                                      
         print(f"****************** # Total Boolean Variables: { cudd_manager.size()} ******************")
         frankapartition_handle.solve(verbose=False)
 

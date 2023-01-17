@@ -527,6 +527,7 @@ class BndReachabilityGame(ReachabilityGame):
                                                                     curr_hint=curr_hint,
                                                                     verbose=verbose)
             if not human_int:
+                # if all the action from the current state belong to the 
                 curr_act_cubes = self.convert_prod_cube_to_func(dd_func=curr_act, prod_curr_list=self.sys_act_vars)
 
                 # if multiple winning actions exisit from same state

@@ -4,7 +4,7 @@ import copy
 import warnings
 import graphviz as gv
 
-from typing import List, Union
+from typing import List, Union, Tuple
 from bidict import bidict
 from functools import reduce
 from itertools import product
@@ -471,6 +471,29 @@ class SymbolicAddDFA(object):
         return expr
     
 
+    def print_plot_dfa_tr(self, plot: bool = False) -> None:
+        """
+         A helper function that prints the Transition Relation for the DFA.
+
+         @param: plot: Set this flag to true if you also want to print the corresponding BDD as a PDF.
+        """
+        print(f"Charateristic Function for DFA  is \n")
+        print(self.dfa_bdd_tr, " \n")
+        if plot:
+            file_path = PROJECT_ROOT + f'/plots/{self.dfa_name}_ADD_ltlf_trans_func.dot'
+            file_name = PROJECT_ROOT + f'/plots/{self.dfa_name}_ADD_ltlf_trans_func.pdf'
+            self.manager.dumpDot([self.dfa_bdd_tr], file_path=file_path)
+            gv.render(engine='dot', format='pdf', filepath=file_path, outfile=file_name)
+
+
+    def ltlf_add_edge_to_tr(self, curr_sym: BDD, nxt_sym: BDD, edge_sym: BDD) -> None:
+        """
+         Given the current symbolic state, the next symbolic state, and the corresponding symbolic edge formula,
+          add it to the transition relation representing set of valid edges
+        """
+        self.dfa_bdd_tr |= curr_sym & nxt_sym & edge_sym
+    
+
     def create_symbolic_ltlf_transition_system(self, verbose: bool = False, plot: bool = False):
         """
         This function parses the Mona DFA output and construct the symbolic TR associated with DFA.
@@ -498,16 +521,12 @@ class SymbolicAddDFA(object):
                 if orig_state:
                     _curr_sym = self.dfa_predicate_add_sym_map_curr.get(orig_state) 
                     _nxt_sym = self.dfa_predicate_add_sym_map_nxt.get(dest_state)
-                    self.dfa_bdd_tr |= _curr_sym & _nxt_sym & _edge_sym
+                    self.ltlf_add_edge_to_tr(curr_sym=_curr_sym,
+                                             nxt_sym=_nxt_sym,
+                                             edge_sym=_edge_sym )
         
         if verbose:
-            print(f"Charateristic Function for DFA  is \n")
-            print(self.dfa_bdd_tr, " \n")
-            if plot:
-                file_path = PROJECT_ROOT + f'/plots/{self.dfa_name}_ADD_ltlf_trans_func.dot'
-                file_name = PROJECT_ROOT + f'/plots/{self.dfa_name}_ADD_ltlf_trans_func.pdf'
-                self.manager.dumpDot([self.dfa_bdd_tr], file_path=file_path)
-                gv.render(engine='dot', format='pdf', filepath=file_path, outfile=file_name)
+            self.print_plot_dfa_tr(plot=plot)     
 
 
 class SymbolicDFAFranka(SymbolicDFA):
@@ -637,14 +656,14 @@ class SymbolicAddDFAFranka(SymbolicAddDFA):
                 box_loc: str = re.search(r'\d+', str(cryptic_lbl)).group()
                 expr = expr & ~self.predicate_add_sym_map_lbl[f'(on b{box_loc[0]} l{box_loc[1]})']
             else:
-                assert value == "X", "Error while constructing symbolic LTLF DAF edge. FIX THIS!!!"
+                assert value == "X", "Error while constructing symbolic LTLF DFA edge. FIX THIS!!!"
         
         return expr
 
 
 class PartitionedDFA(SymbolicDFAFranka):
     """
-     A class that constructs the TR is a partitioned fasshion, i.e., We only a BDD associated with each boolean variable and
+     A class that constructs the TR is a partitioned fashion, i.e., We only construct a BDD associated with each boolean variable and
       store them in a vector
     """
 
@@ -681,6 +700,7 @@ class PartitionedDFA(SymbolicDFAFranka):
                 warnings.warn("Encountered an ambiguous varible during TR construction. FIX THIS!!!")
                 sys.exit(-1)
     
+
     def print_plot_dfa_tr(self, plot: bool = False) -> None:
         """
          Overides the parent print plot class as the BDD is not stored a monolithic TR but rather for each DFA variable.
@@ -695,4 +715,74 @@ class PartitionedDFA(SymbolicDFAFranka):
                 file_path = PROJECT_ROOT + f'/plots/{_bvar}_DFA_ltlf_trans_func.dot'
                 file_name = PROJECT_ROOT + f'/plots/{_bvar}_DFA_ltlf_trans_func.pdf'
                 self.manager.dumpDot([self.tr_state_bdds[_idx]], file_path=file_path)
+                gv.render(engine='dot', format='pdf', filepath=file_path, outfile=file_name) 
+
+
+class ADDPartitionedDFA(SymbolicAddDFAFranka):
+    """
+     A class that constructs the TR is a partitioned fashion, i.e., We only construct an ADD associated with each boolean variable and
+      store them in a vector. This class is called for quantiative synthesis on Two player games
+    """
+
+    def __init__(self,
+                 curr_states: List[ADD],
+                 dfa: DFAGraph,
+                 manager: Cudd,
+                 dfa_name: str,
+                 sym_tr,
+                 ltlf_flag: bool = False):
+        super().__init__(curr_states,
+                         curr_states,
+                         sym_tr.predicate_sym_map_lbl,
+                         sym_tr.predicate_sym_map_lbl,
+                         dfa, manager,
+                         dfa_name,
+                         sym_tr.pred_int_map,
+                         ltlf_flag)
+        
+        # store the bdd associated with each state vars in this list. The index corresonds to its number
+        self.tr_state_adds = [self.manager.addZero() for _ in range(len(self.sym_add_vars_curr))]
+
+        # index to determine where the state vars start
+        self.state_start_idx: int = len(sym_tr.sym_vars_human) + len(sym_tr.sym_vars_robot)
+    
+
+    def ltlf_add_edge_to_tr(self, curr_sym: ADD, nxt_sym: ADD, edge_sym: ADD) -> None:
+        """
+         A helper function that adds the edge from curr state to the next state by checking if the same variable is high in the next state
+        """
+        # generate all the cubes, with their corresponding string repr and leaf value (state value should be 1)
+        add_cube: List[Tuple(list, int)] = list(nxt_sym.generate_cubes())   
+        assert len(add_cube) == 1, "Error computing cube string for next state's symbolic representation. FIX THIS!!!"
+        assert add_cube[0][1] == 1, "Error computing next state cube. The integer value of the leaf node in the ADD is not 1. FIX THIS!!!"
+
+        # we do not need to add edge weight here, thus each edge in the DFA defaults to 1-ADD.
+
+        # for every boolean var in nxt_state check if it high or low.
+        for _idx, var in enumerate(add_cube[0][0]):
+            if var == 1 and self.manager.addVar(_idx) in self.sym_add_vars_curr:
+                _state_idx: int = _idx - self.state_start_idx
+                assert _state_idx >= 0, "Error constructing the Partitioned Transition Relation."
+                
+                self.tr_state_adds[_state_idx] |= curr_sym & edge_sym
+            
+            elif var == 2 and self.manager.addVar(_idx) in self.sym_add_vars_curr:
+                warnings.warn("Encountered an ambiguous varible during TR construction. FIX THIS!!!")
+                sys.exit(-1)
+    
+
+    def print_plot_dfa_tr(self, plot: bool = False) -> None:
+        """
+         Overides the parent print plot class as the ADD is not stored as a monolithic TR but rather for each DFA variable.
+        """
+        print("******************************* Printing Transition Relation for each DFA state variable *******************************")
+        for _idx in range(len(self.sym_add_vars_curr)):
+            _bvar = str(self.manager.addVar(self.state_start_idx + _idx))
+            print(f"Charateristic Function for DFA boolean variable {_bvar} \n")
+            print(self.tr_state_adds[_idx], " \n")
+        
+            if plot:
+                file_path = PROJECT_ROOT + f'/plots/{_bvar}_DFA_ltlf_trans_func.dot'
+                file_name = PROJECT_ROOT + f'/plots/{_bvar}_DFA_ltlf_trans_func.pdf'
+                self.manager.dumpDot([self.tr_state_adds[_idx]], file_path=file_path)
                 gv.render(engine='dot', format='pdf', filepath=file_path, outfile=file_name) 

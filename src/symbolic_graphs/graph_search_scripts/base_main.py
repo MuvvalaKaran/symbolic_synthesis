@@ -83,8 +83,8 @@ class BaseSymMain():
             _num_of_states = len(_state)
 
         curr_states_var = self.create_symbolic_vars_single(num_of_facts=_num_of_states,
-                                                      curr_state_var_name=f'a0_',
-                                                      add_flag=add_flag)
+                                                           curr_state_var_name=f'a0_',
+                                                           add_flag=add_flag)
 
         return curr_states_var, _dfa
     

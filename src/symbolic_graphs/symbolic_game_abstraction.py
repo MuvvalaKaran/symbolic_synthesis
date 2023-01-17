@@ -269,7 +269,7 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
                     self.sym_tr_actions[_tr_idx][_state_idx] |= curr_state_sym & robot_move & no_human_move
                     
             
-            elif var == 2 and self.manager.bddVar(_idx) in self.sym_vars_curr:
+            elif var == 2 and self.manager.bddVar(_idx) in kwargs['prod_curr_list']:
                 warnings.warn("Encountered an ambiguous varible during TR construction. FIX THIS!!!")
                 sys.exit(-1)
         
@@ -312,6 +312,7 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
 
         return True
     
+
     def print_human_edge(self, curr_exp_states: List[str], hnext_exp_states: List[str], haction_name, **kwargs):
         """
          A helper function solely for printing an human intervention edge.
@@ -613,11 +614,6 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
                             # get their corresponding lbls 
                             self.sym_state_labels |= next_sym_state 
 
-                            # store the image in the next bucket
-                            # if kwargs.get('curr_hint') is not None:
-                            #     curr_hint: int = kwargs['curr_hint']
-                            #     open_list[layer + 1] |= next_sym_state & self.predicate_sym_map_hint[curr_hint]
-                            # else:
                             open_list[layer + 1] |= next_sym_state
                 
                 layer += 1
@@ -775,7 +771,7 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
                     self.sym_tr_actions[_tr_idx][_state_idx] |= curr_state_sym & robot_move & no_human_move & self.predicate_sym_map_hint[curr_hint]
 
             
-            elif var == 2 and self.manager.bddVar(_idx) in self.sym_vars_curr:
+            elif var == 2 and self.manager.bddVar(_idx) in kwargs['prod_curr_list']:
                 warnings.warn("Encountered an ambiguous varible during TR construction. FIX THIS!!!")
                 sys.exit(-1)
         

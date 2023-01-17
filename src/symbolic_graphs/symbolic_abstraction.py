@@ -293,12 +293,6 @@ class SymbolicFrankaTransitionSystem():
         self.predicate_sym_map_curr: bidict = {}
         self.predicate_sym_map_nxt: bidict = {}
         self.predicate_sym_map_lbl: bidict = {}
-        
-        # parent diction with all current and state lbl vars
-        self.monolihtic_sym_map_curr: bidict = {}
-
-        # parent dictions with all the nxt and state lbl vars
-        self.monolihtic_sym_map_nxt: bidict = {}
 
         self.set_actions(**kwargs)
         self._create_sym_var_map()
