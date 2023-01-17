@@ -119,7 +119,7 @@ class ReachabilityGame(BaseSymbolicSearch):
     # overriding base class
     def get_prod_states_from_dd(self, dd_func: BDD, obs_flag: bool = False, **kwargs) -> None:
         """
-         This base class overrides the base method by return the Actual state name using the
+         This method overrides the base method by return the Actual state name using the
           pred int map dictionary rather than the state tuple. 
         """
         prod_curr_list = kwargs['prod_curr_list']

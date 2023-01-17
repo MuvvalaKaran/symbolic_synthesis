@@ -12,6 +12,7 @@ from cudd import Cudd, BDD, ADD
 from src.explicit_graphs import CausalGraph, Ltlf2MonaDFA
 
 from src.algorithms.strategy_synthesis import ReachabilityGame, BndReachabilityGame
+from src.algorithms.strategy_synthesis import AdversarialGame
 
 from src.symbolic_graphs import PartitionedDFA, ADDPartitionedDFA
 from src.symbolic_graphs import PartitionedFrankaTransitionSystem, DynamicFrankaTransitionSystem, BndDynamicFrankaTransitionSystem
@@ -117,26 +118,26 @@ class FrankaPartitionedWorld(FrankaWorld):
         return _seg_action
     
 
-    def _create_weight_dict(self, task) -> Dict[str, int]:
+    def _create_weight_dict(self, mod_action) -> Dict[str, int]:
         """
          A function that loop over all the paramterized manipulator actions and
           assigns their corresponding weights from the weight dictionary specified as input.
         """
         new_weight_dict = {}
-        for op in task.operators:
+        for op in mod_action:
             # extract the action name
-            if 'transit' in op.name:
+            if 'transit' in op:
                 weight: int = self.weight_dict['transit']
-            elif 'transfer' in op.name:
+            elif 'transfer' in op:
                 weight: int = self.weight_dict['transfer']
-            elif 'grasp' in op.name:
+            elif 'grasp' in op:
                 weight: int = self.weight_dict['grasp']
-            elif 'release' in op.name:
+            elif 'release' in op:
                 weight: int = self.weight_dict['release']
             else:
                 weight: int = self.weight_dict['human']
             
-            new_weight_dict[op.name] = weight
+            new_weight_dict[op] = weight
 
         return new_weight_dict
 
@@ -336,15 +337,15 @@ class FrankaPartitionedWorld(FrankaWorld):
                                                                                                                                    print_facts=print_facts,
                                                                                                                                    add_flag=True)
         
+        org_to_mod_act: dict = self.get_act_to_mod_act_dict(task=task)
+        
         # get the actual parameterized actions and add their corresponding weights
-        new_weight_dict = self._create_weight_dict(task=task)
+        new_weight_dict = self._create_weight_dict(mod_action=modified_actions['robot'])
 
         # sort them according to their weights and then convert them in to addConst; reverse will sort the weights in descending order
         weight_dict = {k: v for k, v in sorted(new_weight_dict.items(), key=lambda item: item[1], reverse=True)}
         for action, w in weight_dict.items():
             weight_dict[action] = self.manager.addConst(int(w))
-        
-        org_to_mod_act: dict = self.get_act_to_mod_act_dict(task=task)
         
         sym_tr = DynWeightedPartitionedFrankaAbs(curr_vars=ts_curr_vars,
                                                  lbl_vars=ts_lbl_vars,
@@ -529,14 +530,26 @@ class FrankaPartitionedWorld(FrankaWorld):
             # sys.exit(-1)
             if win_str:
                 reachability_handle.roll_out_strategy(transducer=win_str, verbose=True)
+            
+            return win_str
 
         elif self.algorithm == 'quant':
-            raise NotImplementedError()
+            start = time.time()
+            min_max_handle = AdversarialGame(ts_handle=self.ts_handle,
+                                             dfa_handle=self.dfa_handle,
+                                             ts_curr_vars=self.ts_x_list,
+                                             dfa_curr_vars=self.dfa_x_list,
+                                             ts_obs_vars=self.ts_obs_list,
+                                             sys_act_vars=self.ts_robot_vars,
+                                             env_act_vars=self.ts_human_vars,
+                                             cudd_manager=self.manager)
+            min_max_handle.solve(verbose=verbose)
+            stop = time.time()
+            print("Time for solving the game: ", stop - start)
+
+            return 
+
 
         else:
             warnings.warn("Please enter either 'qual' or 'quant' for Two player game strategy synthesis.")
             sys.exit(-1)
-
-        
-
-        return win_str

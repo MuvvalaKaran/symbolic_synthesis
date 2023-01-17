@@ -197,20 +197,23 @@ class DynWeightedPartitionedFrankaAbs():
     def initialize_sym_tr_action_list(self):
         """
          Create a list of Zero ADDs for each paramterized action (Robot and Human) defined in the pddl domain file.
+
+         NOTE: One key difference in the sym TR in the Quantitative abstraction and the Qualitative abstarction is that
+          we do not create TR for human actions in this Class. This is avoid redundance caused nby Human actions. The same should be updated in the 
+          Unbounded Human abstraction. 
         """
         # initiate ADDs for all the action 
         action_idx_map = bidict()
         count = 0
 
-        for _, acts in self.actions.items():
-            for action in acts:
-                action_idx_map[action] = count
-                count += 1
+        for action in self.actions['robot']:
+            action_idx_map[action] = count
+            count += 1
         
         self.tr_action_idx_map = action_idx_map
         
         num_ts_state_vars: int = sum([len(listElem) for listElem in self.sym_vars_lbl]) + len(self.sym_vars_curr)
-        num_of_acts: int = len(self.actions['human']) + len(self.actions['robot'])
+        num_of_acts: int = len(self.actions['robot'])
         self.sym_tr_actions = [[self.manager.addZero() for _ in range(num_ts_state_vars)] for _ in range(num_of_acts)]
 
     
@@ -617,14 +620,14 @@ class DynWeightedPartitionedFrankaAbs():
         mod_raction_name: str = mod_act_dict[robot_action_name]
         
         robot_move: BDD = self.predicate_sym_map_robot[mod_raction_name]
-        edge_wgt = self.weight_dict[robot_action_name]
-        
+        edge_wgt = self.weight_dict.get(mod_raction_name)
+        _tr_idx: int = self.tr_action_idx_map.get(mod_raction_name)
 
         if human_action_name != '':
             # get the modified human action name
             # mod_haction_name: str = self.get_mod_act_name(org_act_name=human_action_name)
             mod_haction_name: str = mod_act_dict[human_action_name]
-            _tr_idx: int = self.tr_action_idx_map.get(mod_haction_name)
+            # _tr_idx: int = self.tr_action_idx_map.get(mod_haction_name)
             
             if 'debug' in kwargs:
                 edge_exist: bool = (self.mono_tr_bdd & curr_state_sym & robot_move & self.predicate_sym_map_human[mod_haction_name] & edge_wgt).isZero()
@@ -634,7 +637,6 @@ class DynWeightedPartitionedFrankaAbs():
                 
                 self.mono_tr_bdd |= curr_state_sym & robot_move & self.predicate_sym_map_human[mod_haction_name] & edge_wgt
         else:
-            _tr_idx: int = self.tr_action_idx_map.get(mod_raction_name)
             if 'debug' in kwargs:
                 edge_exist: bool = (self.mono_tr_bdd & curr_state_sym & robot_move & no_human_move & edge_wgt).isZero()
                 

@@ -176,7 +176,7 @@ class SymbolicBDDAStar(BaseSymbolicSearch):
          product state (s, z) where s \in S belongs to the Treansition System and z \in Z belongs to the DFA for \phi_i where
          i is the ith formula.
 
-        Functionality: Perform backwards reachability in a dijkstras fashion and retain the minimum cost-to-goal from rach (s, z). 
+        Functionality: Perform backwards reachability in a dijkstras fashion and retain the minimum cost-to-goal from each (s, z). 
         All (s, z) where z \in Z_acc (accepting DFA state) have h value of zero. 
         """
 
