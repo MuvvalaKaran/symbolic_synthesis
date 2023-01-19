@@ -1,10 +1,8 @@
-from multiprocessing import managers
 import re
 import sys
 
 from math import inf
 from functools import reduce
-from tabnanny import verbose
 
 from cudd import Cudd, BDD, ADD
 from typing import Union, List, Tuple

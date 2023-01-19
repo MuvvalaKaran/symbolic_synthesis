@@ -1,12 +1,15 @@
 import re 
 import sys
+import math 
 import copy
 import random
 
 from functools import reduce
+from itertools import product
 from collections import defaultdict
-from typing import List, DefaultDict, Union, Tuple
+from typing import List, DefaultDict, Union, Tuple, Dict
 from bidict import bidict
+
 
 from cudd import Cudd, BDD, ADD
 
@@ -110,8 +113,35 @@ class AdversarialGame(BaseSymbolicSearch):
         """
         A helper function that retireves the highest cost amongst all the transiton function costs
         """
-        return max(self.ts_handle.weight_dict.items())
-    
+        _max = 0
+        for tr_action in self.ts_handle.weight_dict.values():
+            if not tr_action.isZero():
+                action_cost = tr_action.findMax()
+                action_cost_int = int(re.findall(r'\d+', action_cost.__repr__())[0])
+                if action_cost_int > _max:
+                    _max = action_cost_int
+        
+        return _max
+
+    # def bdd_get_prod_states_from_dd(self, dd_func: BDD, **kwargs) -> None:
+    #     """
+    #      This method overrides the base method by return the Actual state name using the
+    #       pred int map dictionary rather than the state tuple. 
+    #     """
+    #     prod_curr_list = kwargs['prod_curr_list']
+    #     prod_cube_string: List[BDD] = self.convert_prod_cube_to_func(dd_func=dd_func, prod_curr_list=prod_curr_list) 
+    #     for prod_cube in prod_cube_string:
+    #         _ts_dd = prod_cube.existAbstract(self.dfa_xcube.bddPattern())
+    #         _ts_tuple = self.ts_handle.get_state_tuple_from_sym_state(_ts_dd, kwargs['sym_lbl_cubes'])
+    #         _ts_name = self.ts_handle.get_state_from_tuple(_ts_tuple)
+    #         assert _ts_name is not None, "Couldn't convert TS Cube to its corresponding State. FIX THIS!!!"
+
+    #         _dfa_name = self._look_up_dfa_name(prod_dd=prod_cube,
+    #                                            dfa_dict=self.dfa_bdd_sym_to_curr_state_map,
+    #                                            ADD_flag=False,
+    #                                            **kwargs)
+            
+    #         print(f"([{_ts_name}], {_dfa_name})")
 
     # overriding base class
     def get_prod_states_from_dd(self, dd_func: ADD, **kwargs) -> None:
@@ -135,6 +165,59 @@ class AdversarialGame(BaseSymbolicSearch):
                                                **kwargs)
             
             print(f"([{_ts_name}], {_dfa_name})")
+    
+
+    def get_state_value_from_dd(self, dd_func: ADD, prod_list: List[ADD], **kwargs) -> None:
+        """
+         A helper function that print the value associated with each state.
+          
+          @param: dd_func is wining_state ADD with minimum value at any given iteration
+        """
+
+        addVars = []
+        for cube, sval in dd_func.generate_cubes():
+            if sval == math.inf:
+                continue
+            _amb_var = []
+            var_list = []
+            for _idx, var in enumerate(cube):
+                if var == 2 and self.manager.addVar(_idx) not in prod_list:   # not x list is better than y _list because we also have dfa vairables 
+                    continue   # skipping over prime states 
+                
+                elif self.manager.addVar(_idx) in prod_list:
+                    if var == 2:
+                        _amb_var.append([self.manager.addVar(_idx), ~self.manager.addVar(_idx)])   # count how many vars are missing to fully define the bdd
+                    elif var == 0:
+                        var_list.append(~self.manager.addVar(_idx))
+                    elif var == 1:
+                        var_list.append(self.manager.addVar(_idx))
+                    else:
+                        print("CUDD ERRROR, A variable is assigned an unaccounted integret assignment. FIX THIS!!")
+                        sys.exit(-1)
+
+            # check if it is not full defined
+            if len(_amb_var) != 0:
+                cart_prod = list(product(*_amb_var))  # *is to pass list as iterable
+                for _ele in cart_prod:
+                    var_list.extend(_ele)
+                    addVars.append((reduce(lambda a, b: a & b, var_list), sval))
+                    var_list = list(set(var_list) - set(_ele))
+            else:
+                addVars.append((reduce(lambda a, b: a & b, var_list), sval))
+        
+        
+        for cube, val in addVars: 
+            _ts_tuple = self.ts_handle.get_state_tuple_from_sym_state(cube.existAbstract(self.dfa_xcube), kwargs['sym_lbl_cubes'])
+            _ts_name = self.ts_handle.get_state_from_tuple(_ts_tuple)
+            assert _ts_name is not None, "Couldn't convert TS Cube to its corresponding State. FIX THIS!!!"
+
+            _dfa_name = self._look_up_dfa_name(prod_dd=cube,
+                                               dfa_dict=self.dfa_sym_to_curr_state_map,
+                                               ADD_flag=False,
+                                               **kwargs)
+            
+            print(f"({_ts_name}, {_dfa_name}) {val}")
+
     
 
     def get_prod_state_act_from_dd(self, dd_func: ADD, **kwargs) -> None:
@@ -188,126 +271,251 @@ class AdversarialGame(BaseSymbolicSearch):
         return pre_prod_state
     
 
+    # def solve(self, verbose: bool = False):
+    #     """
+    #      First loop over all the edges in the graph and compute all the possible state values. As the states are reachable from the initial state, 
+    #       all the state should have finite (not infinity) non-zero values except for the accepting state. 
+    #     """
+    #     open_list = defaultdict(lambda: self.manager.addZero())
+    #     # keep tracks all the states action pairs we have visited till now
+    #     closed = self.manager.addZero()
+    #     # computes the max of state action pair max(s, as, -)
+    #     # closed_max_min_add: ADD = self.manager.plusInfinity()
+
+    #     c_max = self._get_max_tr_action_cost()
+
+    #     # counter used for breaking
+    #     empty_bucket_counter: int = 0
+
+    #     # counter 
+    #     g_val = self.manager.addZero()
+    #     if g_val.isZero():
+    #         g_layer = 0
+
+    #     # add the product accepting state to the open list
+    #     open_list[g_layer] = self.winning_states[0]
+
+    #     # all the accepting states have value of zero and the rest of the states are initialized to be inf
+    #     # closed_max_add: ADD = self.winning_states[0].ite(self.manager.addZero(), self.manager.minusInfinity())
+    #     closed_max_add: ADD = self.manager.addZero()
+
+    #     closed_max_add: ADD = self.winning_states[0].ite(self.manager.addZero(), self.manager.minusInfinity())
+    #     closed_min_add: ADD = self.manager.plusInfinity()
+    #     closed_min_add = closed_min_add.min(self.winning_states[0].ite(self.manager.addZero(), self.manager.plusInfinity()))
+    #     # closed_min_add: ADD = self.winning_states[0].ite(self.manager.addZero(), self.manager.plusInfinity())
+
+
+    #     prod_curr_list = []
+    #     prod_curr_list.extend([lbl for sym_vars_list in self.ts_obs_list for lbl in sym_vars_list])
+    #     prod_curr_list.extend(self.ts_x_list)
+
+    #     prod_curr_act_list = prod_curr_list + self.sys_act_vars + self.env_act_vars
+
+    #     prod_bdd_curr_list = [_avar.bddPattern() for _avar in prod_curr_list]
+    #     prod_curr_bdd_act_list = [_avar.bddPattern() for _avar in prod_curr_act_list]
+
+    #     sym_lbl_cubes = self._create_lbl_cubes()
+        
+    #     while not open_list[g_layer].isZero():
+    #         # remove all states that have been explored
+    #         open_list[g_layer] = open_list[g_layer] & ~closed
+
+    #         # If unexpanded states exist ... 
+    #         if not open_list[g_layer].isZero():
+    #             if verbose:
+    #                 print(f"********************Layer: {g_layer + 1}**************************")
+                
+    #             # reset the empty bucket counter 
+    #             empty_bucket_counter = 0
+    #             # Add states to be expanded next to already expanded states
+    #             closed |= open_list[g_layer]
+
+    #             curr_bucket: ADD = open_list[g_layer].existAbstract(self.sys_env_cube)
+    #             curr_bucket_bdd: BDD = curr_bucket.bddPattern()
+    #             if verbose:
+    #                 print("Computing pre of:")
+    #                 self.get_prod_states_from_dd(dd_func=curr_bucket, sym_lbl_cubes=sym_lbl_cubes, prod_curr_list=prod_bdd_curr_list)
+
+                
+    #             for tr_idx, tr_action in enumerate(self.ts_transition_fun_list):
+    #                 # first get the corresponding transition action cost (constant at the terminal node)
+    #                 curr_act_name: str = self.ts_action_idx_map.inv[tr_idx]
+    #                 if verbose:
+    #                     print(f"Pre under Action: {curr_act_name}")
+                    
+    #                 action_cost: ADD =  self.ts_handle.weight_dict[curr_act_name]
+    #                 act_val: int =  int(re.findall(r'\d+', action_cost.__repr__())[0])
+    #                 step_val = g_layer + act_val
+
+    #                 # compute preimages
+    #                 tr_action_bdd: List[BDD] = [ele.bddPattern() for ele in tr_action]
+    #                 pred_prod = self.get_pre_states(ts_action=tr_action_bdd, From=curr_bucket_bdd, prod_curr_list=prod_bdd_curr_list)
+
+    #                 if pred_prod.isZero():
+    #                     continue
+
+    #                 # convert it back to 0-1 ADD 
+    #                 prod_image_restricted = pred_prod.toADD()
+                
+    #                 if step_val in open_list:
+    #                     open_list[step_val] |= prod_image_restricted 
+    #                 else:
+    #                     open_list[step_val] = prod_image_restricted
+                    
+    #                 # first you take the max over (s, a_s, a_e)
+    #                 closed_max_add = closed_max_add.max(prod_image_restricted.ite(self.manager.addConst(step_val),  self.manager.minusInfinity())) 
+
+
+    #                 if verbose:
+    #                     print(f"*****************Max state-action value under action {curr_act_name} is {step_val}****************************")
+    #                     self.get_prod_states_from_dd(dd_func=prod_image_restricted.existAbstract(self.sys_env_cube), sym_lbl_cubes=sym_lbl_cubes, prod_curr_list=prod_bdd_curr_list)
+            
+    #         else:
+    #             empty_bucket_counter += 1
+    #             # If Cmax consecutive layers are empty. . .
+    #             if empty_bucket_counter == c_max:
+    #                 print("Reached a Fix Point!")
+    #                 break
+            
+    #         # g_val = g_val + self.manager.addOne()
+    #         g_layer += 1
+
+    #         # after taking the MAX for each action, we need to take the min
+    #         for act in self.ts_sym_to_human_act_map.keys():
+    #             state_ract = closed_max_add.restrict(act.ite(self.manager.addOne(), self.manager.plusInfinity()))
+
+    #             # conver the state dd into appropriate DD before taking min
+    #             # state_ract = state_ract.
+
+    #             # state_ract = closed_max_add & act
+    #             closed_min_add = closed_min_add.min(state_ract)
+            
+    #         if verbose:
+    #             # for val in open_list.keys():
+    #             for r_dd, robot_act in self.ts_sym_to_robot_act_map.items():
+    #                     # tmp_cadd = closed_min_add.bddInterval(val, val).toADD()
+    #                 # if not tmp_cadd.isZero():
+    #                 print(f"*****************Min state value under action {robot_act}****************************")
+    #                 self.get_prod_states_from_dd(dd_func=closed_min_add.restrict(r_dd), sym_lbl_cubes=sym_lbl_cubes, prod_curr_list=prod_bdd_curr_list)
+
+    #         # compute the max of state and action pair
+    #         # closed_max_add = closed_max_add.max(open_list[g_layer].ite(self.manager.addConst(g_layer), self.manager.addZero()))
+            
+
+    #         if g_layer > max(open_list.keys()):
+    #             g_layer -= 1
+    #             break
+
+    #         # keep updating g_layer up until the most recent bucket
+    #         while g_layer not in open_list:
+    #             # g_val = g_val + self.manager.addOne()
+    #             g_layer += 1
+                
+    #     print(f"********************Took {g_layer} layers to reach a fixed point********************")
+
+    #     return
+    
+
     def solve(self, verbose: bool = False):
         """
-         First loop over all the edges in the graph and compute all the possible state values. As the states are reachable from the initial state, 
-          all the state should have finite (not infinity) non-zero values except for the accepting state. 
+         Method that compute the optimal strategy for the system with minimum payoff under adversarial environment assumptions. 
         """
-        open_list = defaultdict(lambda: self.manager.addZero())
-        # keep tracks all the states action pairs we have visited till now
-        closed = self.manager.addZero()
-        # computes the max of state action pair max(s, as, -)
-        closed_max_min_add: ADD = self.manager.plusInfinity()
 
-        c_max = self._get_max_tr_action_cost()
+        # winning state with values
+        winning_states: ADD = defaultdict(lambda: self.manager.plusInfinity())
+        
+        # strategy - optimal (state & robot-action) pair stored in the ADD
+        strategy : ADD  = self.manager.plusInfinity()
 
-        # counter used for breaking
-        empty_bucket_counter: int = 0
+        # initializes accepting states to be zero
+        winning_states[0] |= winning_states[0].min(self.winning_states[0].ite(self.manager.addZero(), self.manager.plusInfinity()))
+        strategy = strategy.min(self.winning_states[0].ite(self.manager.addZero(), self.manager.plusInfinity()))
 
-        # counter 
-        g_val = self.manager.addZero()
-        if g_val.isZero():
-            g_layer = 0
-
-        # add the product accepting state to the open list
-        open_list[g_layer] = self.winning_states[0]
+        layer: int = 0
+        c_max: int = self._get_max_tr_action_cost()
 
         prod_curr_list = []
         prod_curr_list.extend([lbl for sym_vars_list in self.ts_obs_list for lbl in sym_vars_list])
         prod_curr_list.extend(self.ts_x_list)
 
-        prod_curr_act_list = prod_curr_list + self.sys_act_vars + self.env_act_vars
-
         prod_bdd_curr_list = [_avar.bddPattern() for _avar in prod_curr_list]
-        prod_curr_bdd_act_list = [_avar.bddPattern() for _avar in prod_curr_act_list]
 
         sym_lbl_cubes = self._create_lbl_cubes()
-        
-        while not open_list[g_layer].isZero():
-            # remove all states that have been explored
-            open_list[g_layer] = open_list[g_layer] & ~closed
 
-            # If unexpanded states exist ... 
-            if not open_list[g_layer].isZero():
-                if verbose:
-                    print(f"********************Layer: {g_layer + 1}**************************")
-                
-                # reset the empty bucket counter 
-                empty_bucket_counter = 0
-                # Add states to be expanded next to already expanded states
-                closed |= open_list[g_layer]
-
-                curr_bucket: ADD = open_list[g_layer].existAbstract(self.sys_env_cube)
-                curr_bucket_bdd: BDD = curr_bucket.bddPattern()
-                if verbose:
-                    print("Computing pre of:")
-                    self.get_prod_states_from_dd(dd_func=curr_bucket, sym_lbl_cubes=sym_lbl_cubes, prod_curr_list=prod_bdd_curr_list)
-
-                
-                for tr_idx, tr_action in enumerate(self.ts_transition_fun_list):
-                    # first get the corresponding transition action cost (constant at the terminal node)
-                    curr_act_name: str = self.ts_action_idx_map.inv[tr_idx]
-                    if verbose:
-                        print(f"Pre under Action: {curr_act_name}")
-                    
-                    action_cost: ADD =  self.ts_handle.weight_dict[curr_act_name]
-                    act_val: int =  int(re.findall(r'\d+', action_cost.__repr__())[0])
-                    step_val = g_layer + act_val
-
-                    # compute preimages
-                    tr_action_bdd: List[BDD] = [ele.bddPattern() for ele in tr_action]
-                    pred_prod = self.get_pre_states(ts_action=tr_action_bdd, From=curr_bucket_bdd, prod_curr_list=prod_bdd_curr_list)
-
-                    if pred_prod.isZero():
-                        continue
-
-                    # convert it back to 0-1 ADD 
-                    prod_image_restricted = pred_prod.toADD()
-                
-                    # if verbose:
-                        # self.get_prod_states_from_dd(dd_func=prod_image_restricted.existAbstract(self.sys_env_cube), sym_lbl_cubes=sym_lbl_cubes, prod_curr_list=prod_bdd_curr_list)
-                    
-                    # TODO: Add which action caused this transition to to the BDD before adding it the bucket
-                    # if the bucket exists then take the union else initialize the bucket
-                    if step_val in open_list:
-                        open_list[step_val] |= prod_image_restricted 
-                    else:
-                        open_list[step_val] = prod_image_restricted
-                    
-
-                    if verbose:
-                        print(f"*****************Max states-action value under action {curr_act_name} is {step_val}****************************")
-                        self.get_prod_states_from_dd(dd_func=prod_image_restricted.existAbstract(self.sys_env_cube), sym_lbl_cubes=sym_lbl_cubes, prod_curr_list=prod_bdd_curr_list)
+        while True: 
+            if winning_states[layer].compare(winning_states[layer - 1], 2):
+                print(f"**************************Reached a Fixed Point in {layer} layers**************************")
+                init_state_cube = list(((self.init_TS & self.init_DFA) & winning_states[layer]).generate_cubes())[0]
+                init_val = init_state_cube[1]
+                if init_val != math.inf:
+                    print(f"A Winning Strategy Exists!!. The Min Energy is {init_val}")
+                    return strategy
+                else:
+                    print("No Winning Strategy Exists!!!")
+                    return
             
-            else:
-                empty_bucket_counter += 1
-                # If Cmax consecutive layers are empty. . .
-                if empty_bucket_counter == c_max:
-                    print("Reached a Fix Point!")
-                    break
-            
-            # g_val = g_val + self.manager.addOne()
-            g_layer += 1
+            print(f"**************************Layer: {layer}**************************")
 
-            # compute the max of state and action pair
-            closed_max_add = closed_max_add.max(open_list[g_layer].ite(self.manager.addConst(g_layer), self.manager.addZero()))
+            _win_state_bucket: Dict[BDD] = defaultdict(lambda: self.manager.bddZero())
+
+            # conver the winning states into buckets of BDD
+            _max_interval_val = layer * c_max
+            for sval in range(_max_interval_val + 1):
+                # get the states with state value equal to sval and store them in their respective bukcets
+                win_sval = winning_states[layer].bddInterval(sval, sval)
+                _win_state_bucket[sval] |= win_sval
             
+            _pre_buckets: Dict[ADD] = defaultdict(lambda: self.manager.addZero())
+
+            # compute the predecessor and store tham by action cost + successor cost
+            for tr_idx, tr_action in enumerate(self.ts_transition_fun_list):
+                # TODO: In future to this only once
+                tr_action_bdd: List[BDD] = [ele.bddPattern() for ele in tr_action]
+                curr_act_name: str = self.ts_action_idx_map.inv[tr_idx]
+                action_cost: ADD =  self.ts_handle.weight_dict[curr_act_name]
+                act_val: int =  int(re.findall(r'\d+', action_cost.__repr__())[0])
+                for sval, succ_states in _win_state_bucket.items():
+                    pre_states: BDD = self.get_pre_states(ts_action=tr_action_bdd, From=succ_states, prod_curr_list=prod_bdd_curr_list)
+
+                    _pre_buckets[act_val + sval] |= pre_states.toADD()
+            
+            # unions of all predecessors
+            pre_states: ADD = reduce(lambda x, y: x | y, _pre_buckets.values())
+
+            # now take univ abstraction to remove edges to states with infinity value
+            upre_states: ADD = pre_states.univAbstract(self.env_cube)
+
+            # print non-zero states in this iteration
             # if verbose:
-            #     print(f"*****************Max states-action value at layer {g_layer}****************************")
-            #     # self.get_prod_state_act_from_dd(dd_func=open_list[g_layer].existAbstract(self.sys_env_cube),
-            #     #                                 sym_lbl_cubes=sym_lbl_cubes,
-            #     #                                 prod_curr_list=prod_curr_bdd_act_list)
-            #     self.get_prod_states_from_dd(dd_func=open_list[g_layer].existAbstract(self.sys_env_cube), sym_lbl_cubes=sym_lbl_cubes, prod_curr_list=prod_bdd_curr_list)
+            #     print(f"Non-Zero states at Iteration {layer + 1}")
+            #     self.get_prod_states_from_dd(dd_func=upre_states.existAbstract(self.sys_cube), sym_lbl_cubes=sym_lbl_cubes, prod_curr_list=prod_bdd_curr_list)
+            
+            # convert to ADD so that we take max of (s, a_s, a_e)
+            tmp_strategy = upre_states.ite(self.manager.addOne(), self.manager.plusInfinity())
 
-            if g_layer > max(open_list.keys()):
-                g_layer -= 1
-                break
+            # accomodate for worst-case human behavior
+            for sval, apre_s in _pre_buckets.items():
+                tmp_strategy = tmp_strategy.max(apre_s.ite(self.manager.addConst(int(sval)), self.manager.addZero()))
+            
+            # compute the minimum of state action pairs
 
-            # keep updating g_layer up until the most recent bucket
-            while g_layer not in open_list:
-                # g_val = g_val + self.manager.addOne()
-                g_layer += 1
-                
-        print(f"********************Took {g_layer} layers to reach a fixed point********************")
+            # check if this can be done
+            strategy = strategy.min(tmp_strategy)
 
-        return
+            for tr_dd in self.ts_sym_to_robot_act_map.keys():
+                # remove the dependency for that action and preserve the minimum value for every state
+                winning_states[layer + 1] |= winning_states[layer].min(strategy.restrict(tr_dd))
+            
+            if verbose:
+                print(f"Minimum State value at Iteration {layer +1}")
+                self.get_state_value_from_dd(dd_func=winning_states[layer + 1], sym_lbl_cubes=sym_lbl_cubes, prod_list=[*prod_curr_list, *self.dfa_x_list])
+            
+
+            # update counter 
+            layer += 1
+            
+
+
+            
+
+

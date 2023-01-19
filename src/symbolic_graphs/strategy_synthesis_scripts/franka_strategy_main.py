@@ -543,7 +543,7 @@ class FrankaPartitionedWorld(FrankaWorld):
                                              sys_act_vars=self.ts_robot_vars,
                                              env_act_vars=self.ts_human_vars,
                                              cudd_manager=self.manager)
-            min_max_handle.solve(verbose=verbose)
+            win_str: BDD = min_max_handle.solve(verbose=verbose)
             stop = time.time()
             print("Time for solving the game: ", stop - start)
 
