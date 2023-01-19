@@ -500,9 +500,9 @@ class FrankaPartitionedWorld(FrankaWorld):
         """
          A function that call the winning strategy synthesis code and compute the set of winnign states and winning strategy for robot. 
         """
-        
+        start = time.time()
         if self.algorithm == 'qual':
-            start = time.time()
+            
             if isinstance(self.ts_handle, BndDynamicFrankaTransitionSystem):
                 reachability_handle =  BndReachabilityGame(ts_handle=self.ts_handle,
                                                         dfa_handle=self.dfa_handle,
@@ -530,11 +530,8 @@ class FrankaPartitionedWorld(FrankaWorld):
             # sys.exit(-1)
             if win_str:
                 reachability_handle.roll_out_strategy(transducer=win_str, verbose=True)
-            
-            return win_str
 
         elif self.algorithm == 'quant':
-            start = time.time()
             min_max_handle = AdversarialGame(ts_handle=self.ts_handle,
                                              dfa_handle=self.dfa_handle,
                                              ts_curr_vars=self.ts_x_list,
@@ -543,13 +540,19 @@ class FrankaPartitionedWorld(FrankaWorld):
                                              sys_act_vars=self.ts_robot_vars,
                                              env_act_vars=self.ts_human_vars,
                                              cudd_manager=self.manager)
+
             win_str: BDD = min_max_handle.solve(verbose=verbose)
+
             stop = time.time()
             print("Time for solving the game: ", stop - start)
-
-            return 
-
+            # sys.exit(-1)
+            if win_str:
+                min_max_handle.roll_out_strategy(strategy=win_str, verbose=True)
 
         else:
             warnings.warn("Please enter either 'qual' or 'quant' for Two player game strategy synthesis.")
             sys.exit(-1)
+        
+        
+        return win_str
+        
