@@ -559,7 +559,7 @@ class DynWeightedPartitionedFrankaAbs():
                 else:
                     # check if you are trnasiting from 'else' to l# or from l# to 'else'
                     _dloc: str = re.findall(_loc_pattern, robot_action_name)[1]
-                    
+
                 _box_state: str = re.search(_box_pattern, robot_action_name).group()
 
                 if _hcloc == _dloc:
@@ -623,30 +623,27 @@ class DynWeightedPartitionedFrankaAbs():
         edge_wgt = self.weight_dict.get(mod_raction_name)
         _tr_idx: int = self.tr_action_idx_map.get(mod_raction_name)
 
-        # if mod_raction_name == 'release':
-        #     print("Release the Kraken")
-
         if human_action_name != '':
             # get the modified human action name
             mod_haction_name: str = mod_act_dict[human_action_name]
             
             if 'debug' in kwargs:
-                edge_exist: bool = (self.mono_tr_bdd & curr_state_sym & robot_move & self.predicate_sym_map_human[mod_haction_name] & edge_wgt).isZero()
-                # edge_exist: bool = (self.mono_tr_bdd & curr_state_sym & robot_move & self.predicate_sym_map_human[mod_haction_name]).isZero()
+                # edge_exist: bool = (self.mono_tr_bdd & curr_state_sym & robot_move & self.predicate_sym_map_human[mod_haction_name] & edge_wgt).isZero()
+                edge_exist: bool = (self.mono_tr_bdd & curr_state_sym & robot_move & self.predicate_sym_map_human[mod_haction_name]).isZero()
                 
                 if not edge_exist:
                     print(f"Nondeterminism due to Human Action: {curr_str_state} --- {robot_action_name} & {human_action_name}---> {next_str_state}")
                 
-                self.mono_tr_bdd |= curr_state_sym & robot_move & self.predicate_sym_map_human[mod_haction_name] & edge_wgt
+                self.mono_tr_bdd |= curr_state_sym & robot_move & self.predicate_sym_map_human[mod_haction_name]# & edge_wgt
         else:
             if 'debug' in kwargs:
-                edge_exist: bool = (self.mono_tr_bdd & curr_state_sym & robot_move & no_human_move & edge_wgt).isZero()
-                # edge_exist: bool = (self.mono_tr_bdd & curr_state_sym & robot_move & no_human_move).isZero()
+                # edge_exist: bool = (self.mono_tr_bdd & curr_state_sym & robot_move & no_human_move & edge_wgt).isZero()
+                edge_exist: bool = (self.mono_tr_bdd & curr_state_sym & robot_move & no_human_move).isZero()
                 
                 if not edge_exist:
                     print(f"Nondeterminism due to Human Action: {curr_str_state} ---{robot_action_name}---> {next_str_state}")
 
-                self.mono_tr_bdd |= curr_state_sym & robot_move & no_human_move & edge_wgt           
+                self.mono_tr_bdd |= curr_state_sym & robot_move & no_human_move# & edge_wgt           
 
         # generate all the cubes, with their corresponding string repr and leaf value (state value should be 1)
         add_cube: List[Tuple(list, int)] = list(nxt_state_sym.generate_cubes())   
@@ -660,11 +657,11 @@ class DynWeightedPartitionedFrankaAbs():
                 assert _state_idx >= 0, "Error constructing the Partitioned Transition Relation."
                 # if human intervenes then the edge looks like (true) & (human move b# l# l#)
                 if human_action_name != '':
-                    self.sym_tr_actions[_tr_idx][_state_idx] |= curr_state_sym & robot_move & self.predicate_sym_map_human[mod_haction_name] & edge_wgt
+                    self.sym_tr_actions[_tr_idx][_state_idx] |= curr_state_sym & robot_move & self.predicate_sym_map_human[mod_haction_name]# & edge_wgt
                     
                 # if human does not intervene then the edge looks like (robot-action) & not(valid human moves)
                 else:
-                    self.sym_tr_actions[_tr_idx][_state_idx] |= curr_state_sym & robot_move & no_human_move & edge_wgt
+                    self.sym_tr_actions[_tr_idx][_state_idx] |= curr_state_sym & robot_move & no_human_move# & edge_wgt
                     
             
             elif var == 2 and self.manager.addVar(_idx) in kwargs['prod_curr_list']:

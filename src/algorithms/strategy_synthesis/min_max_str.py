@@ -233,38 +233,71 @@ class AdversarialGame(BaseSymbolicSearch):
                 print(f"({_ts_name}, {_dfa_name})  ----{ract_name} & {hact_name}")
     
 
-    def get_pre_states(self, ts_action: List[BDD], From: BDD, prod_curr_list=None, act_name: str = '') -> BDD:
+    def get_pre_states(self, ts_action: List[BDD], From: BDD, prod_curr_list=None) -> BDD:
         """
          Compute the predecessors using the compositional approach. From is a collection of 0-1 ADD.
           As vectorCompose functionality only works for bdd, we have to first comvert From to 0-1 BDD, 
         """
         # first evolve over DFA and then evolve over the TS
-        # mod_win_state: BDD = From.vectorCompose(self.dfa_bdd_x_list, self.dfa_bdd_transition_fun_list)
+        mod_win_state: BDD = From.vectorCompose(self.dfa_bdd_x_list, self.dfa_bdd_transition_fun_list)
         
-        # pre_prod_state: BDD = mod_win_state.vectorCompose(prod_curr_list, ts_action)
-
-        # testing this new one 
-        pre_prod_state_2: BDD = From.vectorCompose([*self.dfa_bdd_x_list, *prod_curr_list], [*self.dfa_bdd_transition_fun_list, *ts_action])
-
-        # if act_name == 'release':
-        #     if (pre_prod_state & self.init_DFA.bddPattern()).isZero():
-        #         print("Error computing pre of Release action. FIX THIS!!!")
+        pre_prod_state: BDD = mod_win_state.vectorCompose(prod_curr_list, ts_action)
             
-        #     if (pre_prod_state_2 & self.init_DFA.bddPattern()).isZero():
-        #         print("Error computing pre(2) of Release action. FIX THIS!!!")
+        return pre_prod_state
+    
+    def evolve_as_per_human(self, curr_state_tuple: tuple, curr_dfa_state: ADD, ract_name: str) -> ADD:
+        """
+         A function that compute the next state tuple given the current state tuple. 
+        """
+        next_exp_states = random.choice(self.ts_handle.adj_map[curr_state_tuple][ract_name]['h'])
+        nxt_state_tuple = self.ts_handle.get_tuple_from_state(next_exp_states)
         
-        # if act_name == 'transit b0':
-        #     if (pre_prod_state & self.init_DFA.bddPattern()).isZero():
-        #         print("Error computing pre(1) of transit b0 action. FIX THIS!!!")
-            
-        #     if (pre_prod_state_2 & self.init_DFA.bddPattern()).isZero():
-        #         print("Error computing pre(2) of transit b0 action. FIX THIS!!!")
+        # look up its corresponding formula
+        nxt_ts_state: ADD = self.ts_handle.get_sym_state_from_tuple(nxt_state_tuple)
 
-        # sys.exit(-1)
-        # assert pre_prod_state_2 == pre_prod_state, f"Error computing Predecessor states under action {act_name}. FIX THIS!!!"
+        # update the DFA state as per the human move.
+        nxt_ts_lbl = nxt_ts_state.existAbstract(self.ts_xcube)
+
+        # create DFA edge and check if it satisfies any of the dges or not
+        for dfa_state in self.dfa_sym_to_curr_state_map.keys():
+            bdd_dfa_state: BDD = dfa_state.bddPattern()
+            dfa_pre: BDD = bdd_dfa_state.vectorCompose(self.dfa_bdd_x_list, self.dfa_bdd_transition_fun_list)
+            edge_exists: bool = not (dfa_pre & (curr_dfa_state.bddPattern() & nxt_ts_lbl.bddPattern())).isZero()
+
+            if edge_exists:
+                nxt_dfa_state = dfa_state
+                break
             
-        # return pre_prod_state
-        return pre_prod_state_2
+        return nxt_ts_lbl & nxt_dfa_state, nxt_state_tuple
+
+
+    # COPIED AS IT IS FROM WINNING STR class
+    def human_intervention(self,
+                           ract_name:str,
+                           curr_state_tuple: tuple,
+                           curr_dfa_state: ADD,
+                           verbose: bool = False) -> tuple:
+        """
+         Evolve on the game as per human intervention
+        """
+        # get the next action
+        hnext_tuple = curr_state_tuple
+
+        itr = 0
+        nxt_prod_state, nxt_ts_tuple = self.evolve_as_per_human(curr_state_tuple=hnext_tuple, curr_dfa_state=curr_dfa_state, ract_name=ract_name)
+        
+        # forcing human to not make a move that satisfies the specification
+        while not (self.target_DFA & nxt_prod_state).isZero():
+            nxt_prod_state, nxt_ts_tuple = self.evolve_as_per_human(curr_state_tuple=hnext_tuple, curr_dfa_state=curr_dfa_state, ract_name=ract_name)
+            # hacky way to avoid infinite looping
+            itr += 1
+            if itr > 5:
+                break
+
+        if verbose:
+            print(f"Human Moved: New Conf. {self.ts_handle.get_state_from_tuple(nxt_ts_tuple)}")
+
+        return nxt_ts_tuple
     
 
     def solve(self, verbose: bool = False):
@@ -332,11 +365,10 @@ class AdversarialGame(BaseSymbolicSearch):
                 action_cost: ADD =  self.ts_handle.weight_dict[curr_act_name]
                 act_val: int = list(action_cost.generate_cubes())[0][1]
                 for sval, succ_states in _win_state_bucket.items():
-                    # if curr_act_name == 'release' or curr_act_name == 'transit b0':
-                    #     print('Wait!')
-                    pre_states: BDD = self.get_pre_states(ts_action=tr_action, From=succ_states, prod_curr_list=prod_bdd_curr_list, act_name=curr_act_name)
+                    pre_states: BDD = self.get_pre_states(ts_action=tr_action, From=succ_states, prod_curr_list=prod_bdd_curr_list)
 
-                    _pre_buckets[act_val + sval] |= pre_states.toADD()
+                    if not pre_states.isZero():
+                        _pre_buckets[act_val + sval] |= pre_states.toADD()
             
             # unions of all predecessors
             pre_states: ADD = reduce(lambda x, y: x | y, _pre_buckets.values())
@@ -349,33 +381,36 @@ class AdversarialGame(BaseSymbolicSearch):
                 print(f"Non-Zero states at Iteration {layer + 1}")
                 self.get_prod_states_from_dd(dd_func=upre_states.existAbstract(self.sys_cube), sym_lbl_cubes=sym_lbl_cubes, prod_curr_list=prod_dfa_bdd_curr_list)
             
-            # sys.exit(-1)
-            # convert to ADD so that we take max of (s, a_s, a_e)
-            tmp_strategy = upre_states.ite(self.manager.addOne(), self.manager.plusInfinity())
+            # We need to take the unions of all the (s, a_s, a_e). But, we tmp_strategy to have background vale of inf, useful later when we take max() operation.
+            # Thus, I am using this approach. 
+            tmp_strategy: ADD = upre_states.ite(self.manager.addOne(), self.manager.plusInfinity())
 
             # accomodate for worst-case human behavior
             for sval, apre_s in _pre_buckets.items():
                 tmp_strategy = tmp_strategy.max(apre_s.ite(self.manager.addConst(int(sval)), self.manager.addZero()))
-            
-            # compute the minimum of state action pairs
 
-            # check if this can be done
-            strategy = strategy.min(tmp_strategy)
+            new_tmp_strategy: ADD = tmp_strategy
+
+            # go over all the human actions and preserve the maximum one
+            for human_tr_dd in self.ts_sym_to_human_act_map.keys():
+                new_tmp_strategy = new_tmp_strategy.max(tmp_strategy.restrict(human_tr_dd)) 
+
+            # compute the minimum of state action pairs
+            strategy = strategy.min(new_tmp_strategy)
+
+            self.winning_states[layer + 1] |= self.winning_states[layer]
 
             for tr_dd in self.ts_sym_to_robot_act_map.keys():
                 # remove the dependency for that action and preserve the minimum value for every state
-                self.winning_states[layer + 1] |= self.winning_states[layer].min(strategy.restrict(tr_dd))
-            
+                self.winning_states[layer + 1] = self.winning_states[layer  + 1].min(strategy.restrict(tr_dd))
+
             if verbose:
                 print(f"Minimum State value at Iteration {layer +1}")
                 self.get_state_value_from_dd(dd_func=self.winning_states[layer + 1], sym_lbl_cubes=sym_lbl_cubes, prod_list=[*prod_curr_list, *self.dfa_x_list])
             
-
             # update counter 
             layer += 1
 
-            sys.exit(-1)
-    
 
     def roll_out_strategy(self, strategy: ADD, verbose: bool = False):
         """
@@ -433,6 +468,17 @@ class AdversarialGame(BaseSymbolicSearch):
             # look up the next tuple 
             next_exp_states = self.ts_handle.adj_map[curr_ts_tuple][ract_name]['r']
             next_tuple = self.ts_handle.get_tuple_from_state(next_exp_states)
+
+            # Human Intervention
+            # flip a coin and choose to intervene or not intervene
+            coin = random.randint(0, 1)
+            # coin = 1
+            if coin:
+                if self.ts_handle.adj_map.get(curr_ts_tuple, {}).get(ract_name, {}).get('h'):
+                    next_tuple = self.human_intervention(ract_name=ract_name,
+                                                         curr_state_tuple=curr_ts_tuple,
+                                                         curr_dfa_state=curr_dfa_state,
+                                                         verbose=verbose)
 
             # look up its corresponding formula
             curr_ts_state: ADD = self.ts_handle.get_sym_state_from_tuple(next_tuple)
