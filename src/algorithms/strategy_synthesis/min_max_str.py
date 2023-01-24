@@ -46,6 +46,8 @@ class AdversarialGame(BaseSymbolicSearch):
         self.env_act_vars = env_act_vars
 
         self.ts_transition_fun_list: List[List[ADD]] = ts_handle.sym_tr_actions
+        self.ts_bdd_transition_fun_list: List[List[BDD]] = []
+
         self.dfa_transition_fun_list: List[ADD] = dfa_handle.tr_state_adds
 
         # need these two during preimage computation 
@@ -84,6 +86,13 @@ class AdversarialGame(BaseSymbolicSearch):
         # ADD that keeps track of the optimal values of state at each iteration
         self.winning_states: ADD = defaultdict(lambda: self.manager.plusInfinity())
 
+        # get the bdd version of the transition function as vectorComposition only works with
+        for act in self.ts_transition_fun_list:
+            act_ls = []
+            for avar in act:
+                act_ls.append(avar.bddPattern())
+        
+            self.ts_bdd_transition_fun_list.append(act_ls)
     
 
     def _create_lbl_cubes(self) -> List[ADD]:
@@ -224,20 +233,38 @@ class AdversarialGame(BaseSymbolicSearch):
                 print(f"({_ts_name}, {_dfa_name})  ----{ract_name} & {hact_name}")
     
 
-    def get_pre_states(self, ts_action: List[BDD], From: BDD, prod_curr_list=None) -> BDD:
+    def get_pre_states(self, ts_action: List[BDD], From: BDD, prod_curr_list=None, act_name: str = '') -> BDD:
         """
          Compute the predecessors using the compositional approach. From is a collection of 0-1 ADD.
           As vectorCompose functionality only works for bdd, we have to first comvert From to 0-1 BDD, 
         """
-        pre_prod_state: BDD = self.manager.bddZero()
-
         # first evolve over DFA and then evolve over the TS
-        mod_win_state: BDD = From.vectorCompose(self.dfa_bdd_x_list, self.dfa_bdd_transition_fun_list)
+        # mod_win_state: BDD = From.vectorCompose(self.dfa_bdd_x_list, self.dfa_bdd_transition_fun_list)
         
-        # for ts_transition in self.ts_transition_fun_list:
-        pre_prod_state: BDD = mod_win_state.vectorCompose(prod_curr_list, ts_action)
+        # pre_prod_state: BDD = mod_win_state.vectorCompose(prod_curr_list, ts_action)
+
+        # testing this new one 
+        pre_prod_state_2: BDD = From.vectorCompose([*self.dfa_bdd_x_list, *prod_curr_list], [*self.dfa_bdd_transition_fun_list, *ts_action])
+
+        # if act_name == 'release':
+        #     if (pre_prod_state & self.init_DFA.bddPattern()).isZero():
+        #         print("Error computing pre of Release action. FIX THIS!!!")
             
-        return pre_prod_state
+        #     if (pre_prod_state_2 & self.init_DFA.bddPattern()).isZero():
+        #         print("Error computing pre(2) of Release action. FIX THIS!!!")
+        
+        # if act_name == 'transit b0':
+        #     if (pre_prod_state & self.init_DFA.bddPattern()).isZero():
+        #         print("Error computing pre(1) of transit b0 action. FIX THIS!!!")
+            
+        #     if (pre_prod_state_2 & self.init_DFA.bddPattern()).isZero():
+        #         print("Error computing pre(2) of transit b0 action. FIX THIS!!!")
+
+        # sys.exit(-1)
+        # assert pre_prod_state_2 == pre_prod_state, f"Error computing Predecessor states under action {act_name}. FIX THIS!!!"
+            
+        # return pre_prod_state
+        return pre_prod_state_2
     
 
     def solve(self, verbose: bool = False):
@@ -252,7 +279,7 @@ class AdversarialGame(BaseSymbolicSearch):
         accp_states = accp_states.ite(self.manager.addZero(), self.manager.plusInfinity())
         
         # strategy - optimal (state & robot-action) pair stored in the ADD
-        strategy : ADD  = self.manager.plusInfinity()
+        strategy: ADD  = self.manager.plusInfinity()
 
         # initializes accepting states to be zero
         self.winning_states[0] |= self.winning_states[0].min(accp_states)
@@ -264,8 +291,10 @@ class AdversarialGame(BaseSymbolicSearch):
         prod_curr_list = []
         prod_curr_list.extend([lbl for sym_vars_list in self.ts_obs_list for lbl in sym_vars_list])
         prod_curr_list.extend(self.ts_x_list)
-
+        
         prod_bdd_curr_list = [_avar.bddPattern() for _avar in prod_curr_list]
+
+        prod_dfa_bdd_curr_list = prod_bdd_curr_list + self.dfa_bdd_x_list
 
         sym_lbl_cubes = self._create_lbl_cubes()
 
@@ -285,24 +314,27 @@ class AdversarialGame(BaseSymbolicSearch):
 
             _win_state_bucket: Dict[BDD] = defaultdict(lambda: self.manager.bddZero())
 
-            # conver the winning states into buckets of BDD
+            
+            # convert the winning states into buckets of BDD
             _max_interval_val = layer * c_max
             for sval in range(_max_interval_val + 1):
                 # get the states with state value equal to sval and store them in their respective bukcets
                 win_sval = self.winning_states[layer].bddInterval(sval, sval)
-                _win_state_bucket[sval] |= win_sval
+                
+                if not win_sval.isZero():
+                    _win_state_bucket[sval] |= win_sval
             
             _pre_buckets: Dict[ADD] = defaultdict(lambda: self.manager.addZero())
 
-            # compute the predecessor and store tham by action cost + successor cost
-            for tr_idx, tr_action in enumerate(self.ts_transition_fun_list):
-                # TODO: In future to this only once
-                tr_action_bdd: List[BDD] = [ele.bddPattern() for ele in tr_action]
+            # compute the predecessor and store them by action cost + successor cost
+            for tr_idx, tr_action in enumerate(self.ts_bdd_transition_fun_list):
                 curr_act_name: str = self.ts_action_idx_map.inv[tr_idx]
                 action_cost: ADD =  self.ts_handle.weight_dict[curr_act_name]
-                act_val: int =  int(re.findall(r'\d+', action_cost.__repr__())[0])
+                act_val: int = list(action_cost.generate_cubes())[0][1]
                 for sval, succ_states in _win_state_bucket.items():
-                    pre_states: BDD = self.get_pre_states(ts_action=tr_action_bdd, From=succ_states, prod_curr_list=prod_bdd_curr_list)
+                    # if curr_act_name == 'release' or curr_act_name == 'transit b0':
+                    #     print('Wait!')
+                    pre_states: BDD = self.get_pre_states(ts_action=tr_action, From=succ_states, prod_curr_list=prod_bdd_curr_list, act_name=curr_act_name)
 
                     _pre_buckets[act_val + sval] |= pre_states.toADD()
             
@@ -313,10 +345,11 @@ class AdversarialGame(BaseSymbolicSearch):
             upre_states: ADD = pre_states.univAbstract(self.env_cube)
 
             # print non-zero states in this iteration
-            # if verbose:
-            #     print(f"Non-Zero states at Iteration {layer + 1}")
-            #     self.get_prod_states_from_dd(dd_func=upre_states.existAbstract(self.sys_cube), sym_lbl_cubes=sym_lbl_cubes, prod_curr_list=prod_bdd_curr_list)
+            if verbose:
+                print(f"Non-Zero states at Iteration {layer + 1}")
+                self.get_prod_states_from_dd(dd_func=upre_states.existAbstract(self.sys_cube), sym_lbl_cubes=sym_lbl_cubes, prod_curr_list=prod_dfa_bdd_curr_list)
             
+            # sys.exit(-1)
             # convert to ADD so that we take max of (s, a_s, a_e)
             tmp_strategy = upre_states.ite(self.manager.addOne(), self.manager.plusInfinity())
 
@@ -340,6 +373,8 @@ class AdversarialGame(BaseSymbolicSearch):
 
             # update counter 
             layer += 1
+
+            sys.exit(-1)
     
 
     def roll_out_strategy(self, strategy: ADD, verbose: bool = False):
@@ -359,15 +394,13 @@ class AdversarialGame(BaseSymbolicSearch):
             init_ts = self.init_TS
             init_ts_tuple = self.ts_handle.get_state_tuple_from_sym_state(sym_state=init_ts, sym_lbl_xcube_list=sym_lbl_cubes)
             init_ts = self.ts_handle.get_state_from_tuple(state_tuple=init_ts_tuple)
-            print(f"Init State: {init_ts[1:]}")
-
-        # step = max_layer - counter        
+            print(f"Init State: {init_ts[1:]}")     
 
         while True:
             if len(list((self.target_DFA & curr_prod_state).generate_cubes())) > 0:
                 target_state_val = list((self.target_DFA & curr_prod_state).generate_cubes())[0][1]
                 if target_state_val != math.inf:
-                    break
+                    return
             
             # current state tuple 
             curr_ts_state: ADD = curr_prod_state.existAbstract(self.dfa_xcube & self.sys_env_cube).bddPattern().toADD()   # to get 0-1 ADD
@@ -383,8 +416,6 @@ class AdversarialGame(BaseSymbolicSearch):
             act_cube: ADD = curr_state_act_cubes.bddInterval(curr_prod_state_sval, curr_prod_state_sval).toADD()
 
             list_act_cube = self.convert_add_cube_to_func(act_cube, curr_state_list=self.sys_act_vars)
- 
-            # assert not act_cube.isZero(), "Erroe Extracting Robot action from the transducer. FIX THIS!!!"
 
             # if multiple winning actions exisit from same state
             if len(list_act_cube) > 1:
@@ -422,12 +453,3 @@ class AdversarialGame(BaseSymbolicSearch):
             curr_prod_state: ADD = curr_ts_state & curr_dfa_state
 
             counter += 1
-
-
-
-            
-
-
-            
-
-

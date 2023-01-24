@@ -1,4 +1,5 @@
 import sys
+import warnings
 
 from cudd import Cudd
 
@@ -115,9 +116,9 @@ if __name__ == "__main__":
 
         wgt_dict = {
             "transit" : 1,
-            "grasp"   : 1,
-            "transfer": 1,
-            "release" : 1,
+            "grasp"   : 2,
+            "transfer": 3,
+            "release" : 4,
             "human": 0
             }
         
@@ -132,22 +133,27 @@ if __name__ == "__main__":
                                                         ltlf_flag=USE_LTLF,
                                                         dyn_var_ord=DYNAMIC_VAR_ORDERING,
                                                         algorithm=GAME_ALGORITHM,
-                                                        verbose=False,
+                                                        verbose=True,
                                                         plot_ts=False,
                                                         plot_obs=False,
                                                         plot=False)
         
-        assert GAME_ALGORITHM == 'quant' and TWO_PLAYER_GAME_BND is False, "We do not have symbolic bounded quantitative synthesis implemented yet. Please set TWO_PLAYER_GAME flag to True"
+        if GAME_ALGORITHM == 'quant':
+            assert TWO_PLAYER_GAME_BND is False, "We do not have symbolic bounded quantitative synthesis implemented yet. Please set TWO_PLAYER_GAME flag to True"
 
-        assert TWO_PLAYER_GAME is not TWO_PLAYER_GAME_BND, "Please set only one flag to True - BND_TWO_PLAYER_GAME or TWO_PLAYER_GAME!"
+        elif GAME_ALGORITHM == 'qual':
+            assert TWO_PLAYER_GAME is not TWO_PLAYER_GAME_BND, "Please set only one flag to True - BND_TWO_PLAYER_GAME or TWO_PLAYER_GAME!"
+        else:
+            warnings.warn("Make sure you select atleast one Algorithm - 'qual' or 'quant'")
+            sys.exit(-1)
 
         # build the abstraction
         frankapartition_handle.build_abstraction(dynamic_env=TWO_PLAYER_GAME,
                                                  bnd_dynamic_env=TWO_PLAYER_GAME_BND,
                                                  max_human_int=HUMAN_INT_BND)
-        sys.exit(-1)                                      
+        # sys.exit(-1)                                      
         print(f"****************** # Total Boolean Variables: { cudd_manager.size()} ******************")
-        frankapartition_handle.solve(verbose=False)
+        frankapartition_handle.solve(verbose=True)
 
     else:
         warnings.warn("Please set atleast one flag to True - FRANKAWORLD or GRIDWORLD!")

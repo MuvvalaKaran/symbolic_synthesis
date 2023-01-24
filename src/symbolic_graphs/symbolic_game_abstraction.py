@@ -399,17 +399,19 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
             if not valid_move:
                 return False
 
-            # for Unvounded Abstraction we allow the robot to evolve 
+            # for Unbounded Abstraction we allow the robot to evolve 
             if kwargs.get('next_exp_states') is not None:
                 next_exp_state = list(haction.apply(state=frozenset(kwargs['next_exp_states'])))
 
                 if 'transit' in kwargs['robot_action_name']:
                     _hcloc: str = re.findall(_loc_pattern, haction.name)[0]
-                    try:
-                        # fails when transiting from else loc to l#
+                    
+                    # for actions of type (transit b# else l#) or (tansit b# l# else) 
+                    if 'else' in kwargs['robot_action_name']:
+                        # -1 for the last location in the action name and :-1 to remove the trailing bracket 
+                        _dloc: str = kwargs['robot_action_name'].split(' ')[-1][:-1]
+                    else:
                         _dloc: str = re.findall(_loc_pattern, kwargs['robot_action_name'])[1]
-                    except:
-                        _dloc: str = re.findall(_loc_pattern, kwargs['robot_action_name'])[0]
                     
                     _box_state: str = re.search(_box_pattern, kwargs['robot_action_name']).group()
 
@@ -596,6 +598,8 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
                             if len(valid_human_edges) > 0:
                                 valid_hact: List[BDD] = [self.predicate_sym_map_human[self.get_mod_act_name(ha)] for ha in valid_human_edges]
                                 no_human_move_edge: BDD = ~(reduce(lambda x, y: x | y, valid_hact))
+
+                                assert not no_human_move_edge.isZero(), "Error computing a human no-intervene edge. FIX THIS!!!"
                             else:
                                 no_human_move_edge: BDD = self.manager.bddOne()
                     

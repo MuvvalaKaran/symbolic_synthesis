@@ -276,6 +276,7 @@ class DynWeightedPartitionedFrankaAbs():
         sym_lbl = reduce(lambda x, y: x & y, _sym_lbls_list)
 
         assert not sym_lbl.isZero(), "Error constructing the symbolic lbl associated with each state. FIX THIS!!!"
+        assert list(sym_lbl.generate_cubes())[0][1] == 1, "Error constructing Sym state as 0-1 ADD. FIX THIS!!!"
 
         return sym_lbl
 
@@ -526,7 +527,6 @@ class DynWeightedPartitionedFrankaAbs():
             if _box_state == _hbox_state:
                 return False
         
-        # Check release only when you are constructing Bounded Abstraction
         elif 'release' in robot_action_name:
             _dloc: str = re.search(_loc_pattern, robot_action_name).group()
             _hloc: str = re.findall(_loc_pattern, haction.name)[1]
@@ -552,12 +552,14 @@ class DynWeightedPartitionedFrankaAbs():
 
             if 'transit' in robot_action_name:
                 _hcloc: str = re.findall(_loc_pattern, haction.name)[0]
-                try:
-                    # fails when transiting from else loc to l#
-                    _dloc: str = re.findall(_loc_pattern,robot_action_name)[1]
-                except:
-                    _dloc: str = re.findall(_loc_pattern, robot_action_name)[0]
                 
+                 # for actions of type (transit b# else l#) or (tansit b# l# else) 
+                if 'else' in robot_action_name:
+                    _dloc: str = robot_action_name.split(' ')[-1][:-1]
+                else:
+                    # check if you are trnasiting from 'else' to l# or from l# to 'else'
+                    _dloc: str = re.findall(_loc_pattern, robot_action_name)[1]
+                    
                 _box_state: str = re.search(_box_pattern, robot_action_name).group()
 
                 if _hcloc == _dloc:
@@ -565,7 +567,7 @@ class DynWeightedPartitionedFrankaAbs():
                     next_exp_state = list(set(next_exp_state) - set([f'(to-obj {_box_state})']))
                     next_exp_state = next_exp_state + [f'(ready {_dloc})']
             
-            next_sym_state: BDD = self.get_sym_state_from_exp_states(exp_states=next_exp_state)
+            next_sym_state: ADD = self.get_sym_state_from_exp_states(exp_states=next_exp_state)
 
 
             if verbose:
@@ -616,21 +618,21 @@ class DynWeightedPartitionedFrankaAbs():
         
 
         # get the modified robot action name
-        # mod_raction_name: str = self.get_mod_act_name(org_act_name=robot_action_name)
         mod_raction_name: str = mod_act_dict[robot_action_name]
-        
-        robot_move: BDD = self.predicate_sym_map_robot[mod_raction_name]
+        robot_move: ADD = self.predicate_sym_map_robot[mod_raction_name]
         edge_wgt = self.weight_dict.get(mod_raction_name)
         _tr_idx: int = self.tr_action_idx_map.get(mod_raction_name)
 
+        # if mod_raction_name == 'release':
+        #     print("Release the Kraken")
+
         if human_action_name != '':
             # get the modified human action name
-            # mod_haction_name: str = self.get_mod_act_name(org_act_name=human_action_name)
             mod_haction_name: str = mod_act_dict[human_action_name]
-            # _tr_idx: int = self.tr_action_idx_map.get(mod_haction_name)
             
             if 'debug' in kwargs:
                 edge_exist: bool = (self.mono_tr_bdd & curr_state_sym & robot_move & self.predicate_sym_map_human[mod_haction_name] & edge_wgt).isZero()
+                # edge_exist: bool = (self.mono_tr_bdd & curr_state_sym & robot_move & self.predicate_sym_map_human[mod_haction_name]).isZero()
                 
                 if not edge_exist:
                     print(f"Nondeterminism due to Human Action: {curr_str_state} --- {robot_action_name} & {human_action_name}---> {next_str_state}")
@@ -639,6 +641,7 @@ class DynWeightedPartitionedFrankaAbs():
         else:
             if 'debug' in kwargs:
                 edge_exist: bool = (self.mono_tr_bdd & curr_state_sym & robot_move & no_human_move & edge_wgt).isZero()
+                # edge_exist: bool = (self.mono_tr_bdd & curr_state_sym & robot_move & no_human_move).isZero()
                 
                 if not edge_exist:
                     print(f"Nondeterminism due to Human Action: {curr_str_state} ---{robot_action_name}---> {next_str_state}")
@@ -665,7 +668,7 @@ class DynWeightedPartitionedFrankaAbs():
                     
             
             elif var == 2 and self.manager.addVar(_idx) in kwargs['prod_curr_list']:
-                warnings.warn("Encountered an ambiguous varible during TR construction. FIX THIS!!!")
+                warnings.warn("Encountered an ambiguous variable during TR construction. FIX THIS!!!")
                 sys.exit(-1)
         
         if human_action_name != '':
@@ -800,7 +803,7 @@ class DynWeightedPartitionedFrankaAbs():
                                 continue
 
                             next_exp_state = list(raction.apply(state=frozenset(curr_exp_states)))
-                            next_sym_state: BDD = self.get_sym_state_from_exp_states(exp_states=next_exp_state)
+                            next_sym_state: ADD = self.get_sym_state_from_exp_states(exp_states=next_exp_state)
 
                             # create human edges
                             valid_human_edges = self.create_human_edges(human_actions=_seg_actions['human'],
@@ -817,24 +820,25 @@ class DynWeightedPartitionedFrankaAbs():
                                                                         next_exp_state=next_exp_state,
                                                                         **kwargs)
 
-                            no_human_move_edge: BDD = self.manager.addOne()
+                            no_human_move_edge: ADD = self.manager.addOne()
 
                             # if there are any valid human edges from curr state
                             if len(valid_human_edges) > 0:
-                                #  valid_hact: List[BDD] = [self.predicate_sym_map_human[self.get_mod_act_name(ha)] for ha in valid_human_edges]
-                                valid_hact: List[BDD] = [self.predicate_sym_map_human[mod_act_dict[ha]] for ha in valid_human_edges]
-                                no_human_move_edge: BDD = ~(reduce(lambda x, y: x | y, valid_hact))            
+                                valid_hact: List[ADD] = [self.predicate_sym_map_human[mod_act_dict[ha]] for ha in valid_human_edges]
+                                no_human_move_edge: ADD = ~(reduce(lambda x, y: x | y, valid_hact))    
+
+                                assert not no_human_move_edge.isZero(), "Error computing a human no-intervene edge. FIX THIS!!!"        
                     
                             # create robot edges
                             self.add_edge_to_action_tr(robot_action_name=raction.name,
-                                                        curr_state_tuple=curr_state_tuple,
-                                                        mod_act_dict=mod_act_dict,
-                                                        next_state_tuple=next_exp_state,
-                                                        curr_state_sym=state,
-                                                        nxt_state_sym=next_sym_state,
-                                                        valid_hact_list=no_human_move_edge,
-                                                        prod_curr_list=prod_curr_list,
-                                                        **kwargs)
+                                                       curr_state_tuple=curr_state_tuple,
+                                                       mod_act_dict=mod_act_dict,
+                                                       next_state_tuple=next_exp_state,
+                                                       curr_state_sym=state,
+                                                       nxt_state_sym=next_sym_state,
+                                                       valid_hact_list=no_human_move_edge,
+                                                       prod_curr_list=prod_curr_list,
+                                                       **kwargs)
                             if verbose:
                                 print(f"Adding Robot edge: {list(curr_exp_states)} -------{raction.name}------> {next_exp_state}")
 

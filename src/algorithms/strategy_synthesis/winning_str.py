@@ -277,7 +277,6 @@ class ReachabilityGame(BaseSymbolicSearch):
         strategy: BDD = transducer.solveEqn(self.sys_act_vars)
         state_action = strategy[0].vectorCompose(self.sys_act_vars, strategy[1])
 
-
         # restrict the strategy to non accpeting state, as we don not care what the Roboto after it reaches an accepting state
         if verbose:
             self.get_state_action(state_action & self.init_DFA)
@@ -296,6 +295,8 @@ class ReachabilityGame(BaseSymbolicSearch):
         
         for ts_transition in self.ts_transition_fun_list:
             pre_prod_state |= mod_win_state.vectorCompose(prod_curr_list,[*ts_transition])
+        # for ts_transition in self.ts_transition_fun_list:
+        #     pre_prod_state |= self.winning_states[layer].vectorCompose([*self.dfa_x_list, *prod_curr_list],[*self.dfa_transition_fun_list, *ts_transition])
             
         
         return pre_prod_state
