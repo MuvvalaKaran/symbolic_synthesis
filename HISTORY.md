@@ -1,5 +1,16 @@
 This file keep tracks of various version of this source code
 
+
+### V5.0
+
+This tag implements symbolic strategy synthesis for Two-player zero-sum games with quantitative constraints under adversarial and cooperative human assumptions. The abstraction is similar to the Unbounded Abstraction. The graph evolves under system and human action from a given state in the Transition System. Each edge also has an edge weight associated with. This, to represent edge weights we use Algebraic Decision Diagrams (ADDs). We make use of the Compositional Approach along with ADDs for strategy synthesis for the Robot player. The task is defined using LTLf language.
+
+Adversarial (Min-Max) Game: The Robot player and the Human player have competing objectives. We assume the human to be adversarial, i.e., the objective for the system is to minimize the total cost (Cumulative Payoff) to accomplish the task while the objective is to maximize the total energy the Robot player needs to spend to accomplish the same task. Thus, we call System/Robot player as Min player and Human/Environment player as Max player as well. We are playing a Zero-sum game thus the payoff for the Robot player is exactly the opposite of the payoff of the Human player. Thus, we also call this a Min-Max game.
+
+Note: The Reactive sysntheis community also calls the Human player as Input and Robot player as the Output player. The Robot chooses an action (Output) for all possible Human actions (inputs). Thus, in my code I represent Human actions as `I` and Robot actions as `O`. 
+
+Cooperative (Min-Min) Game: The Robot player and the Human player both have the same objective, i.e., both players want to the minimzie the total energy spent by the Robot player to accomplish the given task.  Thus, we also call this a Min-Min game.
+
 ### V4.0
 
 This tag implements a faster and smaller abstraction construction and quicker winning strategy synthesis code.
