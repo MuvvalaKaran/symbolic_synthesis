@@ -9,7 +9,7 @@ FRANKAWORLD: bool = False  # Set this flag to true when using manipulator scenar
 STRATEGY_SYNTHESIS: bool = True  # Set this flag to true when  when using manipulator scenarios for Strategy synthesis
 TWO_PLAYER_GAME: bool = True # Set this flag to true when you want to contruct a two-player game env.
 TWO_PLAYER_GAME_BND: bool = False  # Set this flag to true when you want to construct som bounded no. off human interventions.
-GAME_ALGORITHM = 'quant' # choose qual for qualitative game and quant for quantitative games
+GAME_ALGORITHM = 'quant-adv' # choose qual for qualitative game, quant-adv for quantitative adversarial game, and quant-coop for cooperative game
 
 HUMAN_INT_BND: int = 3
 
@@ -51,7 +51,15 @@ TOP_LOC = []
 
 ### BENCHMARKING formulas
 # formulas = ['F(p00 & p11 & p22 & p33 & p44)']
-formulas = ['F(p00)']
+# formulas = ['F(p00)']
+
+
+### BENCHMARKING formulas
+# formulas = ['F(p00 & p11)']
+formulas = ['F(p01 & XF(p17))']   # tricky complicated formula
+# formulas = ['F(p11 & p06 & F(p07 & F(p06)))']   # neat complicated formula
+# formulas = ['F(p01)']
+# formulas = ['F(p01 | p11)'] 
 
 
 # formulas = [

@@ -295,9 +295,6 @@ class ReachabilityGame(BaseSymbolicSearch):
         
         for ts_transition in self.ts_transition_fun_list:
             pre_prod_state |= mod_win_state.vectorCompose(prod_curr_list,[*ts_transition])
-        # for ts_transition in self.ts_transition_fun_list:
-        #     pre_prod_state |= self.winning_states[layer].vectorCompose([*self.dfa_x_list, *prod_curr_list],[*self.dfa_transition_fun_list, *ts_transition])
-            
         
         return pre_prod_state
     

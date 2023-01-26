@@ -620,7 +620,6 @@ class DynWeightedPartitionedFrankaAbs():
         # get the modified robot action name
         mod_raction_name: str = mod_act_dict[robot_action_name]
         robot_move: ADD = self.predicate_sym_map_robot[mod_raction_name]
-        edge_wgt = self.weight_dict.get(mod_raction_name)
         _tr_idx: int = self.tr_action_idx_map.get(mod_raction_name)
 
         if human_action_name != '':
@@ -628,7 +627,6 @@ class DynWeightedPartitionedFrankaAbs():
             mod_haction_name: str = mod_act_dict[human_action_name]
             
             if 'debug' in kwargs:
-                # edge_exist: bool = (self.mono_tr_bdd & curr_state_sym & robot_move & self.predicate_sym_map_human[mod_haction_name] & edge_wgt).isZero()
                 edge_exist: bool = (self.mono_tr_bdd & curr_state_sym & robot_move & self.predicate_sym_map_human[mod_haction_name]).isZero()
                 
                 if not edge_exist:
@@ -637,7 +635,6 @@ class DynWeightedPartitionedFrankaAbs():
                 self.mono_tr_bdd |= curr_state_sym & robot_move & self.predicate_sym_map_human[mod_haction_name]# & edge_wgt
         else:
             if 'debug' in kwargs:
-                # edge_exist: bool = (self.mono_tr_bdd & curr_state_sym & robot_move & no_human_move & edge_wgt).isZero()
                 edge_exist: bool = (self.mono_tr_bdd & curr_state_sym & robot_move & no_human_move).isZero()
                 
                 if not edge_exist:
@@ -657,11 +654,11 @@ class DynWeightedPartitionedFrankaAbs():
                 assert _state_idx >= 0, "Error constructing the Partitioned Transition Relation."
                 # if human intervenes then the edge looks like (true) & (human move b# l# l#)
                 if human_action_name != '':
-                    self.sym_tr_actions[_tr_idx][_state_idx] |= curr_state_sym & robot_move & self.predicate_sym_map_human[mod_haction_name]# & edge_wgt
+                    self.sym_tr_actions[_tr_idx][_state_idx] |= curr_state_sym & robot_move & self.predicate_sym_map_human[mod_haction_name]
                     
                 # if human does not intervene then the edge looks like (robot-action) & not(valid human moves)
                 else:
-                    self.sym_tr_actions[_tr_idx][_state_idx] |= curr_state_sym & robot_move & no_human_move# & edge_wgt
+                    self.sym_tr_actions[_tr_idx][_state_idx] |= curr_state_sym & robot_move & no_human_move
                     
             
             elif var == 2 and self.manager.addVar(_idx) in kwargs['prod_curr_list']:
@@ -669,15 +666,10 @@ class DynWeightedPartitionedFrankaAbs():
                 sys.exit(-1)
         
         if human_action_name != '':
-            if self.adj_map.get(curr_state_tuple, {}).get(mod_raction_name, {}).get('h') is None:
-                self.adj_map[curr_state_tuple][mod_raction_name]['h'] = [next_state_tuple]
-            else:
-                self.adj_map[curr_state_tuple][mod_raction_name]['h'].append(next_state_tuple)
+            assert self.adj_map.get(curr_state_tuple, {}).get(mod_raction_name, {}).get(mod_haction_name) is None, "Error Computing Adj Dictionary, Fix this!!!"
+            self.adj_map[curr_state_tuple][mod_raction_name][mod_haction_name] = next_state_tuple
         else:
-            if self.adj_map.get(curr_state_tuple, {}).get(mod_raction_name, {}).get('r') is not None:
-                print("Error Computing Adj Dictionary, Fix this!!!")
-                sys.exit(-1)
-            
+            assert self.adj_map.get(curr_state_tuple, {}).get(mod_raction_name, {}).get('r') is None, "Error Computing Adj Dictionary, Fix this!!!"
             self.adj_map[curr_state_tuple][mod_raction_name]['r'] = next_state_tuple
         
         # update edge count 

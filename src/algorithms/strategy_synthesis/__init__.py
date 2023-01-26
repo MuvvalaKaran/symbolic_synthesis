@@ -1,2 +1,3 @@
 from .winning_str import ReachabilityGame, BndReachabilityGame
-from .min_max_str import AdversarialGame
+from .adversarial_game import AdversarialGame
+from .cooperative_game import CooperativeGame

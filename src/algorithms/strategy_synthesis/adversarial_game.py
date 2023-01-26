@@ -19,6 +19,7 @@ from src.symbolic_graphs import DynWeightedPartitionedFrankaAbs
 
 from utls import *
 
+
 class AdversarialGame(BaseSymbolicSearch):
     """
      A class that implements optimal strategy synthesis for the Robot player assuming Human player to be adversarial with quantitative constraints. 
@@ -64,10 +65,10 @@ class AdversarialGame(BaseSymbolicSearch):
         self.ts_sym_to_robot_act_map: bidict = ts_handle.predicate_sym_map_robot.inv
 
         self.obs_add: ADD = ts_handle.sym_state_labels
-
+        
         self.ts_handle = ts_handle
         self.dfa_handle = dfa_handle
-
+        
         # create corresponding cubes to avoid repetition
         self.ts_xcube: ADD = reduce(lambda x, y: x & y, self.ts_x_list)
         self.dfa_xcube: ADD = reduce(lambda x, y: x & y, self.dfa_x_list)
@@ -85,7 +86,7 @@ class AdversarialGame(BaseSymbolicSearch):
 
         # ADD that keeps track of the optimal values of state at each iteration
         self.winning_states: ADD = defaultdict(lambda: self.manager.plusInfinity())
-
+        
         # get the bdd version of the transition function as vectorComposition only works with
         for act in self.ts_transition_fun_list:
             act_ls = []
@@ -245,11 +246,12 @@ class AdversarialGame(BaseSymbolicSearch):
             
         return pre_prod_state
     
-    def evolve_as_per_human(self, curr_state_tuple: tuple, curr_dfa_state: ADD, ract_name: str) -> ADD:
+    
+    def evolve_as_per_human(self, curr_state_tuple: tuple, curr_dfa_state: ADD, ract_name: str, valid_human_act: str) -> ADD:
         """
          A function that compute the next state tuple given the current state tuple. 
         """
-        next_exp_states = random.choice(self.ts_handle.adj_map[curr_state_tuple][ract_name]['h'])
+        next_exp_states = self.ts_handle.adj_map[curr_state_tuple][ract_name][valid_human_act]
         nxt_state_tuple = self.ts_handle.get_tuple_from_state(next_exp_states)
         
         # look up its corresponding formula
@@ -271,11 +273,12 @@ class AdversarialGame(BaseSymbolicSearch):
         return nxt_ts_lbl & nxt_dfa_state, nxt_state_tuple
 
 
-    # COPIED AS IT IS FROM WINNING STR class
     def human_intervention(self,
                            ract_name:str,
+                           rnext_tuple: tuple,
                            curr_state_tuple: tuple,
                            curr_dfa_state: ADD,
+                           valid_human_acts: list,
                            verbose: bool = False) -> tuple:
         """
          Evolve on the game as per human intervention
@@ -283,26 +286,21 @@ class AdversarialGame(BaseSymbolicSearch):
         # get the next action
         hnext_tuple = curr_state_tuple
 
-        itr = 0
-        nxt_prod_state, nxt_ts_tuple = self.evolve_as_per_human(curr_state_tuple=hnext_tuple, curr_dfa_state=curr_dfa_state, ract_name=ract_name)
-        
-        # forcing human to not make a move that satisfies the specification
-        while not (self.target_DFA & nxt_prod_state).isZero():
-            nxt_prod_state, nxt_ts_tuple = self.evolve_as_per_human(curr_state_tuple=hnext_tuple, curr_dfa_state=curr_dfa_state, ract_name=ract_name)
-            # hacky way to avoid infinite looping
-            itr += 1
-            if itr > 5:
-                break
+        for hact in valid_human_acts:
+            nxt_prod_state, nxt_ts_tuple = self.evolve_as_per_human(curr_state_tuple=hnext_tuple, curr_dfa_state=curr_dfa_state, ract_name=ract_name, valid_human_act=hact)
 
-        if verbose:
-            print(f"Human Moved: New Conf. {self.ts_handle.get_state_from_tuple(nxt_ts_tuple)}")
+            # forcing human to not make a move that satisfies the specification
+            if (self.target_DFA & nxt_prod_state).isZero():
+                if verbose:
+                    print(f"Human Moved: New Conf. {self.ts_handle.get_state_from_tuple(nxt_ts_tuple)}")
+                return nxt_ts_tuple
 
-        return nxt_ts_tuple
+        return rnext_tuple
     
 
-    def solve(self, verbose: bool = False):
+    def solve(self, verbose: bool = False) -> ADD:
         """
-         Method that compute the optimal strategy for the system with minimum payoff under adversarial environment assumptions. 
+         Method that computes the optimal strategy for the system with minimum payoff under adversarial environment assumptions. 
         """
 
         ts_states: ADD = self.obs_add
@@ -431,12 +429,8 @@ class AdversarialGame(BaseSymbolicSearch):
             init_ts = self.ts_handle.get_state_from_tuple(state_tuple=init_ts_tuple)
             print(f"Init State: {init_ts[1:]}")     
 
-        while True:
-            if len(list((self.target_DFA & curr_prod_state).generate_cubes())) > 0:
-                target_state_val = list((self.target_DFA & curr_prod_state).generate_cubes())[0][1]
-                if target_state_val != math.inf:
-                    return
-            
+        # until you reach a goal state. . .
+        while (self.target_DFA & curr_prod_state).isZero():
             # current state tuple 
             curr_ts_state: ADD = curr_prod_state.existAbstract(self.dfa_xcube & self.sys_env_cube).bddPattern().toADD()   # to get 0-1 ADD
             curr_ts_tuple = self.ts_handle.get_state_tuple_from_sym_state(sym_state=curr_ts_state, sym_lbl_xcube_list=sym_lbl_cubes)
@@ -474,10 +468,16 @@ class AdversarialGame(BaseSymbolicSearch):
             coin = random.randint(0, 1)
             # coin = 1
             if coin:
-                if self.ts_handle.adj_map.get(curr_ts_tuple, {}).get(ract_name, {}).get('h'):
+                # check if there any human action from the current state
+                valid_acts = set(self.ts_handle.adj_map.get(curr_ts_tuple, {}).get(ract_name, {}).keys())
+                human_acts = valid_acts.difference('r')
+                
+                if len(human_acts) > 0:
                     next_tuple = self.human_intervention(ract_name=ract_name,
                                                          curr_state_tuple=curr_ts_tuple,
+                                                         rnext_tuple=next_tuple,
                                                          curr_dfa_state=curr_dfa_state,
+                                                         valid_human_acts=human_acts,
                                                          verbose=verbose)
 
             # look up its corresponding formula
@@ -499,3 +499,6 @@ class AdversarialGame(BaseSymbolicSearch):
             curr_prod_state: ADD = curr_ts_state & curr_dfa_state
 
             counter += 1
+        
+        # need to delete this dict that holds cudd object to avoid segfaults after exiting python code
+        del self.winning_states

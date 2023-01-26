@@ -116,9 +116,9 @@ if __name__ == "__main__":
 
         wgt_dict = {
             "transit" : 1,
-            "grasp"   : 2,
-            "transfer": 3,
-            "release" : 4,
+            "grasp"   : 1,
+            "transfer": 1,
+            "release" : 1,
             "human": 0
             }
         
@@ -133,18 +133,18 @@ if __name__ == "__main__":
                                                         ltlf_flag=USE_LTLF,
                                                         dyn_var_ord=DYNAMIC_VAR_ORDERING,
                                                         algorithm=GAME_ALGORITHM,
-                                                        verbose=True,
+                                                        verbose=False,
                                                         plot_ts=False,
                                                         plot_obs=False,
                                                         plot=False)
         
-        if GAME_ALGORITHM == 'quant':
+        if 'quant' in GAME_ALGORITHM:
             assert TWO_PLAYER_GAME_BND is False, "We do not have symbolic bounded quantitative synthesis implemented yet. Please set TWO_PLAYER_GAME flag to True"
 
         elif GAME_ALGORITHM == 'qual':
             assert TWO_PLAYER_GAME is not TWO_PLAYER_GAME_BND, "Please set only one flag to True - BND_TWO_PLAYER_GAME or TWO_PLAYER_GAME!"
         else:
-            warnings.warn("Make sure you select atleast one Algorithm - 'qual' or 'quant'")
+            warnings.warn("Make sure you select atleast one Algorithm - 'qual' or 'quant-adv' or 'quant-coop'")
             sys.exit(-1)
 
         # build the abstraction
@@ -153,7 +153,11 @@ if __name__ == "__main__":
                                                  max_human_int=HUMAN_INT_BND)
         # sys.exit(-1)                                      
         print(f"****************** # Total Boolean Variables: { cudd_manager.size()} ******************")
-        frankapartition_handle.solve(verbose=True)
+        frankapartition_handle.solve(verbose=False)
+
+        # convert bytes to MegaBytes and print the Memory usage
+        print(f"Memory in use (MB): {cudd_manager.readMemoryInUse()/(10**6)}")
+
 
     else:
         warnings.warn("Please set atleast one flag to True - FRANKAWORLD or GRIDWORLD!")

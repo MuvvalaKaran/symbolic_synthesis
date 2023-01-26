@@ -12,7 +12,7 @@ from cudd import Cudd, BDD, ADD
 from src.explicit_graphs import CausalGraph, Ltlf2MonaDFA
 
 from src.algorithms.strategy_synthesis import ReachabilityGame, BndReachabilityGame
-from src.algorithms.strategy_synthesis import AdversarialGame
+from src.algorithms.strategy_synthesis import AdversarialGame, CooperativeGame
 
 from src.symbolic_graphs import PartitionedDFA, ADDPartitionedDFA
 from src.symbolic_graphs import PartitionedFrankaTransitionSystem, DynamicFrankaTransitionSystem, BndDynamicFrankaTransitionSystem
@@ -47,7 +47,7 @@ class FrankaPartitionedWorld(FrankaWorld):
          A main function that construct a symbolic Franka World TS and its corresponsing DFA
         """
         print("*****************Creating Boolean variables for Partitioned Frankaworld!*****************")
-        if self.algorithm == 'quant':
+        if 'quant' in self.algorithm:
             # All vars (TS, DFA and Predicate) are of type ADDs
             # unbounded human interventions
             if dynamic_env:
@@ -74,7 +74,8 @@ class FrankaPartitionedWorld(FrankaWorld):
             dfa_tr = self.build_bdd_symbolic_dfa(sym_tr_handle=sym_tr)
         
         else:
-            warnings.warn("Please enter a valid graph search algorthim. Currently Available - Quanlitative")
+            warnings.warn("Please enter a valid graph search algorthim. Currently Available -'qual' or 'quant-adv' or 'quant-coop'")
+            sys.exit(-1)
         
         self.ts_handle: Union[DynamicFrankaTransitionSystem, PartitionedFrankaTransitionSystem] = sym_tr
         self.dfa_handle: Union[PartitionedDFA, ADDPartitionedDFA] = dfa_tr
@@ -127,6 +128,9 @@ class FrankaPartitionedWorld(FrankaWorld):
         for op in mod_action:
             # extract the action name
             if 'transit' in op:
+                # if 'b0' in op:
+                #     weight: int = 100
+                # else:
                 weight: int = self.weight_dict['transit']
             elif 'transfer' in op:
                 weight: int = self.weight_dict['transfer']
@@ -531,7 +535,7 @@ class FrankaPartitionedWorld(FrankaWorld):
             if win_str:
                 reachability_handle.roll_out_strategy(transducer=win_str, verbose=True)
 
-        elif self.algorithm == 'quant':
+        elif self.algorithm == 'quant-adv':
             min_max_handle = AdversarialGame(ts_handle=self.ts_handle,
                                              dfa_handle=self.dfa_handle,
                                              ts_curr_vars=self.ts_x_list,
@@ -541,18 +545,33 @@ class FrankaPartitionedWorld(FrankaWorld):
                                              env_act_vars=self.ts_human_vars,
                                              cudd_manager=self.manager)
 
-            win_str: BDD = min_max_handle.solve(verbose=verbose)
+            win_str: ADD = min_max_handle.solve(verbose=verbose)
 
             stop = time.time()
             print("Time for solving the game: ", stop - start)
             # sys.exit(-1)
             if win_str:
                 min_max_handle.roll_out_strategy(strategy=win_str, verbose=True)
+        
+        elif self.algorithm == 'quant-coop':
+            min_min_handle = CooperativeGame(ts_handle=self.ts_handle,
+                                             dfa_handle=self.dfa_handle,
+                                             ts_curr_vars=self.ts_x_list,
+                                             dfa_curr_vars=self.dfa_x_list,
+                                             ts_obs_vars=self.ts_obs_list,
+                                             sys_act_vars=self.ts_robot_vars,
+                                             env_act_vars=self.ts_human_vars,
+                                             cudd_manager=self.manager)
+            
+            win_str: ADD = min_min_handle.solve(verbose=verbose)
+            # sys.exit(-1)
+            stop = time.time()
+            print("Time for solving the game: ", stop - start)
+            
+            if win_str:
+                min_min_handle.roll_out_strategy(strategy=win_str, verbose=True)
 
         else:
-            warnings.warn("Please enter either 'qual' or 'quant' for Two player game strategy synthesis.")
+            warnings.warn("Please enter either 'qual', 'quant-adv', or 'quant-coop' for Two player game strategy synthesis.")
             sys.exit(-1)
-        
-        
-        return win_str
         
