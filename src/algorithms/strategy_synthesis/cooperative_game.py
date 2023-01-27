@@ -82,6 +82,8 @@ class CooperativeGame(AdversarialGame):
                     return tmp_strategy
                 else:
                     print("No Winning Strategy Exists!!!")
+                    # need to delete this dict that holds cudd object to avoid segfaults after exiting python code
+                    del self.winning_states
                     return
             
             print(f"**************************Layer: {layer}**************************")
