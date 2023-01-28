@@ -2,10 +2,10 @@ import os
 import unittest
 
 from typing import List
-from cudd import Cudd, ADD
+from cudd import Cudd, BDD
 
 from src.symbolic_graphs.strategy_synthesis_scripts import FrankaPartitionedWorld
-from src.algorithms.strategy_synthesis import AdversarialGame
+from src.algorithms.strategy_synthesis import ReachabilityGame
 from src.symbolic_graphs.strategy_synthesis_scripts import FrankaPartitionedWorld
 
 
@@ -15,7 +15,7 @@ PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 
 TWO_PLAYER_GAME: bool = True # Set this flag to true when you want to contruct a two-player game env.
 TWO_PLAYER_GAME_BND: bool = False  # Set this flag to true when you want to construct som bounded no. off human interventions.
-GAME_ALGORITHM = 'quant-coop' # choose qual for qualitative game, quant-adv for quantitative adversarial game, and quant-coop for cooperative game
+GAME_ALGORITHM = 'qual' # choose qual for qualitative game, quant-adv for quantitative adversarial game, and quant-coop for cooperative game
 
 HUMAN_INT_BND: int = 0  # DOES not matter
 
@@ -23,9 +23,8 @@ USE_LTLF: bool = True # Construct DFA from LTLf
 
 DYNAMIC_VAR_ORDERING: bool = False
 
-SUP_LOC = []
-TOP_LOC = []
-
+SUP_LOC = ['l0', 'l1']   # support for Arch
+TOP_LOC = ['l2']         # top location for Arch
 
 ## RUN these scripts as modules python3 -m tests.test_adversarial_game -b
 # -m runs them as module and -b is suppress the prints within each function. Will still throw warning if the test(s) fail(s).
@@ -36,14 +35,12 @@ class TestAdversarialGame(unittest.TestCase):
         """
          Check all the tests related abstraction construction
         """
-        # TEST for various formulas 
-        formulas = ['F(p00 & p11)', 
-                    'F(p01 & XF(p17))',
-                    'F(p11 & p06 & F(p07 & F(p06)))',
-                    'F(p01 | p11)']
+        # TEST for various formulas
+        formulas = ['F(p00 & p12 & p21) & G(~(p00 & p21) -> ~(p12))',  # all support location and boxes are fixed  
+                    "(F((((p00 & p21) | (p01 & p20)) & p12)) & G((!(((p00 & p21) | (p01 & p20))) -> !(p12))))"]   # flexible support boxes
 
         domain_file_path = PROJECT_ROOT + "/quantitative_game/domain.pddl"
-        problem_file_path = PROJECT_ROOT + "/quantitative_game/problem.pddl"
+        problem_file_path = PROJECT_ROOT + "/quantitative_game/problem_arch1.pddl"
 
 
         wgt_dict = {
@@ -55,7 +52,7 @@ class TestAdversarialGame(unittest.TestCase):
             }
         
         # correct values
-        cor_total_vars: List[int] = [16, 17, 17, 16]
+        cor_total_vars: List[int] = [22, 22]
 
         for task_id, task in enumerate(formulas):
             cudd_manager = Cudd()
@@ -89,7 +86,7 @@ class TestAdversarialGame(unittest.TestCase):
                              msg=f"Mismatch in the Total # of boolean vars required to construct the Symbolic Weighted Abstraction for formula {task}")
             
             self.assertEqual(frankapartition_handle.ts_handle.ecount,
-                             394,
+                             6486,
                              msg=f"Mismatch in the # of edges in the Symbolic Weighted Abstraction for formula {task}.")
     
 
@@ -99,13 +96,11 @@ class TestAdversarialGame(unittest.TestCase):
         """
 
         # TEST for various formulas 
-        formulas = ['F(p00 & p11)',    # Adv strategy should not exist
-                    'F(p01 & XF(p17))',  # Adv exists as the robot can force the human
-                    'F(p11 & p06 & F(p07 & F(p06)))',  # Adv. strategy will NOT exists. In coop setting the human will help in satisfying the inner formula
-                    'F(p01 | p11)']  # Adv. strategy will prefer p01 and p11 is not possible
+        formulas = ['F(p00 & p12 & p21) & G(~(p00 & p21) -> ~(p12))',  # all support location and boxes are fixed  
+                    "(F((((p00 & p21) | (p01 & p20)) & p12)) & G((!(((p00 & p21) | (p01 & p20))) -> !(p12))))"]   # flexible support boxes
 
         domain_file_path = PROJECT_ROOT + "/quantitative_game/domain.pddl"
-        problem_file_path = PROJECT_ROOT + "/quantitative_game/problem.pddl"
+        problem_file_path = PROJECT_ROOT + "/quantitative_game/problem_arch1.pddl"
 
         wgt_dict = {
             "transit" : 1,
@@ -116,10 +111,7 @@ class TestAdversarialGame(unittest.TestCase):
             }
 
         # No. of iteration req. to reach the fixed point
-        cor_fp: List[int] = [9, 17, 24, 5]
-
-        # Min. energy required
-        corr_eng: List[int] = [None, 9, None, 4]
+        cor_fp: List[int] = [12, 12]
 
         for task_id, task in enumerate(formulas):
             cudd_manager = Cudd()
@@ -142,34 +134,26 @@ class TestAdversarialGame(unittest.TestCase):
                                                     bnd_dynamic_env=TWO_PLAYER_GAME_BND,
                                                     max_human_int=HUMAN_INT_BND)
             
-            min_max_handle = AdversarialGame(ts_handle=frankapartition_handle.ts_handle,
-                                             dfa_handle=frankapartition_handle.dfa_handle,
-                                             ts_curr_vars=frankapartition_handle.ts_x_list,
-                                             dfa_curr_vars=frankapartition_handle.dfa_x_list,
-                                             ts_obs_vars=frankapartition_handle.ts_obs_list,
-                                             sys_act_vars=frankapartition_handle.ts_robot_vars,
-                                             env_act_vars=frankapartition_handle.ts_human_vars,
-                                             cudd_manager=frankapartition_handle.manager)
+            reachability_handle = ReachabilityGame(ts_handle=frankapartition_handle.ts_handle,
+                                                    dfa_handle=frankapartition_handle.dfa_handle,
+                                                    ts_curr_vars=frankapartition_handle.ts_x_list,
+                                                    dfa_curr_vars=frankapartition_handle.dfa_x_list,
+                                                    ts_obs_vars=frankapartition_handle.ts_obs_list,
+                                                    sys_act_vars=frankapartition_handle.ts_robot_vars,
+                                                    env_act_vars=frankapartition_handle.ts_human_vars,
+                                                    cudd_manager=frankapartition_handle.manager)
 
-            win_str: ADD = min_max_handle.solve(verbose=False)
+            win_str: BDD = reachability_handle.solve(verbose=False)
 
             # ensure winning strategy exisits
-            self.assertNotEqual(win_str, cudd_manager.addZero(), "Could not synthesize a winning strategy for adversarial game")
+            self.assertNotEqual(win_str, cudd_manager.bddZero(), "Could not synthesize a winning strategy!")
 
             if win_str:
                 # ensure that you reach the fixed point correctly
-                self.assertEqual(max(min_max_handle.winning_states.keys()), cor_fp[task_id], "Error computing the fixed point.")
+                self.assertEqual(max(reachability_handle.stra_list.keys()), cor_fp[task_id], "Error computing the fixed point.")
 
-                init_state_cube = list(((min_max_handle.init_TS & min_max_handle.init_DFA) & min_max_handle.winning_states[cor_fp[task_id]]).generate_cubes())[0]
-                init_val: int = init_state_cube[1]
-
-                # ensure that the energy required is correct
-                self.assertEqual(init_val, corr_eng[task_id], "Error in the minimum energy required the task under adv. env. assumption.")
-
-                # this has to be done to ensure that
-                # 1) the strategy synthesized does indeed reach the accepting state, and
-                # 2) to ensure that the code does not seg fault.
-                min_max_handle.roll_out_strategy(strategy=win_str, verbose=False)
+                # this has to be done to ensure that the strategy synthesized does indeed reach the accepting state
+                reachability_handle.roll_out_strategy(transducer=win_str, verbose=False)
         
 
 

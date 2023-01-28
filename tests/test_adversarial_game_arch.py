@@ -102,7 +102,7 @@ class TestAdversarialGame(unittest.TestCase):
 
         domain_file_path = PROJECT_ROOT + "/quantitative_game/domain.pddl"
         problem_file_paths = [
-            PROJECT_ROOT + "/quantitative_game/problem_arch1.pddl",   # all boxed are withing robot's reach
+            PROJECT_ROOT + "/quantitative_game/problem_arch1.pddl",   # all boxes are within robot's reach
             PROJECT_ROOT + "/quantitative_game/problem_arch2.pddl"]    # robot cannot force human to build the arch
 
         wgt_dict = {
