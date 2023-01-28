@@ -169,7 +169,7 @@ class TestAdversarialGame(unittest.TestCase):
                 # this has to be done to ensure that
                 # 1) the strategy synthesized does indeed reach the accepting state, and
                 # 2) to ensure that the code does not seg fault.
-                min_min_handle.roll_out_strategy(strategy=win_str, verbose=True)
+                min_min_handle.roll_out_strategy(strategy=win_str, verbose=False)
         
 
 
