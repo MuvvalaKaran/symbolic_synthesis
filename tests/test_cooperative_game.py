@@ -65,6 +65,8 @@ class TestAdversarialGame(unittest.TestCase):
                                                             problem_file=problem_file_path,
                                                             formulas=[task],
                                                             manager=cudd_manager,
+                                                            sup_locs=SUP_LOC,
+                                                            top_locs=TOP_LOC,
                                                             weight_dict=wgt_dict,
                                                             ltlf_flag=USE_LTLF,
                                                             dyn_var_ord=DYNAMIC_VAR_ORDERING,
@@ -125,6 +127,8 @@ class TestAdversarialGame(unittest.TestCase):
                                                             problem_file=problem_file_path,
                                                             formulas=[task],
                                                             manager=cudd_manager,
+                                                            sup_locs=SUP_LOC,
+                                                            top_locs=TOP_LOC,
                                                             weight_dict=wgt_dict,
                                                             ltlf_flag=USE_LTLF,
                                                             dyn_var_ord=DYNAMIC_VAR_ORDERING,
@@ -165,7 +169,7 @@ class TestAdversarialGame(unittest.TestCase):
                 # this has to be done to ensure that
                 # 1) the strategy synthesized does indeed reach the accepting state, and
                 # 2) to ensure that the code does not seg fault.
-                min_min_handle.roll_out_strategy(strategy=win_str, verbose=False)
+                min_min_handle.roll_out_strategy(strategy=win_str, verbose=True)
         
 
 

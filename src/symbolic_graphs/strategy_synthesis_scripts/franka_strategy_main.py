@@ -1,6 +1,5 @@
 import re
 import sys
-import copy
 import time
 import warnings
 
@@ -31,6 +30,8 @@ class FrankaPartitionedWorld(FrankaWorld):
                  formulas: Union[List, str],
                  manager: Cudd,
                  algorithm: str,
+                 sup_locs: List[str],
+                 top_locs: List[str],
                  weight_dict: dict = {},
                  ltlf_flag: bool = True,
                  dyn_var_ord: bool = False,
@@ -40,8 +41,24 @@ class FrankaPartitionedWorld(FrankaWorld):
                  plot_dfa: bool = False,
                  plot: bool = False,
                  create_lbls: bool = True):
-        super().__init__(domain_file, problem_file, formulas, manager, algorithm, weight_dict, ltlf_flag, dyn_var_ord, verbose, plot_ts, plot_obs, plot_dfa, plot, create_lbls)
+        super().__init__(domain_file=domain_file,
+                         problem_file=problem_file,
+                         formulas=formulas,
+                         manager=manager,
+                         algorithm=algorithm,
+                         sup_locs=sup_locs,
+                         top_locs=top_locs,
+                         weight_dict=weight_dict,
+                         ltlf_flag=ltlf_flag,
+                         dyn_var_ord=dyn_var_ord,
+                         verbose=verbose,
+                         plot_ts=plot_ts,
+                         plot_obs=plot_obs,
+                         plot_dfa=plot_dfa,
+                         plot=plot,
+                         create_lbls=create_lbls)
 
+    
     def build_abstraction(self, draw_causal_graph: bool = False, dynamic_env: bool = False, bnd_dynamic_env: bool = False, max_human_int: int = 0):
         """
          A main function that construct a symbolic Franka World TS and its corresponsing DFA
@@ -200,6 +217,13 @@ class FrankaPartitionedWorld(FrankaWorld):
 
         # compute all valid preds of the robot conf and box conf.
         robot_preds, box_preds = self.compute_valid_predicates(predicates=task_facts, boxes=boxes)
+
+        # throw warning if there is exactly one human (hbox) location
+        if len(_causal_graph_instance.task_intervening_locations) <= 1:
+            warnings.warn("If you do not want human interventions then have only 1 hbox loc. \
+        Ensure you have atleast two hbox locs for human intervention (edges) to exists.")
+            if len(_causal_graph_instance.task_intervening_locations) == 0:
+                sys.exit(-1)
         
         # segregate actions in robot actions (controllable vars - `o`) and humans moves (uncontrollable vars - `i`)
         if build_human_move:
@@ -311,7 +335,9 @@ class FrankaPartitionedWorld(FrankaWorld):
                                                dfa_state_vars=self.dfa_x_list,
                                                ts_state_map=self.pred_int_map,
                                                manager=self.manager,
-                                               modified_actions=modified_actions)
+                                               modified_actions=modified_actions,
+                                               sup_locs=self.sup_locs,
+                                               top_locs=self.top_locs)
         
         start: float = time.time()
         sym_tr.create_transition_system_franka(boxes=boxes,
@@ -363,6 +389,8 @@ class FrankaPartitionedWorld(FrankaWorld):
                                                  ts_state_lbls=possible_lbls,
                                                  dfa_state_vars=self.dfa_x_list,
                                                  ts_state_map=self.pred_int_map,
+                                                 sup_locs=self.sup_locs,
+                                                 top_locs=self.top_locs,
                                                  manager=self.manager)
         
         start: float = time.time()
@@ -509,13 +537,13 @@ class FrankaPartitionedWorld(FrankaWorld):
             
             if isinstance(self.ts_handle, BndDynamicFrankaTransitionSystem):
                 reachability_handle =  BndReachabilityGame(ts_handle=self.ts_handle,
-                                                        dfa_handle=self.dfa_handle,
-                                                        ts_curr_vars=self.ts_x_list,
-                                                        dfa_curr_vars=self.dfa_x_list,
-                                                        ts_obs_vars=self.ts_obs_list,
-                                                        sys_act_vars=self.ts_robot_vars,
-                                                        env_act_vars=self.ts_human_vars,
-                                                        cudd_manager=self.manager)
+                                                           dfa_handle=self.dfa_handle,
+                                                           ts_curr_vars=self.ts_x_list,
+                                                           dfa_curr_vars=self.dfa_x_list,
+                                                           ts_obs_vars=self.ts_obs_list,
+                                                           sys_act_vars=self.ts_robot_vars,
+                                                           env_act_vars=self.ts_human_vars,
+                                                           cudd_manager=self.manager)
             
             else:
                 reachability_handle =  ReachabilityGame(ts_handle=self.ts_handle,

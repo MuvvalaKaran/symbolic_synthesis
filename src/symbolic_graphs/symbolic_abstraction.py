@@ -3,13 +3,11 @@ import sys
 import copy
 import graphviz as gv
 
-from typing import Tuple, List, Dict
+from typing import Tuple, List
 from collections import defaultdict
 from functools import reduce
-from cudd import Cudd, BDD, ADD
+from cudd import Cudd, BDD
 from itertools import product
-
-from src.explicit_graphs import FiniteTransitionSystem
 
 from bidict import bidict
 

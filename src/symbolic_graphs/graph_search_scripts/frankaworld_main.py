@@ -7,8 +7,6 @@ import warnings
 
 from bidict import bidict
 from itertools import product
-from itertools import combinations
-from collections import defaultdict
 from typing import Tuple, List, Dict, Union
 
 from cudd import Cudd, BDD, ADD
@@ -37,6 +35,8 @@ class FrankaWorld(BaseSymMain):
                  formulas: Union[List, str],
                  manager: Cudd,
                  algorithm: str,
+                 sup_locs: List[str],
+                 top_locs: List[str],
                  weight_dict: dict = {},
                  ltlf_flag: bool = True,
                  dyn_var_ord: bool = False,
@@ -59,6 +59,10 @@ class FrankaWorld(BaseSymMain):
         # maps individual predicates to a unique int
         self.pred_int_map: bidict = bidict({})
         self.create_lbls: bool = create_lbls
+
+        # support and top locations referred during the Arch Abstarction construction
+        self.sup_locs = sup_locs
+        self.top_locs = top_locs
     
 
     def build_abstraction(self, draw_causal_graph: bool = False):

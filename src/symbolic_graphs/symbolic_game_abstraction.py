@@ -8,10 +8,8 @@ import graphviz as gv
 from functools import reduce
 from collections import defaultdict
 from itertools import product
-from typing import Tuple, List, Dict
-from cudd import Cudd, BDD, ADD
-
-from config import *
+from typing import Tuple, List
+from cudd import Cudd, BDD
 
 from bidict import bidict
 
@@ -34,6 +32,8 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
                  manager: Cudd,
                  ts_state_lbls: list,
                  dfa_state_vars: List[BDD],
+                 sup_locs: List[str],
+                 top_locs: List[str], 
                  **kwargs):
         self.state_lbls = ts_state_lbls
         self.sym_vars_human: List[BDD] = human_action_vars
@@ -54,6 +54,10 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
 
         self.state_cube = reduce(lambda x, y: x & y, self.sym_vars_curr)
         self.lbl_cube = reduce(lambda x, y: x & y, [lbl for sym_vars_list in self.sym_vars_lbl for lbl in sym_vars_list])
+
+        # adding support and top location. Useful during arch construction to chekc for valid human intervention.
+        self.sup_locs = sup_locs
+        self.top_locs = top_locs  
 
         # for safety remove variable deprecated vars from parent class
         del self.sym_vars_action
@@ -300,7 +304,7 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
         dloc = _loc_states[1]
 
         # human cannot move an object to TOP LOC
-        if dloc in TOP_LOC:
+        if dloc in self.top_locs:
             return False
 
         # if box1 is being manipulated, get the list of rest of boxes (that have to be grounded) at this instance
@@ -331,12 +335,12 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
         # check if the box is in support loc and has another box in top location, i.e,
         # if box1 is being manipulated, get the list of rest of boxes (that have to be grounded) at this instance
 
-        if _chloc in SUP_LOC:  # if the human move is from current loc
+        if _chloc in self.sup_locs:  # if the human move is from current loc
             tmp_copy = copy.deepcopy(boxes)
             tmp_copy.remove(_box_state)
 
             # create predicates that say on b0 l1 (l1 is the destination in the action)
-            on_preds = [self.pred_int_map[f'(on {bid} {tloc})'] for bid in tmp_copy for tloc in TOP_LOC]
+            on_preds = [self.pred_int_map[f'(on {bid} {tloc})'] for bid in tmp_copy for tloc in self.top_locs]
 
             # check if a box exists on "top" in the curr state lbl or after the completion of the robot action
             if set(on_preds).intersection(set(curr_state_lbl)):
@@ -345,7 +349,7 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
             # for Unbounded Abstraction
             if 'release' in kwargs.get('robot_action_name', ''):
                 _dloc: str = re.search(_loc_pattern, kwargs['robot_action_name']).group()
-                if _dloc in TOP_LOC:
+                if _dloc in self.top_locs:
                     return False
 
         return True
@@ -1011,13 +1015,9 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
 
                 # if verbose:
                 print(f"******************************* Layer: {layer}*******************************")
-
-                # get all the states and their corresponding remaining human intervention
-                # sta = time.time()
+               
                 sym_state = self._convert_state_lbl_cube_to_func(dd_func=open_list[layer], prod_curr_list=prod_curr_list)
-                # sto = time.time()
-                # print("Time spent computing the cubes: ", sto -sta)
-                # sta = time.time()
+                
                 for state in sym_state:
                     curr_state_tuple, curr_hint = self.get_state_tuple_from_sym_state(sym_state=state, sym_lbl_xcube_list=sym_lbl_xcube_list)
                     # create human edges
@@ -1054,9 +1054,6 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
                                             verbose=verbose,
                                             curr_hint=curr_hint,
                                             **kwargs)
-                    
-                # sto = time.time()
-                # print("Time spent costructing the Edges: ", sto -sta)
                 layer += 1
         
         if kwargs['print_tr'] is True:
