@@ -328,6 +328,13 @@ def roll_out_franka_strategy_nLTL(ts_handle: Union[SymbolicWeightedTransitionSys
 
     counter = 0
 
+    if not ADD_flag:
+        # for Franka world with no human, the labels are stored as a list of lists(different bVars for each box.) 
+        if isinstance(ts_handle, SymbolicFrankaTransitionSystem):
+            ts_obs_cube = reduce(lambda x, y: x & y,  [lbl for sym_vars_list in ts_handle.sym_vars_lbl for lbl in sym_vars_list])
+        else:
+            ts_obs_cube = reduce(lambda x, y: x & y, ts_handle.sym_vars_lbl)
+
     while not curr_dfa_state == monolithic_dfa_target:    
         # get the strategy
         if ADD_flag:
@@ -381,7 +388,7 @@ def roll_out_franka_strategy_nLTL(ts_handle: Union[SymbolicWeightedTransitionSys
             _nxt_dfa = _nxt_dfa.existAbstract(reduce(lambda x, y: x & y, ts_handle.sym_add_vars_lbl))
             _nxt_dfa = _nxt_dfa.bddPattern().toADD()
         else:
-            _nxt_dfa = _nxt_dfa.existAbstract(reduce(lambda x, y: x & y, ts_handle.sym_vars_lbl))
+            _nxt_dfa = _nxt_dfa.existAbstract(ts_obs_cube)
 
         # finally swap variables of TS and DFA 
         curr_ts_state_sym = _nxt_ts_state_sym

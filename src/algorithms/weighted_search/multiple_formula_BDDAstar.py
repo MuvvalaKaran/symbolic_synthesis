@@ -115,7 +115,7 @@ class MultipleFormulaBDDAstar(BaseSymbolicSearch):
         return composed_tr_list
     
 
-    def _compute_heurstic_functions(self, verbose: bool = False, print_h_vals: bool = False) -> Tuple[ADD, int]:
+    def _compute_heurstic_functions(self, verbose: bool = False, print_h_vals: bool = False) -> Tuple[List[ADD], int]:
         """
         A function that compute the heursitic value of each product states associated with each DFA in the list of formulas.
 
@@ -206,8 +206,10 @@ class MultipleFormulaBDDAstar(BaseSymbolicSearch):
 
         # sanity check
         if not state_vals.isZero():
-            check_val: int = int(list(state_vals.generate_cubes())[0][1])
-            assert check_val <= self.estimate_max, "Error while computing the heuristic for monolithic prod state. FIXTHIS!!!"
+            val = list(state_vals.generate_cubes())[0][1]
+            if val != inf:
+                check_val: int = int()
+                assert check_val <= self.estimate_max, "Error while computing the heuristic for monolithic prod state. FIX THIS!!!"
 
         if verbose:
             self._print_heuristic_add(state_vals=state_vals)
@@ -233,6 +235,8 @@ class MultipleFormulaBDDAstar(BaseSymbolicSearch):
 
         for cube, tmp_h_val in list(state_vals.generate_cubes()):
             if not accp_flag:
+                if tmp_h_val == inf:
+                    continue
                 inttmp_h_val = int(tmp_h_val)
             else:
                 inttmp_h_val = 0
