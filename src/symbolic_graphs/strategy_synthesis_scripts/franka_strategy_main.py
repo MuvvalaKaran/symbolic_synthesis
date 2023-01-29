@@ -3,6 +3,7 @@ import sys
 import time
 import warnings
 
+from bidict import bidict
 from collections import defaultdict
 from typing import Union, List, Tuple, Dict
 
@@ -199,6 +200,55 @@ class FrankaPartitionedWorld(FrankaWorld):
                 sys.exit(-1)
 
         return _org_to_mod_act
+    
+
+    def compute_valid_predicates(self, predicates: List[str], boxes: List[str]) -> Tuple[List, Dict]:
+        """
+        A helper function that segretaes the predicates as required by the symbolic transition relation. We separate them based on
+
+         1) all gripper predicates - we do not need to create prime version for these
+         2) all on predicates - we do need to create prime version for these
+         3) all holding predicates 
+         4) rest of the predicates - holding, ready, to-obj, and to-loc predicates. We do create prime version for these. 
+        """
+
+        predicate_dict = {
+            'ready_all': [],
+            'holding_all': [],
+            'to_obj_all': [],
+            'on': [],
+        }
+
+        # dictionary where we segreate on predicates based on boxes - all b0, b1 ,... into seperate list 
+        boxes_dict = {box: [] for box in boxes} 
+
+        for pred in predicates:
+            if 'on' in pred:
+                predicate_dict['on'].append(pred)
+                for b in boxes:
+                    if b in pred:
+                        boxes_dict[b].append(pred)
+                        break
+            else:
+                if 'holding' in pred:
+                    predicate_dict['holding_all'].append(pred)
+                if 'ready' in pred:
+                    predicate_dict['ready_all'].append(pred)
+                elif 'to-obj' in pred:
+                    predicate_dict['to_obj_all'].append(pred)
+        
+        # create predicate int map
+        _ind_pred_list = predicate_dict['ready_all'] + predicate_dict['holding_all'] + predicate_dict['to_obj_all']
+        _pred_map = {pred: num for num, pred in enumerate(_ind_pred_list)}
+        _pred_map = bidict(_pred_map)
+
+        # create on predicate map
+        len_robot_conf = len(_ind_pred_list)
+        _pred_map.update({pred: len_robot_conf + num for num, pred in enumerate(predicate_dict['on'])})
+        
+        self.pred_int_map = _pred_map
+
+        return _ind_pred_list, boxes_dict
 
 
     def create_symbolic_causal_graph(self, draw_causal_graph: bool = False, add_flag: bool = False, build_human_move: bool = False, print_facts: bool = False) -> Tuple:
