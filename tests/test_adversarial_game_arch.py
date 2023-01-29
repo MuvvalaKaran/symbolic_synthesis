@@ -4,10 +4,8 @@ import unittest
 from typing import List
 from cudd import Cudd, ADD
 
-from src.symbolic_graphs.strategy_synthesis_scripts import FrankaPartitionedWorld
 from src.algorithms.strategy_synthesis import AdversarialGame
 from src.symbolic_graphs.strategy_synthesis_scripts import FrankaPartitionedWorld
-
 
 # config flags 
 
@@ -27,14 +25,10 @@ SUP_LOC = ['l0', 'l1']   # support for Arch
 TOP_LOC = ['l2']    
 
 
-## RUN these scripts as modules python3 -m tests.test_adversarial_game -b
-# -m runs them as module and -b is suppress the prints within each function. Will still throw warning if the test(s) fail(s).
-
-
 class TestAdversarialGame(unittest.TestCase):
     def test_abstraction(self):
         """
-         Check all the tests related abstraction construction
+         Check all the tests related Arch abstraction construction
         """
         
         formulas = ['F(p00 & p12 & p21) & G(~(p00 & p21) -> ~(p12))']
@@ -95,7 +89,7 @@ class TestAdversarialGame(unittest.TestCase):
 
     def test_synthesis(self):
         """
-         Check all the tests related Quantitative strategy synthesis under quantitative constraints. 
+         Check all the tests related Arch Quantitative strategy synthesis under quantitative constraints. 
         """
         formulas = ['F(p00 & p12 & p21) & G(~(p00 & p21) -> ~(p12))']
 

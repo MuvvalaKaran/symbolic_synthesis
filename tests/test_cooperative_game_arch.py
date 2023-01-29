@@ -4,10 +4,8 @@ import unittest
 from typing import List
 from cudd import Cudd, ADD
 
-from src.symbolic_graphs.strategy_synthesis_scripts import FrankaPartitionedWorld
 from src.algorithms.strategy_synthesis import CooperativeGame
 from src.symbolic_graphs.strategy_synthesis_scripts import FrankaPartitionedWorld
-
 
 # config flags 
 
@@ -24,11 +22,7 @@ USE_LTLF: bool = True # Construct DFA from LTLf
 DYNAMIC_VAR_ORDERING: bool = False
 
 SUP_LOC = ['l0', 'l1']   # support for Arch
-TOP_LOC = ['l2']    
-
-
-## RUN these scripts as modules python3 -m tests.test_adversarial_game -b
-# -m runs them as module and -b is suppress the prints within each function. Will still throw warning if the test(s) fail(s).
+TOP_LOC = ['l2']         # top location for Arch
 
 
 class TestAdversarialGame(unittest.TestCase):

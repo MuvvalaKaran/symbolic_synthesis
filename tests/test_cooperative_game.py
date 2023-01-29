@@ -4,9 +4,9 @@ import unittest
 from typing import List
 from cudd import Cudd, ADD
 
-from src.symbolic_graphs.strategy_synthesis_scripts import FrankaPartitionedWorld
 from src.algorithms.strategy_synthesis import CooperativeGame
 from src.symbolic_graphs.strategy_synthesis_scripts import FrankaPartitionedWorld
+
 
 
 # config flags 
@@ -25,10 +25,6 @@ DYNAMIC_VAR_ORDERING: bool = False
 
 SUP_LOC = []
 TOP_LOC = []
-
-
-## RUN these scripts as modules python3 -m tests.test_adversarial_game -b
-# -m runs them as module and -b is suppress the prints within each function. Will still throw warning if the test(s) fail(s).
 
 
 class TestAdversarialGame(unittest.TestCase):

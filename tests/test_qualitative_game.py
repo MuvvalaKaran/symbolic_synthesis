@@ -4,9 +4,9 @@ import unittest
 from typing import List
 from cudd import Cudd, BDD
 
-from src.symbolic_graphs.strategy_synthesis_scripts import FrankaPartitionedWorld
 from src.algorithms.strategy_synthesis import ReachabilityGame
 from src.symbolic_graphs.strategy_synthesis_scripts import FrankaPartitionedWorld
+
 
 
 # config flags 
@@ -27,14 +27,10 @@ SUP_LOC = []
 TOP_LOC = []
 
 
-## RUN these scripts as modules python3 -m tests.test_adversarial_game -b
-# -m runs them as module and -b is suppress the prints within each function. Will still throw warning if the test(s) fail(s).
-
-
 class TestAdversarialGame(unittest.TestCase):
     def test_abstraction(self):
         """
-         Check all the tests related abstraction construction
+         Check all the tests related abstraction construction for Winning Strategy
         """
         # TEST for various formulas - THe formulas are the same as the Qunatitative games. 
         formulas = ['F(p00 & p11)', 
@@ -95,7 +91,7 @@ class TestAdversarialGame(unittest.TestCase):
 
     def test_synthesis(self):
         """
-         Check all the tests related Quantitative strategy synthesis under quantitative constraints. 
+         Check all the tests related winning strategy synthesis assuming human to be adversarial. 
         """
 
         # TEST for various formulas 
@@ -137,17 +133,17 @@ class TestAdversarialGame(unittest.TestCase):
                                                             plot=False)
             # build the abstraction
             frankapartition_handle.build_abstraction(dynamic_env=TWO_PLAYER_GAME,
-                                                    bnd_dynamic_env=TWO_PLAYER_GAME_BND,
-                                                    max_human_int=HUMAN_INT_BND)
+                                                     bnd_dynamic_env=TWO_PLAYER_GAME_BND,
+                                                     max_human_int=HUMAN_INT_BND)
             
             reachability_handle = ReachabilityGame(ts_handle=frankapartition_handle.ts_handle,
-                                             dfa_handle=frankapartition_handle.dfa_handle,
-                                             ts_curr_vars=frankapartition_handle.ts_x_list,
-                                             dfa_curr_vars=frankapartition_handle.dfa_x_list,
-                                             ts_obs_vars=frankapartition_handle.ts_obs_list,
-                                             sys_act_vars=frankapartition_handle.ts_robot_vars,
-                                             env_act_vars=frankapartition_handle.ts_human_vars,
-                                             cudd_manager=frankapartition_handle.manager)
+                                                   dfa_handle=frankapartition_handle.dfa_handle,
+                                                   ts_curr_vars=frankapartition_handle.ts_x_list,
+                                                   dfa_curr_vars=frankapartition_handle.dfa_x_list,
+                                                   ts_obs_vars=frankapartition_handle.ts_obs_list,
+                                                   sys_act_vars=frankapartition_handle.ts_robot_vars,
+                                                   env_act_vars=frankapartition_handle.ts_human_vars,
+                                                   cudd_manager=frankapartition_handle.manager)
 
             win_str: BDD = reachability_handle.solve(verbose=False)
 
@@ -161,6 +157,8 @@ class TestAdversarialGame(unittest.TestCase):
                 # this has to be done to ensure that the strategy synthesized does indeed reach the accepting state
                 reachability_handle.roll_out_strategy(transducer=win_str, verbose=False)
         
+            del reachability_handle.stra_list
+            del reachability_handle.winning_states
 
 
 if __name__ == "__main__":

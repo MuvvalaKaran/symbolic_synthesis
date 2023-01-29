@@ -4,9 +4,10 @@ import unittest
 from typing import List
 from cudd import Cudd, BDD
 
-from src.symbolic_graphs.strategy_synthesis_scripts import FrankaPartitionedWorld
 from src.algorithms.strategy_synthesis import ReachabilityGame
 from src.symbolic_graphs.strategy_synthesis_scripts import FrankaPartitionedWorld
+
+
 
 
 # config flags 
@@ -26,14 +27,11 @@ DYNAMIC_VAR_ORDERING: bool = False
 SUP_LOC = ['l0', 'l1']   # support for Arch
 TOP_LOC = ['l2']         # top location for Arch
 
-## RUN these scripts as modules python3 -m tests.test_adversarial_game -b
-# -m runs them as module and -b is suppress the prints within each function. Will still throw warning if the test(s) fail(s).
-
 
 class TestAdversarialGame(unittest.TestCase):
     def test_abstraction(self):
         """
-         Check all the tests related abstraction construction
+         Check all the tests related to Arch abstraction construction for Winning Strategy.
         """
         # TEST for various formulas
         formulas = ['F(p00 & p12 & p21) & G(~(p00 & p21) -> ~(p12))',  # all support location and boxes are fixed  
@@ -92,7 +90,7 @@ class TestAdversarialGame(unittest.TestCase):
 
     def test_synthesis(self):
         """
-         Check all the tests related Quantitative strategy synthesis under quantitative constraints. 
+         Check all the tests related Arch winning strategy synthesis assuming human to be adversarial. 
         """
 
         # TEST for various formulas 
@@ -154,6 +152,9 @@ class TestAdversarialGame(unittest.TestCase):
 
                 # this has to be done to ensure that the strategy synthesized does indeed reach the accepting state
                 reachability_handle.roll_out_strategy(transducer=win_str, verbose=False)
+
+            del reachability_handle.stra_list
+            del reachability_handle.winning_states
         
 
 
