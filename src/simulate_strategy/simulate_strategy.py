@@ -1,3 +1,4 @@
+import os
 import re
 import warnings
 import random
@@ -6,9 +7,11 @@ import src.gridworld_visualizer.gridworld_vis.gridworld as gridworld_handle
 import src.gridworld_visualizer.gridworld_vis.matplotlib_gw as policy_plotter
 
 from typing import List, Union
-from config import *
+
 from cudd import Cudd, BDD, ADD
 from functools import reduce
+
+from config import PROJECT_ROOT, GRID_WORLD_SIZE, OBSTACLE
 
 from src.algorithms.base.base_symbolic_search import BaseSymbolicSearch
 from src.symbolic_graphs import SymbolicDFA, SymbolicAddDFA, SymbolicDFAFranka
@@ -87,7 +90,7 @@ def get_dfa_evolution(dfa_handle, _nxt_ts_state, state_obs_dd, dfa_curr_vars, df
     return curr_dfa_state_tuple
 
 
-def create_gridworld(size: int, strategy: list, init_pos: tuple = (1, 1)):
+def create_gridworld(size: int, strategy: list, file_name: str = ' ', init_pos: tuple = (1, 1)):
     def tile2classes_obstacle(x, y):
         # draw horizontal block
         if (5 <= x <= 16) and (16 <= y <= 18):
@@ -103,7 +106,11 @@ def create_gridworld(size: int, strategy: list, init_pos: tuple = (1, 1)):
 
         return "normal"
 
-    file_name = PROJECT_ROOT + f'/plots/simulated_strategy.svg'
+    if file_name == ' ':
+        file_name = PROJECT_ROOT + '/plots/simulated_strategy.svg'
+    else:
+        assert 'svg' in file_name, "Please make sure the save strategy has .svg as file extension."
+        file_name = PROJECT_ROOT + f'/plots/{file_name}'
 
     if strategy is None:
         warnings.warn("Strategy is None. Unrolling Default strategy")
@@ -114,6 +121,9 @@ def create_gridworld(size: int, strategy: list, init_pos: tuple = (1, 1)):
         svg = gridworld_handle.gridworld(n=size, tile2classes=tile2classes_obstacle, actions=strategy, init_pos=init_pos)
     else:
         svg = gridworld_handle.gridworld(n=size, tile2classes=tile2classes, actions=strategy, init_pos=init_pos)
+    
+    assert os.path.isdir(PROJECT_ROOT + f'/plots') is True, "Please ensure that you have a folder `plots` in the project root to save simulated gridwork policy."
+
     svg.saveas(file_name, pretty=True)
 
 
