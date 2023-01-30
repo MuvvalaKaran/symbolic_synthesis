@@ -27,7 +27,7 @@ SUP_LOC = []
 TOP_LOC = []
 
 
-class TestCoopGameArch(unittest.TestCase):
+class TestCoopGame(unittest.TestCase):
     def test_abstraction(self):
         """
          Check all the tests related abstraction construction

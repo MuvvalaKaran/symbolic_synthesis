@@ -13,8 +13,8 @@ from functools import reduce
 
 from config import PROJECT_ROOT, GRID_WORLD_SIZE, OBSTACLE
 
-from src.algorithms.base.base_symbolic_search import BaseSymbolicSearch
-from src.symbolic_graphs import SymbolicDFA, SymbolicAddDFA, SymbolicDFAFranka
+
+from src.symbolic_graphs import SymbolicDFA, SymbolicAddDFA
 from src.symbolic_graphs import SymbolicTransitionSystem, SymbolicWeightedTransitionSystem, SymbolicFrankaTransitionSystem
 
 
@@ -23,20 +23,6 @@ PDDL_TO_GRIDWORLD_MAP = {'moveright': gridworld_handle.E,
                          'moveleft': gridworld_handle.W,
                          'moveup': gridworld_handle.N,
                          'movedown': gridworld_handle.S}
-
-
-def plot_policy(action_dict):
-    """
-    A function to plot the gridworld policy using my policy plotting code.
-    """
-    
-
-    plot_handle = policy_plotter.plotterClass(fig_title='gridworld_str')
-    plot_handle.plot_policy(width=GRID_WORLD_SIZE, height=GRID_WORLD_SIZE, sys_str=action_dict)
-    
-    file_name = PROJECT_ROOT + f'/plots/{plot_handle.fig_title}_N_{GRID_WORLD_SIZE}.png'
-    plot_handle.save_fig(file_name, dpi=500)
-    # plot_handle.close()
 
 
 def get_ADD_dfa_evolution(dfa_handle, _nxt_ts_state, state_obs_dd, dfa_curr_vars, dfa_next_vars, curr_dfa_state_tuple) -> tuple:

@@ -22,7 +22,7 @@ from src.algorithms.weighted_search import SymbolicDijkstraSearch, MultipleFormu
 from src.algorithms.weighted_search import SymbolicBDDAStar, MultipleFormulaBDDAstar
 
 from src.simulate_strategy import create_gridworld, \
-     convert_action_dict_to_gridworld_strategy, plot_policy, convert_action_dict_to_gridworld_strategy_nLTL
+     convert_action_dict_to_gridworld_strategy, convert_action_dict_to_gridworld_strategy_nLTL
 
 
 from .base_main import BaseSymMain
