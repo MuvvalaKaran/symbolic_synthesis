@@ -6,11 +6,11 @@ import sys
 from functools import reduce
 from cudd import Cudd, BDD
 
-from typing import List
+from typing import List, Union
 
 from src.algorithms.base import BaseSymbolicSearch
-from src.symbolic_graphs import SymbolicDFA, SymbolicTransitionSystem
-
+from src.symbolic_graphs import SymbolicDFA, SymbolicDFAFranka
+from src.symbolic_graphs import SymbolicTransitionSystem, SymbolicFrankaTransitionSystem
 
 class SymbolicSearch(BaseSymbolicSearch):
     """
@@ -21,8 +21,8 @@ class SymbolicSearch(BaseSymbolicSearch):
     """
 
     def __init__(self,
-                 ts_handle: SymbolicTransitionSystem,
-                 dfa_handle: SymbolicDFA,
+                 ts_handle: Union[SymbolicTransitionSystem, SymbolicFrankaTransitionSystem],
+                 dfa_handle: Union[SymbolicDFA, SymbolicDFAFranka],
                  ts_curr_vars: list,
                  ts_next_vars: list,
                  ts_obs_vars: list,
@@ -30,6 +30,7 @@ class SymbolicSearch(BaseSymbolicSearch):
                  dfa_next_vars: list,
                  cudd_manager: Cudd):
         super().__init__(ts_obs_vars, cudd_manager)
+        self.ts_handle = ts_handle
         self.init_TS = ts_handle.sym_init_states
         self.target_DFA = dfa_handle.sym_goal_state
         self.init_DFA = dfa_handle.sym_init_state
@@ -40,17 +41,21 @@ class SymbolicSearch(BaseSymbolicSearch):
         self.dfa_y_list = dfa_next_vars
         self.ts_transition_fun_list = ts_handle.sym_tr_actions
         self.dfa_transition_fun = dfa_handle.dfa_bdd_tr
-        self.ts_sym_to_curr_state_map: dict = ts_handle.predicate_sym_map_curr.inv
-        self.ts_sym_to_S2obs_map: dict = ts_handle.predicate_sym_map_lbl.inv
-        self.dfa_sym_to_curr_state_map: dict = dfa_handle.dfa_predicate_sym_map_curr.inv
-        self.dfa_sym_to_nxt_state_map: dict = dfa_handle.dfa_predicate_sym_map_nxt.inv
+        self.ts_bdd_sym_to_curr_state_map: dict = ts_handle.predicate_sym_map_curr.inv
+        self.ts_bdd_sym_to_S2obs_map: dict = ts_handle.predicate_sym_map_lbl.inv
+        self.dfa_bdd_sym_to_curr_state_map: dict = dfa_handle.dfa_predicate_sym_map_curr.inv
+        self.dfa_bdd_sym_to_nxt_state_map: dict = dfa_handle.dfa_predicate_sym_map_nxt.inv
         self.obs_bdd = ts_handle.sym_state_labels
         self.tr_action_idx_map = ts_handle.tr_action_idx_map
 
         # create corresponding cubes to avoid repetition
         self.ts_xcube = reduce(lambda x, y: x & y, self.ts_x_list)
         self.ts_ycube = reduce(lambda x, y: x & y, self.ts_y_list)
-        self.ts_obs_cube = reduce(lambda x, y: x & y, self.ts_obs_list)
+        
+        if isinstance(ts_handle, SymbolicFrankaTransitionSystem):
+            self.ts_obs_cube = reduce(lambda x, y: x & y, [lbl for sym_vars_list in self.ts_obs_list for lbl in sym_vars_list])
+        else:
+            self.ts_obs_cube = reduce(lambda x, y: x & y, self.ts_obs_list)
 
         self.dfa_xcube = reduce(lambda x, y: x & y, self.dfa_x_list)
         self.dfa_ycube = reduce(lambda x, y: x & y, self.dfa_y_list)
@@ -123,7 +128,7 @@ class SymbolicSearch(BaseSymbolicSearch):
                 prod_image_bdd_restricted = prod_image_bdd.existAbstract(self.ts_obs_cube)
                 
                 if verbose:
-                    self.get_states_from_dd(dd_func=prod_image_bdd, obs_flag=obs_flag)
+                    self.get_prod_states_from_dd(dd_func=prod_image_bdd, obs_flag=obs_flag)
                     
                 open_list.append(prod_image_bdd_restricted)
             
@@ -137,7 +142,7 @@ class SymbolicSearch(BaseSymbolicSearch):
 
         if verbose:
             print("********************The goal state encountered is***********************")
-            self.get_states_from_dd(dd_func=open_list[layer_num], obs_flag=obs_flag)
+            self.get_prod_states_from_dd(dd_func=open_list[layer_num], obs_flag=obs_flag)
 
         print(f"Found a plan with least cost length {layer_num}, Now retireving it!")
 

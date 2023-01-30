@@ -34,6 +34,8 @@ class DynWeightedPartitionedFrankaAbs():
                  seg_actions: dict,
                  ts_state_lbls: list,
                  dfa_state_vars: List[ADD],
+                 sup_locs: List[str],
+                 top_locs: List[str],
                  **kwargs):
         self.sym_vars_curr: List[ADD] = curr_vars
         self.sym_vars_lbl: List[ADD] = lbl_vars
@@ -76,6 +78,10 @@ class DynWeightedPartitionedFrankaAbs():
 
         self.state_cube = reduce(lambda x, y: x & y, self.sym_vars_curr)
         self.lbl_cube = reduce(lambda x, y: x & y, [lbl for sym_vars_list in self.sym_vars_lbl for lbl in sym_vars_list])
+
+        # adding support and top location. Useful during arch construction to chekc for valid human intervention.
+        self.sup_locs = sup_locs
+        self.top_locs = top_locs
 
 
     def _initialize_sym_init_goal_states(self):
@@ -353,7 +359,8 @@ class DynWeightedPartitionedFrankaAbs():
                                   human_action_name: str,
                                   robot_action_name: str, **kwargs) -> bool:
         """
-         Given the current human move check if the box being manipulated by the human is a support location or not. If yes, check if there is something in "top loc" or not.
+         Given the current human move check if the box being manipulated by the human is at a support location or not.
+          If yes, check if there is something in "top loc" or not.
         """
         _box_pattern = "[b|B][\d]+"
         _loc_pattern = "[l|L][\d]+"
@@ -362,12 +369,12 @@ class DynWeightedPartitionedFrankaAbs():
         # check if the box is in support loc and has another box in top location, i.e,
         # if box1 is being manipulated, get the list of rest of boxes (that have to be grounded) at this instance
 
-        if _chloc in SUP_LOC:  # if the human move is from current loc
+        if _chloc in self.sup_locs:  # if the human move is from current loc
             tmp_copy = copy.deepcopy(boxes)
             tmp_copy.remove(_box_state)
 
             # create predicates that say on b0 l1 (l1 is the destination in the action)
-            on_preds = [self.pred_int_map[f'(on {bid} {tloc})'] for bid in tmp_copy for tloc in TOP_LOC]
+            on_preds = [self.pred_int_map[f'(on {bid} {tloc})'] for bid in tmp_copy for tloc in self.top_locs]
 
             # check if a box exists on "top" in the curr state lbl or after the completion of the robot action
             if set(on_preds).intersection(set(curr_state_lbl)):
@@ -376,7 +383,7 @@ class DynWeightedPartitionedFrankaAbs():
             # for Unbounded Abstraction
             if 'release' in robot_action_name:
                 _dloc: str = re.search(_loc_pattern, robot_action_name).group()
-                if _dloc in TOP_LOC:
+                if _dloc in self.top_locs:
                     return False
 
         return True
@@ -393,7 +400,7 @@ class DynWeightedPartitionedFrankaAbs():
         dloc = _loc_states[1]
 
         # human cannot move an object to TOP LOC
-        if dloc in TOP_LOC:
+        if dloc in self.top_locs:
             return False
 
         # if box1 is being manipulated, get the list of rest of boxes (that have to be grounded) at this instance

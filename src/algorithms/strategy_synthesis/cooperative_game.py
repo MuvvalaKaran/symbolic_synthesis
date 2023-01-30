@@ -82,6 +82,8 @@ class CooperativeGame(AdversarialGame):
                     return tmp_strategy
                 else:
                     print("No Winning Strategy Exists!!!")
+                    # need to delete this dict that holds cudd object to avoid segfaults after exiting python code
+                    del self.winning_states
                     return
             
             print(f"**************************Layer: {layer}**************************")
@@ -184,18 +186,18 @@ class CooperativeGame(AdversarialGame):
             act_cube: ADD = curr_state_act_cubes.bddInterval(curr_prod_state_sval, curr_prod_state_sval).toADD()
 
             # if there are multuple human edges then do not intervene else follow the unambiguous human action from the strategy
-            sys_act_sube = act_cube.bddPattern().existAbstract(self.env_cube.bddPattern()).toADD()
-            list_act_cube = self.convert_add_cube_to_func(sys_act_sube, curr_state_list=self.sys_act_vars)
+            sys_act_cube = act_cube.bddPattern().existAbstract(self.env_cube.bddPattern()).toADD()
+            list_act_cube = self.convert_add_cube_to_func(sys_act_cube, curr_state_list=self.sys_act_vars)
 
             # if multiple winning actions exisit from same state
             if len(list_act_cube) > 1:
                 ract_name = None
                 while ract_name is None:
-                    sys_act_sube: List[int] = random.choice(list_act_cube)
-                    ract_name = self.ts_sym_to_robot_act_map.get(sys_act_sube, None)
+                    sys_act_cube: List[int] = random.choice(list_act_cube)
+                    ract_name = self.ts_sym_to_robot_act_map.get(sys_act_cube, None)
 
             else:
-                ract_name = self.ts_sym_to_robot_act_map[sys_act_sube]
+                ract_name = self.ts_sym_to_robot_act_map[sys_act_cube]
 
             if verbose:
                 print(f"Step {counter}: Conf: {self.ts_handle.get_state_from_tuple(curr_ts_tuple)} Act: {ract_name}")
@@ -206,13 +208,28 @@ class CooperativeGame(AdversarialGame):
 
             # for a given (s, a_s) there should be exaclty one human action (a_e). 
             # If you encounter multiple then that corresponds to no-human intervention
-            curr_state_human_act_cubes: ADD = strategy.restrict(curr_prod_state & sys_act_sube)
+            curr_state_human_act_cubes: ADD = strategy.restrict(curr_prod_state & sys_act_cube)
+            print(f"{counter}: State value: {curr_prod_state_sval}")
             human_act_cube: ADD = curr_state_human_act_cubes.bddInterval(curr_prod_state_sval, curr_prod_state_sval).toADD()
-
+            # print(human_act_cube.display())
             human_list_act_cube = self.convert_add_cube_to_func(human_act_cube, curr_state_list=self.env_act_vars)
 
+            # This logic does not work for Cooperative games - just check the state value during roll out
             if len(human_list_act_cube) > 1:
-                pass
+                for env_act_cube in human_list_act_cube:
+                    full_state_act_cube = strategy.restrict(curr_prod_state & sys_act_cube & env_act_cube)
+                    
+                    if full_state_act_cube.findMin() == self.manager.addConst(opt_sval_cube[1]):
+                        hact_name = self.ts_sym_to_human_act_map.get(env_act_cube, ' ')
+                        # check is this robot action exisits from (s, a_s) in the adj dictionary
+                        if self.ts_handle.adj_map.get(curr_ts_tuple, {}).get(ract_name, {}).get(hact_name):
+                            next_exp_states = self.ts_handle.adj_map[curr_ts_tuple][ract_name][hact_name]
+                            next_tuple = self.ts_handle.get_tuple_from_state(next_exp_states)
+                            
+                            if verbose:
+                                print(f"Human Moved: New Conf.: {self.ts_handle.get_state_from_tuple(next_tuple)} Act: {hact_name}")
+                            
+                            break
             else:
                 hact_name = self.ts_sym_to_human_act_map[human_act_cube]
                 # look up the next tuple - could fail if the no-intervention edge is an unambiguous one.  

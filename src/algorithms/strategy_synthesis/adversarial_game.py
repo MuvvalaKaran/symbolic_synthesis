@@ -333,12 +333,14 @@ class AdversarialGame(BaseSymbolicSearch):
             if self.winning_states[layer].compare(self.winning_states[layer - 1], 2):
                 print(f"**************************Reached a Fixed Point in {layer} layers**************************")
                 init_state_cube = list(((self.init_TS & self.init_DFA) & self.winning_states[layer]).generate_cubes())[0]
-                init_val = init_state_cube[1]
+                init_val: int = init_state_cube[1]
                 if init_val != math.inf:
                     print(f"A Winning Strategy Exists!!. The Min Energy is {init_val}")
                     return strategy
                 else:
                     print("No Winning Strategy Exists!!!")
+                    # need to delete this dict that holds cudd object to avoid segfaults after exiting python code
+                    del self.winning_states
                     return
             
             print(f"**************************Layer: {layer}**************************")
@@ -418,7 +420,7 @@ class AdversarialGame(BaseSymbolicSearch):
         curr_dfa_state = self.init_DFA
         curr_prod_state = self.init_TS & curr_dfa_state
         counter = 0
-        max_layer: input = max(self.winning_states.keys())
+        max_layer: int = max(self.winning_states.keys())
         ract_name: str = ''
 
         sym_lbl_cubes = self._create_lbl_cubes()

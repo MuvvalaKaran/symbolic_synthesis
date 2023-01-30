@@ -1,9 +1,9 @@
 import re
 import sys
-import copy
 import time
 import warnings
 
+from bidict import bidict
 from collections import defaultdict
 from typing import Union, List, Tuple, Dict
 
@@ -31,6 +31,8 @@ class FrankaPartitionedWorld(FrankaWorld):
                  formulas: Union[List, str],
                  manager: Cudd,
                  algorithm: str,
+                 sup_locs: List[str],
+                 top_locs: List[str],
                  weight_dict: dict = {},
                  ltlf_flag: bool = True,
                  dyn_var_ord: bool = False,
@@ -40,8 +42,24 @@ class FrankaPartitionedWorld(FrankaWorld):
                  plot_dfa: bool = False,
                  plot: bool = False,
                  create_lbls: bool = True):
-        super().__init__(domain_file, problem_file, formulas, manager, algorithm, weight_dict, ltlf_flag, dyn_var_ord, verbose, plot_ts, plot_obs, plot_dfa, plot, create_lbls)
+        super().__init__(domain_file=domain_file,
+                         problem_file=problem_file,
+                         formulas=formulas,
+                         manager=manager,
+                         algorithm=algorithm,
+                         sup_locs=sup_locs,
+                         top_locs=top_locs,
+                         weight_dict=weight_dict,
+                         ltlf_flag=ltlf_flag,
+                         dyn_var_ord=dyn_var_ord,
+                         verbose=verbose,
+                         plot_ts=plot_ts,
+                         plot_obs=plot_obs,
+                         plot_dfa=plot_dfa,
+                         plot=plot,
+                         create_lbls=create_lbls)
 
+    
     def build_abstraction(self, draw_causal_graph: bool = False, dynamic_env: bool = False, bnd_dynamic_env: bool = False, max_human_int: int = 0):
         """
          A main function that construct a symbolic Franka World TS and its corresponsing DFA
@@ -182,6 +200,55 @@ class FrankaPartitionedWorld(FrankaWorld):
                 sys.exit(-1)
 
         return _org_to_mod_act
+    
+
+    def compute_valid_predicates(self, predicates: List[str], boxes: List[str]) -> Tuple[List, Dict]:
+        """
+        A helper function that segretaes the predicates as required by the symbolic transition relation. We separate them based on
+
+         1) all gripper predicates - we do not need to create prime version for these
+         2) all on predicates - we do need to create prime version for these
+         3) all holding predicates 
+         4) rest of the predicates - holding, ready, to-obj, and to-loc predicates. We do create prime version for these. 
+        """
+
+        predicate_dict = {
+            'ready_all': [],
+            'holding_all': [],
+            'to_obj_all': [],
+            'on': [],
+        }
+
+        # dictionary where we segreate on predicates based on boxes - all b0, b1 ,... into seperate list 
+        boxes_dict = {box: [] for box in boxes} 
+
+        for pred in predicates:
+            if 'on' in pred:
+                predicate_dict['on'].append(pred)
+                for b in boxes:
+                    if b in pred:
+                        boxes_dict[b].append(pred)
+                        break
+            else:
+                if 'holding' in pred:
+                    predicate_dict['holding_all'].append(pred)
+                if 'ready' in pred:
+                    predicate_dict['ready_all'].append(pred)
+                elif 'to-obj' in pred:
+                    predicate_dict['to_obj_all'].append(pred)
+        
+        # create predicate int map
+        _ind_pred_list = predicate_dict['ready_all'] + predicate_dict['holding_all'] + predicate_dict['to_obj_all']
+        _pred_map = {pred: num for num, pred in enumerate(_ind_pred_list)}
+        _pred_map = bidict(_pred_map)
+
+        # create on predicate map
+        len_robot_conf = len(_ind_pred_list)
+        _pred_map.update({pred: len_robot_conf + num for num, pred in enumerate(predicate_dict['on'])})
+        
+        self.pred_int_map = _pred_map
+
+        return _ind_pred_list, boxes_dict
 
 
     def create_symbolic_causal_graph(self, draw_causal_graph: bool = False, add_flag: bool = False, build_human_move: bool = False, print_facts: bool = False) -> Tuple:
@@ -200,6 +267,13 @@ class FrankaPartitionedWorld(FrankaWorld):
 
         # compute all valid preds of the robot conf and box conf.
         robot_preds, box_preds = self.compute_valid_predicates(predicates=task_facts, boxes=boxes)
+
+        # throw warning if there is exactly one human (hbox) location
+        if len(_causal_graph_instance.task_intervening_locations) <= 1:
+            warnings.warn("If you do not want human interventions then have only 1 hbox loc. \
+        Ensure you have atleast two hbox locs for human intervention (edges) to exists.")
+            if len(_causal_graph_instance.task_intervening_locations) == 0:
+                sys.exit(-1)
         
         # segregate actions in robot actions (controllable vars - `o`) and humans moves (uncontrollable vars - `i`)
         if build_human_move:
@@ -311,7 +385,9 @@ class FrankaPartitionedWorld(FrankaWorld):
                                                dfa_state_vars=self.dfa_x_list,
                                                ts_state_map=self.pred_int_map,
                                                manager=self.manager,
-                                               modified_actions=modified_actions)
+                                               modified_actions=modified_actions,
+                                               sup_locs=self.sup_locs,
+                                               top_locs=self.top_locs)
         
         start: float = time.time()
         sym_tr.create_transition_system_franka(boxes=boxes,
@@ -363,6 +439,8 @@ class FrankaPartitionedWorld(FrankaWorld):
                                                  ts_state_lbls=possible_lbls,
                                                  dfa_state_vars=self.dfa_x_list,
                                                  ts_state_map=self.pred_int_map,
+                                                 sup_locs=self.sup_locs,
+                                                 top_locs=self.top_locs,
                                                  manager=self.manager)
         
         start: float = time.time()
@@ -414,6 +492,8 @@ class FrankaPartitionedWorld(FrankaWorld):
                                                   ts_state_lbls=possible_lbls,
                                                   dfa_state_vars=self.dfa_x_list,
                                                   manager=self.manager,
+                                                  sup_locs=self.sup_locs,
+                                                  top_locs=self.top_locs,
                                                   modified_actions=modified_actions)
         
         start: float = time.time()
@@ -509,13 +589,13 @@ class FrankaPartitionedWorld(FrankaWorld):
             
             if isinstance(self.ts_handle, BndDynamicFrankaTransitionSystem):
                 reachability_handle =  BndReachabilityGame(ts_handle=self.ts_handle,
-                                                        dfa_handle=self.dfa_handle,
-                                                        ts_curr_vars=self.ts_x_list,
-                                                        dfa_curr_vars=self.dfa_x_list,
-                                                        ts_obs_vars=self.ts_obs_list,
-                                                        sys_act_vars=self.ts_robot_vars,
-                                                        env_act_vars=self.ts_human_vars,
-                                                        cudd_manager=self.manager)
+                                                           dfa_handle=self.dfa_handle,
+                                                           ts_curr_vars=self.ts_x_list,
+                                                           dfa_curr_vars=self.dfa_x_list,
+                                                           ts_obs_vars=self.ts_obs_list,
+                                                           sys_act_vars=self.ts_robot_vars,
+                                                           env_act_vars=self.ts_human_vars,
+                                                           cudd_manager=self.manager)
             
             else:
                 reachability_handle =  ReachabilityGame(ts_handle=self.ts_handle,

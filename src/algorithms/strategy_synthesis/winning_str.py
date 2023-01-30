@@ -82,6 +82,8 @@ class ReachabilityGame(BaseSymbolicSearch):
         # sys and env cube
         self.sys_env_cube = reduce(lambda x, y: x & y, [*self.sys_act_vars, *self.env_act_vars])
 
+        self.stra_list = defaultdict(lambda: self.manager.bddZero())
+
         # for bounded Game abstraction with addition boolean vars for # remaining human interventions
         if isinstance(self.ts_handle, BndDynamicFrankaTransitionSystem):
             self.max_hint: int = self.ts_handle.max_hint - 1
@@ -304,12 +306,12 @@ class ReachabilityGame(BaseSymbolicSearch):
          This function compute the set of winning states and winnign strategies. 
         """
 
-        stra_list = defaultdict(lambda: self.manager.bddZero())
+        
         closed = self.manager.bddZero()  # BDD to keep track of winning states explore till now
 
         layer: int = 0
 
-        stra_list[layer] = self.winning_states[layer]
+        self.stra_list[layer] = self.winning_states[layer]
         if verbose:
             closed |= self.winning_states[layer]
         
@@ -324,12 +326,12 @@ class ReachabilityGame(BaseSymbolicSearch):
         sym_lbl_cubes = self._create_lbl_cubes()
 
         while True:
-            if layer > 0 and stra_list[layer].compare(stra_list[layer - 1], 2):
+            if layer > 0 and self.stra_list[layer].compare(self.stra_list[layer - 1], 2):
                 print(f"**************************Reached a Fixed Point in {layer} layers**************************")
-                if not ((self.init_TS & self.init_DFA) & stra_list[layer]).isZero():
+                if not ((self.init_TS & self.init_DFA) & self.stra_list[layer]).isZero():
                     print("A Winning Strategy Exists!!")
 
-                    return stra_list[layer]
+                    return self.stra_list[layer]
                 else:
                     print("No Winning Strategy Exists!!!")
                     return
@@ -343,10 +345,10 @@ class ReachabilityGame(BaseSymbolicSearch):
             pre_univ = (pre_prod_state).univAbstract(self.env_cube)
 
             # remove self loops
-            stra_list[layer + 1] |= stra_list[layer] | (~self.winning_states[layer] & pre_univ)
+            self.stra_list[layer + 1] |= self.stra_list[layer] | (~self.winning_states[layer] & pre_univ)
             
             # if init state is reached
-            if not ((self.init_TS & self.init_DFA) & stra_list[layer + 1]).isZero():
+            if not ((self.init_TS & self.init_DFA) & self.stra_list[layer + 1]).isZero():
                 print(f"************************** Reached the Initial State at layer: {layer + 1} **************************")
                 print("A Winning Strategy Exists!!")
 
@@ -357,10 +359,10 @@ class ReachabilityGame(BaseSymbolicSearch):
                     self.get_prod_states_from_dd(dd_func=new_states, sym_lbl_cubes=sym_lbl_cubes, prod_curr_list=prod_curr_list)
 
                     closed |= pre_univ.existAbstract(self.sys_env_cube)# & self.ts_obs_cube)
-                return stra_list[layer + 1]
+                return self.stra_list[layer + 1]
 
             # do existentail quantification
-            self.winning_states[layer + 1] |=  stra_list[layer + 1].existAbstract(self.sys_cube)
+            self.winning_states[layer + 1] |=  self.stra_list[layer + 1].existAbstract(self.sys_cube)
 
             # print new winning states in each iteration
             if verbose:

@@ -6,7 +6,8 @@ from functools import reduce
 
 from cudd import Cudd, BDD, ADD
 from src.algorithms.base import BaseSymbolicSearch
-from src.symbolic_graphs import SymbolicTransitionSystem, SymbolicDFA
+from src.symbolic_graphs import SymbolicDFA, SymbolicDFAFranka
+from src.symbolic_graphs import SymbolicTransitionSystem, SymbolicFrankaTransitionSystem
 
 
 class MultipleFormulaBFS(BaseSymbolicSearch):
@@ -18,8 +19,8 @@ class MultipleFormulaBFS(BaseSymbolicSearch):
     """
 
     def __init__(self,
-                 ts_handle: SymbolicTransitionSystem,
-                 dfa_handles: List[SymbolicDFA],
+                 ts_handle: Union[SymbolicTransitionSystem, SymbolicFrankaTransitionSystem],
+                 dfa_handles: List[Union[SymbolicDFA, SymbolicDFAFranka]],
                  ts_curr_vars: List[BDD],
                  ts_next_vars: List[BDD],
                  dfa_curr_vars: List[BDD],
@@ -54,7 +55,11 @@ class MultipleFormulaBFS(BaseSymbolicSearch):
         # create corresponding cubes to avoid repetition
         self.ts_xcube = reduce(lambda x, y: x & y, self.ts_x_list)
         self.ts_ycube = reduce(lambda x, y: x & y, self.ts_y_list)
-        self.ts_obs_cube = reduce(lambda x, y: x & y, self.ts_obs_list)
+
+        if isinstance(ts_handle, SymbolicFrankaTransitionSystem):
+            self.ts_obs_cube = reduce(lambda x, y: x & y, [lbl for sym_vars_list in self.ts_obs_list for lbl in sym_vars_list])
+        else:
+            self.ts_obs_cube = reduce(lambda x, y: x & y, self.ts_obs_list)
 
         self.dfa_xcube = reduce(lambda x, y: x & y, self.dfa_x_list)
         self.dfa_ycube = reduce(lambda x, y: x & y, self.dfa_y_list)

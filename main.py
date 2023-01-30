@@ -68,13 +68,11 @@ if __name__ == "__main__":
         else:
             algo = 'bfs'
         
-        # grid world dictionary
         wgt_dict = {
             "transit" : 1,
             "grasp"   : 2,
             "transfer": 3,
             "release" : 4,
-            
             }
 
         # frankaworld stuff
@@ -82,6 +80,8 @@ if __name__ == "__main__":
                                          problem_file=problem_file_path,
                                          formulas=formulas,
                                          manager=cudd_manager,
+                                         sup_locs=SUP_LOC,
+                                         top_locs=TOP_LOC,
                                          weight_dict=wgt_dict,
                                          ltlf_flag=USE_LTLF,
                                          dyn_var_ord=DYNAMIC_VAR_ORDERING,
@@ -93,6 +93,7 @@ if __name__ == "__main__":
 
         # build the abstraction
         frankaworld_handle.build_abstraction()
+        # sys.exit(-1)
         print("No. of Boolean Variables in the memory:", cudd_manager.size())
         policy: dict = frankaworld_handle.solve(verbose=False)
         frankaworld_handle.simulate(action_dict=policy, print_strategy=True)
@@ -129,6 +130,8 @@ if __name__ == "__main__":
                                                         problem_file=problem_file_path,
                                                         formulas=formulas,
                                                         manager=cudd_manager,
+                                                        sup_locs=SUP_LOC,
+                                                        top_locs=TOP_LOC,
                                                         weight_dict=wgt_dict,
                                                         ltlf_flag=USE_LTLF,
                                                         dyn_var_ord=DYNAMIC_VAR_ORDERING,
@@ -155,9 +158,9 @@ if __name__ == "__main__":
         print(f"****************** # Total Boolean Variables: { cudd_manager.size()} ******************")
         frankapartition_handle.solve(verbose=False)
 
-        # convert bytes to MegaBytes and print the Memory usage
-        print(f"Memory in use (MB): {cudd_manager.readMemoryInUse()/(10**6)}")
-
-
     else:
         warnings.warn("Please set atleast one flag to True - FRANKAWORLD or GRIDWORLD!")
+        sys.exit(-1)
+    
+    # convert bytes to MegaBytes and print the Memory usage
+    print(f"Memory in use (MB): {cudd_manager.readMemoryInUse()/(10**6)}")

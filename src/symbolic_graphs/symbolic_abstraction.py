@@ -3,13 +3,11 @@ import sys
 import copy
 import graphviz as gv
 
-from typing import Tuple, List, Dict
+from typing import Tuple, List
 from collections import defaultdict
 from functools import reduce
-from cudd import Cudd, BDD, ADD
+from cudd import Cudd, BDD
 from itertools import product
-
-from src.explicit_graphs import FiniteTransitionSystem
 
 from bidict import bidict
 
@@ -378,14 +376,15 @@ class SymbolicFrankaTransitionSystem():
         """
         preds = self.get_state_from_tuple(state_tuple=state_tuple)
 
+        # for Franka world with no human, we have additionals gripper free predicate. Thus, we need to check for it too!
         _int_tuple = []
         for pred in preds:
             if only_world_conf:
-                if 'on' in pred:
+                if 'on' in pred or ('gripper' in pred):
                     _int_tuple.append(self.pred_int_map[pred])
 
             elif only_robot_conf:
-                if 'on' not in pred:
+                if not(('on' in pred) or ('gripper' in pred)):
                     _int_tuple.append(self.pred_int_map[pred])
         
         return tuple(sorted(_int_tuple))
@@ -405,7 +404,7 @@ class SymbolicFrankaTransitionSystem():
                 _sym_lbls_list.append(self.predicate_sym_map_lbl[lbl])
             else:
                 _sym_lbls_list.append(self.predicate_sym_map_curr[lbl])
-        
+
         sym_lbl = reduce(lambda x, y: x & y, _sym_lbls_list)
 
         assert not sym_lbl.isZero(), "Error constructing the symbolic lbl associated with each state. FIX THIS!!!"
@@ -442,6 +441,13 @@ class SymbolicFrankaTransitionSystem():
 
         _sym_lbls_list = [self.predicate_sym_map_lbl[lbl] for lbl in exp_lbls]
         
+        # for Franka world with no human, we have additionals gripper free predicate
+        # if gripper is not free then explicitly add not(gripper free) to the state lbl
+        if '(gripper free)' in self.pred_int_map:
+            if '(gripper free)' not in exp_lbls:
+                _sym_lbls_list.append(~self.predicate_sym_map_lbl['(gripper free)'])
+
+
         sym_lbl = reduce(lambda x, y: x & y, _sym_lbls_list)
 
         assert not sym_lbl.isZero(), "Error constructing the symbolic lbl associated with each state. FIX THIS!!!"
@@ -477,9 +483,12 @@ class SymbolicFrankaTransitionSystem():
         
         # loop over each box and create its corresponding boolean formula 
         for b_id, preds in domain_lbls.items():
-            # get its corresponding boolean vars
-            _id: int = int(re.search("\d+", b_id).group())
-            _tmp_vars_list = self.sym_vars_lbl[_id]
+             # get its corresponding boolean vars
+            if b_id == 'gripper':
+                _tmp_vars_list = self.sym_vars_lbl[-1]
+            else:
+                _id: int = int(re.search("\d+", b_id).group())
+                _tmp_vars_list = self.sym_vars_lbl[_id]
 
             # TODO: When the boxes are out of sequence, say only b0 abd b2 exists, this for loop fails. FIX THIS!!!
             # create all combinations of 1-true and 0-false

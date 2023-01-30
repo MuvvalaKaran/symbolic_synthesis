@@ -22,7 +22,7 @@ from src.algorithms.weighted_search import SymbolicDijkstraSearch, MultipleFormu
 from src.algorithms.weighted_search import SymbolicBDDAStar, MultipleFormulaBDDAstar
 
 from src.simulate_strategy import create_gridworld, \
-     convert_action_dict_to_gridworld_strategy, plot_policy, convert_action_dict_to_gridworld_strategy_nLTL
+     convert_action_dict_to_gridworld_strategy, convert_action_dict_to_gridworld_strategy_nLTL
 
 
 from .base_main import BaseSymMain
@@ -103,7 +103,7 @@ class SimpleGridWorld(BaseSymMain):
     def build_abstraction(self):
         if self.algorithm in ['dijkstras','astar']:
             
-            if len(self.weight_dict.keys()) == 0:
+            if self.weight_dict is None or len(self.weight_dict.keys()) == 0:
                 warnings.warn("Please enter the weights associated with gridworld transitions. The actions for Gridworld are 'moveleft', 'moveright', 'moveup', 'movedown'")
                 sys.exit(-1)
 
@@ -120,6 +120,7 @@ class SimpleGridWorld(BaseSymMain):
 
         else:
             warnings.warn("Please enter a valid graph search algorthim. Currently Available - bfs (BDD), dijkstras (BDD/ADD), astar (BDD/ADD)")
+            sys.exit(-1)
         
 
         self.ts_handle: Union[SymbolicTransitionSystem, SymbolicWeightedTransitionSystem] = sym_tr
@@ -240,7 +241,7 @@ class SimpleGridWorld(BaseSymMain):
         return action_dict
     
 
-    def simulate(self, action_dict: dict,  gridworld_size: int, init_pos: tuple = (0, 0)):
+    def simulate(self, action_dict: dict,  gridworld_size: int, file_name: str = ' ', init_pos: tuple = (0, 0)):
         """
         A function to simulate the synthesize policy for the gridworld agent.
         """
@@ -271,7 +272,7 @@ class SimpleGridWorld(BaseSymMain):
                                                                                     dfa_next_vars=dfa_next_vars)
 
 
-                create_gridworld(size=gridworld_size, strategy=gridworld_strategy, init_pos=init_pos)
+                create_gridworld(size=gridworld_size, strategy=gridworld_strategy, init_pos=init_pos, file_name=file_name)
             
             else:
                 # plot_policy(action_dict)
@@ -289,7 +290,7 @@ class SimpleGridWorld(BaseSymMain):
                                                                                     dfa_curr_vars=dfa_curr_vars,
                                                                                     dfa_next_vars=dfa_next_vars)
 
-                create_gridworld(size=gridworld_size, strategy=gridworld_strategy, init_pos=init_pos)
+                create_gridworld(size=gridworld_size, strategy=gridworld_strategy, init_pos=init_pos, file_name=file_name)
         else:
             dfa_handle = self.dfa_handle_list[0]
 
@@ -307,7 +308,7 @@ class SimpleGridWorld(BaseSymMain):
                                                                                dfa_curr_vars=dfa_curr_vars,
                                                                                dfa_next_vars=dfa_next_vars)
 
-                create_gridworld(size=gridworld_size, strategy=gridworld_strategy, init_pos=init_pos)
+                create_gridworld(size=gridworld_size, strategy=gridworld_strategy, init_pos=init_pos, file_name=file_name)
 
             else:
                 init_state_ts = ts_handle.sym_init_states
@@ -323,7 +324,7 @@ class SimpleGridWorld(BaseSymMain):
                                                                                dfa_curr_vars=dfa_curr_vars,
                                                                                dfa_next_vars=dfa_next_vars)
 
-                create_gridworld(size=gridworld_size, strategy=gridworld_strategy, init_pos=init_pos)
+                create_gridworld(size=gridworld_size, strategy=gridworld_strategy, init_pos=init_pos, file_name=file_name)
 
 
 

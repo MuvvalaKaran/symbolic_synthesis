@@ -1,3 +1,4 @@
+import os
 import re
 import warnings
 import random
@@ -6,12 +7,14 @@ import src.gridworld_visualizer.gridworld_vis.gridworld as gridworld_handle
 import src.gridworld_visualizer.gridworld_vis.matplotlib_gw as policy_plotter
 
 from typing import List, Union
-from config import *
+
 from cudd import Cudd, BDD, ADD
 from functools import reduce
 
-from src.algorithms.base.base_symbolic_search import BaseSymbolicSearch
-from src.symbolic_graphs import SymbolicDFA, SymbolicAddDFA, SymbolicDFAFranka
+from config import PROJECT_ROOT, GRID_WORLD_SIZE, OBSTACLE
+
+
+from src.symbolic_graphs import SymbolicDFA, SymbolicAddDFA
 from src.symbolic_graphs import SymbolicTransitionSystem, SymbolicWeightedTransitionSystem, SymbolicFrankaTransitionSystem
 
 
@@ -20,20 +23,6 @@ PDDL_TO_GRIDWORLD_MAP = {'moveright': gridworld_handle.E,
                          'moveleft': gridworld_handle.W,
                          'moveup': gridworld_handle.N,
                          'movedown': gridworld_handle.S}
-
-
-def plot_policy(action_dict):
-    """
-    A function to plot the gridworld policy using my policy plotting code.
-    """
-    
-
-    plot_handle = policy_plotter.plotterClass(fig_title='gridworld_str')
-    plot_handle.plot_policy(width=GRID_WORLD_SIZE, height=GRID_WORLD_SIZE, sys_str=action_dict)
-    
-    file_name = PROJECT_ROOT + f'/plots/{plot_handle.fig_title}_N_{GRID_WORLD_SIZE}.png'
-    plot_handle.save_fig(file_name, dpi=500)
-    # plot_handle.close()
 
 
 def get_ADD_dfa_evolution(dfa_handle, _nxt_ts_state, state_obs_dd, dfa_curr_vars, dfa_next_vars, curr_dfa_state_tuple) -> tuple:
@@ -87,7 +76,7 @@ def get_dfa_evolution(dfa_handle, _nxt_ts_state, state_obs_dd, dfa_curr_vars, df
     return curr_dfa_state_tuple
 
 
-def create_gridworld(size: int, strategy: list, init_pos: tuple = (1, 1)):
+def create_gridworld(size: int, strategy: list, file_name: str = ' ', init_pos: tuple = (1, 1)):
     def tile2classes_obstacle(x, y):
         # draw horizontal block
         if (5 <= x <= 16) and (16 <= y <= 18):
@@ -103,7 +92,11 @@ def create_gridworld(size: int, strategy: list, init_pos: tuple = (1, 1)):
 
         return "normal"
 
-    file_name = PROJECT_ROOT + f'/plots/simulated_strategy.svg'
+    if file_name == ' ':
+        file_name = PROJECT_ROOT + '/plots/simulated_strategy.svg'
+    else:
+        assert 'svg' in file_name, "Please make sure the save strategy has .svg as file extension."
+        file_name = PROJECT_ROOT + f'/plots/{file_name}'
 
     if strategy is None:
         warnings.warn("Strategy is None. Unrolling Default strategy")
@@ -114,6 +107,9 @@ def create_gridworld(size: int, strategy: list, init_pos: tuple = (1, 1)):
         svg = gridworld_handle.gridworld(n=size, tile2classes=tile2classes_obstacle, actions=strategy, init_pos=init_pos)
     else:
         svg = gridworld_handle.gridworld(n=size, tile2classes=tile2classes, actions=strategy, init_pos=init_pos)
+    
+    assert os.path.isdir(PROJECT_ROOT + f'/plots') is True, "Please ensure that you have a folder `plots` in the project root to save simulated gridwork policy."
+
     svg.saveas(file_name, pretty=True)
 
 
@@ -318,6 +314,13 @@ def roll_out_franka_strategy_nLTL(ts_handle: Union[SymbolicWeightedTransitionSys
 
     counter = 0
 
+    if not ADD_flag:
+        # for Franka world with no human, the labels are stored as a list of lists(different bVars for each box.) 
+        if isinstance(ts_handle, SymbolicFrankaTransitionSystem):
+            ts_obs_cube = reduce(lambda x, y: x & y,  [lbl for sym_vars_list in ts_handle.sym_vars_lbl for lbl in sym_vars_list])
+        else:
+            ts_obs_cube = reduce(lambda x, y: x & y, ts_handle.sym_vars_lbl)
+
     while not curr_dfa_state == monolithic_dfa_target:    
         # get the strategy
         if ADD_flag:
@@ -371,7 +374,7 @@ def roll_out_franka_strategy_nLTL(ts_handle: Union[SymbolicWeightedTransitionSys
             _nxt_dfa = _nxt_dfa.existAbstract(reduce(lambda x, y: x & y, ts_handle.sym_add_vars_lbl))
             _nxt_dfa = _nxt_dfa.bddPattern().toADD()
         else:
-            _nxt_dfa = _nxt_dfa.existAbstract(reduce(lambda x, y: x & y, ts_handle.sym_vars_lbl))
+            _nxt_dfa = _nxt_dfa.existAbstract(ts_obs_cube)
 
         # finally swap variables of TS and DFA 
         curr_ts_state_sym = _nxt_ts_state_sym
@@ -413,7 +416,13 @@ def roll_out_franka_strategy(ts_handle: Union[SymbolicWeightedTransitionSystem, 
     curr_dfa_state = init_state_dfa
 
     counter = 0
-
+    
+    if not ADD_flag:
+        # for Franka world with no human, the labels are stored as a list of lists(different bVars for each box.) 
+        if isinstance(ts_handle, SymbolicFrankaTransitionSystem):
+            ts_obs_cube = reduce(lambda x, y: x & y,  [lbl for sym_vars_list in ts_handle.sym_vars_lbl for lbl in sym_vars_list])
+        else:
+            ts_obs_cube = reduce(lambda x, y: x & y, ts_handle.sym_vars_lbl)
 
     while not target_DFA == curr_dfa_state:
         # get the strategy
@@ -465,7 +474,7 @@ def roll_out_franka_strategy(ts_handle: Union[SymbolicWeightedTransitionSystem, 
             _nxt_dfa = _nxt_dfa.existAbstract(reduce(lambda x, y: x & y, ts_handle.sym_add_vars_lbl))
             _nxt_dfa = _nxt_dfa.bddPattern().toADD()
         else:
-            _nxt_dfa = _nxt_dfa.existAbstract(reduce(lambda x, y: x & y, ts_handle.sym_vars_lbl))
+            _nxt_dfa = _nxt_dfa.existAbstract(ts_obs_cube)
         
         # finally swap variables of TS and DFA 
         curr_ts_state = _nxt_ts_state
