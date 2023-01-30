@@ -38,7 +38,7 @@ MULTIPLE_FORMULAS = ["F(l21 & F(l5) & F(l25))",
                      "F(l2 & F(l20) & F(l16))"]
 
 
-class TestLTLSymbolicDFA(unittest.TestCase):
+class TestLTLSymbolicADDDFA(unittest.TestCase):
     def test_single_LTL_Symbolic_DFA(self):
         """
          Check DFA construction for a single LTL formula for 2d gridworld robot

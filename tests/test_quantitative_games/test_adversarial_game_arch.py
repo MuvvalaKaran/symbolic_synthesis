@@ -25,7 +25,7 @@ SUP_LOC = ['l0', 'l1']   # support for Arch
 TOP_LOC = ['l2']    
 
 
-class TestAdversarialGame(unittest.TestCase):
+class TestAdversarialGameArch(unittest.TestCase):
     def test_abstraction(self):
         """
          Check all the tests related Arch abstraction construction

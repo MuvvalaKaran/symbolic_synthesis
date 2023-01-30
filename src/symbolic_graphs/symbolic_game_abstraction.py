@@ -649,9 +649,11 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
                  manager: Cudd,
                  ts_state_lbls: list,
                  dfa_state_vars: List[BDD],
+                 sup_locs: List[str],
+                 top_locs: List[str], 
                  **kwargs):
         self.sym_vars_hint: List[BDD] = human_int_vars
-        super().__init__(curr_vars, lbl_vars, robot_action_vars, human_action_vars, task, domain, ts_state_map, ts_states, manager, ts_state_lbls, dfa_state_vars, **kwargs)
+        super().__init__(curr_vars, lbl_vars, robot_action_vars, human_action_vars, task, domain, ts_state_map, ts_states, manager, ts_state_lbls, dfa_state_vars, sup_locs, top_locs, **kwargs)
         
         self.max_hint: int = max_human_int
 

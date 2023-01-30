@@ -39,7 +39,7 @@ class TestSymbolicFrankaDFAs(unittest.TestCase):
         domain_file_path = PROJECT_ROOT + "/pddl_files/only_franka_world/domain.pddl"
         problem_file_path = PROJECT_ROOT + "/pddl_files/only_franka_world/problem.pddl"
 
-        formulas = ['F(p00 & p11)']
+        formulas = ['F(p00 & p11 & free)']
         
         algo = 'bfs'
         
@@ -114,7 +114,7 @@ class TestSymbolicFrankaDFAs(unittest.TestCase):
         domain_file_path = PROJECT_ROOT + "/pddl_files/only_franka_world/domain.pddl"
         problem_file_path = PROJECT_ROOT + "/pddl_files/only_franka_world/problem.pddl"
 
-        formulas = ['F(p00 & p11)']
+        formulas = ['F(p00 & p11 & free)']
         
         algo = 'astar'  # 'dijkstras' will work too. 
         

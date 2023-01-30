@@ -15,7 +15,7 @@ To run the test scripts within each package, use the following command to run on
 ```bash
 cd <root/of/project>
 
-python3 -m tests.<directory-name><module-nane> -b
+python3 -m tests.<directory-name>.<module-nane> -b
 ```
 
 The `-m` flag runs the test as a module while `-b` flag suppresses the output of the code if all the tests pass (you can also use `-bv`). If the test fails, then it throws the error message at the very begining and then the rest of the output. 

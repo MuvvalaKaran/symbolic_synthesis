@@ -492,6 +492,8 @@ class FrankaPartitionedWorld(FrankaWorld):
                                                   ts_state_lbls=possible_lbls,
                                                   dfa_state_vars=self.dfa_x_list,
                                                   manager=self.manager,
+                                                  sup_locs=self.sup_locs,
+                                                  top_locs=self.top_locs,
                                                   modified_actions=modified_actions)
         
         start: float = time.time()

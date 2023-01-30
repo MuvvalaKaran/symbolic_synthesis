@@ -28,7 +28,7 @@ SUP_LOC = ['l0', 'l1']   # support for Arch
 TOP_LOC = ['l2']         # top location for Arch
 
 
-class TestAdversarialGame(unittest.TestCase):
+class TestReachabilityGameArch(unittest.TestCase):
     def test_abstraction(self):
         """
          Check all the tests related to Arch abstraction construction for Winning Strategy.
