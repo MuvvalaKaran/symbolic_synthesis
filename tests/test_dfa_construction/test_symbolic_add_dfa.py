@@ -1,9 +1,7 @@
 '''
- This file tests the LTL/ LTLf to DFA construction. We will test three abstarction construction for 
+ This file tests the LTL/ LTLf to DFA construction. We will test one abstraction construction for 
 
-    1. SymboliDFA() - A class used to create the DFA for the 2d gridworld exmaples. The formulas can be LTL or LTLf!
-    2. SymbolicDFAFranka() - A class used to create DFA for the Manipulation examples in MONOLITHIC Fashion. The formulas can be LTL or LTLf!
-    3. PartitionedDFA() - A class used to create DFA for the Manipulation example in COMPOSITIONAL Fashion. The formula can be only be LTLf!
+    1. SymboliADDDFA() - A class used to create the DFA for the 2d gridworld exmaples using ADD Variables. The formulas can be LTL or LTLf!
 '''
 import os
 import unittest
@@ -14,11 +12,12 @@ from src.symbolic_graphs.graph_search_scripts import SimpleGridWorld
 
 import os
 
+
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 
 DYNAMIC_VAR_ORDERING: bool = False
 GRID_WORLD_SIZE: int = 5
-DIJKSTRAS: bool = False  # set this flag to true when you want to use Dijkstras
+DIJKSTRAS: bool = True  # set this flag to true when you want to use Dijkstras
 ASTAR: bool = False # set this flag to true when you want to use A* algorithm
 
 # Note on the griworld: The location start from l1 and go up till l25 (n x n - square gridworld).
@@ -51,18 +50,25 @@ class TestLTLSymbolicDFA(unittest.TestCase):
         else:
             algo = 'bfs'
 
+        wgt_dict = {
+            "moveleft"  : 1,
+            "moveright" : 2,
+            "moveup"    : 3,
+            "movedown"  : 4
+            }
+
         # initiate a manager
         cudd_manager = Cudd()
 
-        domain_file_path = PROJECT_ROOT + "/grid_world/domain.pddl"
-        problem_file_path = PROJECT_ROOT + f"/grid_world/problem{GRID_WORLD_SIZE}_{GRID_WORLD_SIZE}.pddl"
+        domain_file_path = PROJECT_ROOT + "/pddl_files/grid_world/domain.pddl"
+        problem_file_path = PROJECT_ROOT + f"/pddl_files/grid_world/problem{GRID_WORLD_SIZE}_{GRID_WORLD_SIZE}.pddl"
 
         gridworld_handle = SimpleGridWorld(domain_file=domain_file_path,
                                            problem_file=problem_file_path,
                                            formulas=SINGLE_FORMULA,
                                            manager=cudd_manager,
                                            algorithm=algo,
-                                           weight_dict=None,
+                                           weight_dict=wgt_dict,
                                            ltlf_flag=False,
                                            dyn_var_ord=DYNAMIC_VAR_ORDERING,
                                            verbose=False,
@@ -87,7 +93,7 @@ class TestLTLSymbolicDFA(unittest.TestCase):
 
     def test_multiple_single_LTL_Symbolic_DFA(self):
         """
-         Check DFA construction from a multiple LTL formulas for 2d gridworld robot
+         Check DFA construction for multiple LTL formulas for 2d gridworld robot
         """
         if DIJKSTRAS:
             algo = 'dijkstras'
@@ -95,19 +101,26 @@ class TestLTLSymbolicDFA(unittest.TestCase):
             algo = 'astar'
         else:
             algo = 'bfs'
+        
+        wgt_dict = {
+            "moveleft"  : 1,
+            "moveright" : 2,
+            "moveup"    : 3,
+            "movedown"  : 4
+            }
 
         # initiate a manager
         cudd_manager = Cudd()
 
-        domain_file_path = PROJECT_ROOT + "/grid_world/domain.pddl"
-        problem_file_path = PROJECT_ROOT + f"/grid_world/problem{GRID_WORLD_SIZE}_{GRID_WORLD_SIZE}.pddl"
+        domain_file_path = PROJECT_ROOT + "/pddl_files/grid_world/domain.pddl"
+        problem_file_path = PROJECT_ROOT + f"/pddl_files/grid_world/problem{GRID_WORLD_SIZE}_{GRID_WORLD_SIZE}.pddl"
 
         gridworld_handle = SimpleGridWorld(domain_file=domain_file_path,
                                            problem_file=problem_file_path,
                                            formulas=MULTIPLE_FORMULAS,
                                            manager=cudd_manager,
                                            algorithm=algo,
-                                           weight_dict=None,
+                                           weight_dict=wgt_dict,
                                            ltlf_flag=False,
                                            dyn_var_ord=DYNAMIC_VAR_ORDERING,
                                            verbose=False,
@@ -130,7 +143,7 @@ class TestLTLSymbolicDFA(unittest.TestCase):
 
     def test_single_LTLf_Symbolic_DFA(self):
         """
-         Check DFA construction from a single LTLf formulas for 2d gridworld robot
+         Check DFA construction for a single LTLf formulas for 2d gridworld robot
         """
         if DIJKSTRAS:
             algo = 'dijkstras'
@@ -138,19 +151,26 @@ class TestLTLSymbolicDFA(unittest.TestCase):
             algo = 'astar'
         else:
             algo = 'bfs'
+        
+        wgt_dict = {
+            "moveleft"  : 1,
+            "moveright" : 2,
+            "moveup"    : 3,
+            "movedown"  : 4
+            }
 
         # initiate a manager
         cudd_manager = Cudd()
 
-        domain_file_path = PROJECT_ROOT + "/grid_world/domain.pddl"
-        problem_file_path = PROJECT_ROOT + f"/grid_world/problem{GRID_WORLD_SIZE}_{GRID_WORLD_SIZE}.pddl"
+        domain_file_path = PROJECT_ROOT + "/pddl_files/grid_world/domain.pddl"
+        problem_file_path = PROJECT_ROOT + f"/pddl_files/grid_world/problem{GRID_WORLD_SIZE}_{GRID_WORLD_SIZE}.pddl"
 
         gridworld_handle = SimpleGridWorld(domain_file=domain_file_path,
                                            problem_file=problem_file_path,
                                            formulas=SINGLE_FORMULA,
                                            manager=cudd_manager,
                                            algorithm=algo,
-                                           weight_dict=None,
+                                           weight_dict=wgt_dict,
                                            ltlf_flag=True,
                                            dyn_var_ord=DYNAMIC_VAR_ORDERING,
                                            verbose=False,
@@ -174,7 +194,7 @@ class TestLTLSymbolicDFA(unittest.TestCase):
 
     def test_multiple_single_LTLf_Symbolic_DFA(self):
         """
-         Check DFA construction from a multiple LTLf formulas for 2d gridworld robot
+         Check DFA construction for multiple LTLf formulas for 2d gridworld robot
         """
         if DIJKSTRAS:
             algo = 'dijkstras'
@@ -182,19 +202,26 @@ class TestLTLSymbolicDFA(unittest.TestCase):
             algo = 'astar'
         else:
             algo = 'bfs'
+        
+        wgt_dict = {
+            "moveleft"  : 1,
+            "moveright" : 2,
+            "moveup"    : 3,
+            "movedown"  : 4
+            }
 
         # initiate a manager
         cudd_manager = Cudd()
 
-        domain_file_path = PROJECT_ROOT + "/grid_world/domain.pddl"
-        problem_file_path = PROJECT_ROOT + f"/grid_world/problem{GRID_WORLD_SIZE}_{GRID_WORLD_SIZE}.pddl"
+        domain_file_path = PROJECT_ROOT + "/pddl_files/grid_world/domain.pddl"
+        problem_file_path = PROJECT_ROOT + f"/pddl_files/grid_world/problem{GRID_WORLD_SIZE}_{GRID_WORLD_SIZE}.pddl"
 
         gridworld_handle = SimpleGridWorld(domain_file=domain_file_path,
                                            problem_file=problem_file_path,
                                            formulas=MULTIPLE_FORMULAS,
                                            manager=cudd_manager,
                                            algorithm=algo,
-                                           weight_dict=None,
+                                           weight_dict=wgt_dict,
                                            ltlf_flag=True,
                                            dyn_var_ord=DYNAMIC_VAR_ORDERING,
                                            verbose=False,

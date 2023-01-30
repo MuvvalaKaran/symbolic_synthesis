@@ -33,10 +33,10 @@ class TestAdversarialGame(unittest.TestCase):
         
         formulas = ['F(p00 & p12 & p21) & G(~(p00 & p21) -> ~(p12))']
 
-        domain_file_path = PROJECT_ROOT + "/quantitative_game/domain.pddl"
+        domain_file_path = PROJECT_ROOT + "/pddl_files/domain.pddl"
         problem_file_paths = [
-            PROJECT_ROOT + "/quantitative_game/problem_arch1.pddl",   # all boxes are withing robot's reach
-            PROJECT_ROOT + "/quantitative_game/problem_arch2.pddl"]    # robot CAN cooperative with human to build the arch
+            PROJECT_ROOT + "/pddl_files/problem_arch1.pddl",   # all boxes are withing robot's reach
+            PROJECT_ROOT + "/pddl_files/problem_arch2.pddl"]    # robot CAN cooperative with human to build the arch
 
 
         wgt_dict = {
@@ -94,10 +94,10 @@ class TestAdversarialGame(unittest.TestCase):
         formulas = ['F(p00 & p12 & p21) & G(~(p00 & p21) -> ~(p12))']
 
 
-        domain_file_path = PROJECT_ROOT + "/quantitative_game/domain.pddl"
+        domain_file_path = PROJECT_ROOT + "/pddl_files/domain.pddl"
         problem_file_paths = [
-            PROJECT_ROOT + "/quantitative_game/problem_arch1.pddl",   # all boxed are withing robot's reach
-            PROJECT_ROOT + "/quantitative_game/problem_arch2.pddl"]    # robot cannot force human to build the arch
+            PROJECT_ROOT + "/pddl_files/problem_arch1.pddl",   # all boxed are withing robot's reach
+            PROJECT_ROOT + "/pddl_files/problem_arch2.pddl"]    # robot cannot force human to build the arch
 
         wgt_dict = {
             "transit" : 1,

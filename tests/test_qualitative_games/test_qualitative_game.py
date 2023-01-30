@@ -38,17 +38,8 @@ class TestAdversarialGame(unittest.TestCase):
                     'F(p01 & p16 & F(p17 & F(p16)))',
                     'F(p01 | p11)']
 
-        domain_file_path = PROJECT_ROOT + "/quantitative_game/domain.pddl"
-        problem_file_path = PROJECT_ROOT + "/quantitative_game/problem.pddl"
-
-
-        wgt_dict = {
-            "transit" : 1,
-            "grasp"   : 1,
-            "transfer": 1,
-            "release" : 1,
-            "human": 0
-            }
+        domain_file_path = PROJECT_ROOT + "/pddl_files/domain.pddl"
+        problem_file_path = PROJECT_ROOT + "/pddl_files/problem.pddl"
         
         # correct values
         cor_total_vars: List[int] = [16, 17, 17, 16]
@@ -63,7 +54,7 @@ class TestAdversarialGame(unittest.TestCase):
                                                             manager=cudd_manager,
                                                             sup_locs=SUP_LOC,
                                                             top_locs=TOP_LOC,
-                                                            weight_dict=wgt_dict,
+                                                            weight_dict=None,
                                                             ltlf_flag=USE_LTLF,
                                                             dyn_var_ord=DYNAMIC_VAR_ORDERING,
                                                             algorithm=GAME_ALGORITHM,
@@ -101,16 +92,9 @@ class TestAdversarialGame(unittest.TestCase):
                     'F(p01 & p16 & F(p17 & F(p16)))',  # Adv. strategy exists.
                     'F(p01 | p11)']  # Adv. strategy will prefer p01 as p11 is not possible
 
-        domain_file_path = PROJECT_ROOT + "/quantitative_game/domain.pddl"
-        problem_file_path = PROJECT_ROOT + "/quantitative_game/problem.pddl"
+        domain_file_path = PROJECT_ROOT + "/pddl_files/domain.pddl"
+        problem_file_path = PROJECT_ROOT + "/pddl_files/problem.pddl"
 
-        wgt_dict = {
-            "transit" : 1,
-            "grasp"   : 1,
-            "transfer": 1,
-            "release" : 1,
-            "human": 0
-            }
 
         # No. of iteration req. to reach the fixed point
         cor_fp: List[int] = [9, 9, 16, 4]
@@ -123,7 +107,7 @@ class TestAdversarialGame(unittest.TestCase):
                                                             manager=cudd_manager,
                                                             sup_locs=SUP_LOC,
                                                             top_locs=TOP_LOC,
-                                                            weight_dict=wgt_dict,
+                                                            weight_dict=None,
                                                             ltlf_flag=USE_LTLF,
                                                             dyn_var_ord=DYNAMIC_VAR_ORDERING,
                                                             algorithm=GAME_ALGORITHM,

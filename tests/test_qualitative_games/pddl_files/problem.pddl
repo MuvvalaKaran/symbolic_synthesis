@@ -30,7 +30,7 @@
 
 )
 
-;todo: put the initial state's facts and numeric values here
+
 (:init
     (ready l0)
     
