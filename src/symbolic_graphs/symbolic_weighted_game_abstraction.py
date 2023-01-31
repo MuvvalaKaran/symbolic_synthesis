@@ -210,16 +210,16 @@ class DynWeightedPartitionedFrankaAbs():
         """
         # initiate ADDs for all the action 
         action_idx_map = bidict()
-        count = 0
+        num_of_acts: int = 0
 
-        for action in self.actions['robot']:
-            action_idx_map[action] = count
-            count += 1
+        for act in self.task.operators:
+            if 'human' not in act.name:
+                action_idx_map[act.name] = num_of_acts
+                num_of_acts += 1
         
         self.tr_action_idx_map = action_idx_map
         
         num_ts_state_vars: int = sum([len(listElem) for listElem in self.sym_vars_lbl]) + len(self.sym_vars_curr)
-        num_of_acts: int = len(self.actions['robot'])
         self.sym_tr_actions = [[self.manager.addZero() for _ in range(num_ts_state_vars)] for _ in range(num_of_acts)]
 
     
@@ -627,7 +627,8 @@ class DynWeightedPartitionedFrankaAbs():
         # get the modified robot action name
         mod_raction_name: str = mod_act_dict[robot_action_name]
         robot_move: ADD = self.predicate_sym_map_robot[mod_raction_name]
-        _tr_idx: int = self.tr_action_idx_map.get(mod_raction_name)
+        # _tr_idx: int = self.tr_action_idx_map.get(mod_raction_name)
+        _tr_idx: int = self.tr_action_idx_map.get(robot_action_name)
 
         if human_action_name != '':
             # get the modified human action name
