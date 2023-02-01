@@ -77,6 +77,7 @@ class CooperativeGame(AdversarialGame):
                 print(f"**************************Reached a Fixed Point in {layer} layers**************************")
                 init_state_cube = list(((self.init_TS & self.init_DFA) & self.winning_states[layer]).generate_cubes())[0]
                 init_val = init_state_cube[1]
+                self.init_state_value = init_val
                 if init_val != math.inf:
                     print(f"A Winning Strategy Exists!!. The Min Energy is {init_val}")
                     return tmp_strategy

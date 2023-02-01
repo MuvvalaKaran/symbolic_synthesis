@@ -94,6 +94,9 @@ class AdversarialGame(BaseSymbolicSearch):
                 act_ls.append(avar.bddPattern())
         
             self.ts_bdd_transition_fun_list.append(act_ls)
+        
+        # mimimum energy required from the init states
+        self.init_state_value: Union[int, float] = math.inf
     
 
     def _create_lbl_cubes(self) -> List[ADD]:
@@ -334,6 +337,7 @@ class AdversarialGame(BaseSymbolicSearch):
                 print(f"**************************Reached a Fixed Point in {layer} layers**************************")
                 init_state_cube = list(((self.init_TS & self.init_DFA) & self.winning_states[layer]).generate_cubes())[0]
                 init_val: int = init_state_cube[1]
+                self.init_state_value = init_val
                 if init_val != math.inf:
                     print(f"A Winning Strategy Exists!!. The Min Energy is {init_val}")
                     return strategy

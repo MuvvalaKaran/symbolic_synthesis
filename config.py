@@ -6,7 +6,9 @@ EXPLICIT_GRAPH: bool = False  # set this flag to true when you want to construct
 
 GRIDWORLD: bool = False   # Set this flag to true when using gridworld example for graph search 
 FRANKAWORLD: bool = False  # Set this flag to true when using manipulator scenarios for graph search
-STRATEGY_SYNTHESIS: bool = True  # Set this flag to true when  when using manipulator scenarios for Strategy synthesis
+STRATEGY_SYNTHESIS: bool = False  # Set this flag to true when  when using manipulator scenarios for Strategy synthesis
+REGRET_SYNTHESIS: bool = True  # Set this flag to true when you want compute regret minimizing strategies
+
 TWO_PLAYER_GAME: bool = True # Set this flag to true when you want to contruct a two-player game env.
 TWO_PLAYER_GAME_BND: bool = False  # Set this flag to true when you want to construct som bounded no. off human interventions.
 GAME_ALGORITHM = 'quant-adv' # choose qual for qualitative game, quant-adv for quantitative adversarial game, and quant-coop for cooperative game
@@ -50,13 +52,14 @@ TOP_LOC = []
 # formulas = ['F(p00 & p11 & p22 & p33 & p44)']
 
 ### BENCHMARKING formulas
-# formulas = ['F(p00 & p11 & p22 & p33 & p44)']
-# formulas = ['F(p00)']
+# formulas = ['F(p00 & p11 & p22 & p33 & p44)']  # 5 boxes one
+# formulas = ['F(p00 & p11 & p22 & p33)']
+formulas = ['F(p00)']
 
 
 ### BENCHMARKING formulas
 # formulas = ['F(p00 & p11)']
-formulas = ['F(p01 & XF(p17))']   # tricky complicated formula
+# formulas = ['F(p01 & XF(p17))']   # tricky complicated formula
 # formulas = ['F(p11 & p06 & F(p07 & F(p06)))']   # neat complicated formula
 # formulas = ['F(p01)']
 # formulas = ['F(p01 | p11)'] 

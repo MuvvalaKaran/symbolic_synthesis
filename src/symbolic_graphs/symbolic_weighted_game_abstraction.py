@@ -73,6 +73,9 @@ class DynWeightedPartitionedFrankaAbs():
 
         # create adj map. Useful when rolling out strategy with human intervention for sanity checking
         self.adj_map = defaultdict(lambda: defaultdict(lambda: {}))
+
+        # refered during graph of utility construction
+        self.org_adj_map = defaultdict(lambda: defaultdict(lambda: {}))
         # edge counter
         self.ecount = 0
 
@@ -627,7 +630,6 @@ class DynWeightedPartitionedFrankaAbs():
         # get the modified robot action name
         mod_raction_name: str = mod_act_dict[robot_action_name]
         robot_move: ADD = self.predicate_sym_map_robot[mod_raction_name]
-        # _tr_idx: int = self.tr_action_idx_map.get(mod_raction_name)
         _tr_idx: int = self.tr_action_idx_map.get(robot_action_name)
 
         if human_action_name != '':
@@ -640,7 +642,7 @@ class DynWeightedPartitionedFrankaAbs():
                 if not edge_exist:
                     print(f"Nondeterminism due to Human Action: {curr_str_state} --- {robot_action_name} & {human_action_name}---> {next_str_state}")
                 
-                self.mono_tr_bdd |= curr_state_sym & robot_move & self.predicate_sym_map_human[mod_haction_name]# & edge_wgt
+                self.mono_tr_bdd |= curr_state_sym & robot_move & self.predicate_sym_map_human[mod_haction_name]
         else:
             if 'debug' in kwargs:
                 edge_exist: bool = (self.mono_tr_bdd & curr_state_sym & robot_move & no_human_move).isZero()
@@ -648,7 +650,7 @@ class DynWeightedPartitionedFrankaAbs():
                 if not edge_exist:
                     print(f"Nondeterminism due to Human Action: {curr_str_state} ---{robot_action_name}---> {next_str_state}")
 
-                self.mono_tr_bdd |= curr_state_sym & robot_move & no_human_move# & edge_wgt           
+                self.mono_tr_bdd |= curr_state_sym & robot_move & no_human_move          
 
         # generate all the cubes, with their corresponding string repr and leaf value (state value should be 1)
         add_cube: List[Tuple(list, int)] = list(nxt_state_sym.generate_cubes())   
@@ -676,9 +678,16 @@ class DynWeightedPartitionedFrankaAbs():
         if human_action_name != '':
             assert self.adj_map.get(curr_state_tuple, {}).get(mod_raction_name, {}).get(mod_haction_name) is None, "Error Computing Adj Dictionary, Fix this!!!"
             self.adj_map[curr_state_tuple][mod_raction_name][mod_haction_name] = next_state_tuple
+
+            assert self.org_adj_map.get(curr_state_tuple, {}).get(robot_action_name, {}).get(human_action_name) is None, "Error Computing Adj Dictionary, Fix this!!!"
+            self.org_adj_map[curr_state_tuple][robot_action_name][human_action_name] = next_state_tuple
         else:
             assert self.adj_map.get(curr_state_tuple, {}).get(mod_raction_name, {}).get('r') is None, "Error Computing Adj Dictionary, Fix this!!!"
             self.adj_map[curr_state_tuple][mod_raction_name]['r'] = next_state_tuple
+
+            # create another adj map with the edges are stored accoridng to the org name of the action - used during Graph of Utility construction
+            assert self.org_adj_map.get(curr_state_tuple, {}).get(robot_action_name, {}).get('r') is None, "Error Computing Adj Dictionary, Fix this!!!"
+            self.org_adj_map[curr_state_tuple][robot_action_name]['r'] = next_state_tuple
         
         # update edge count 
         self.ecount += 1
