@@ -13,8 +13,7 @@ from cudd import Cudd, BDD, ADD
 
 from src.explicit_graphs import CausalGraph, Ltlf2MonaDFA
 
-from src.algorithms.strategy_synthesis import ReachabilityGame, BndReachabilityGame
-from src.algorithms.strategy_synthesis import AdversarialGame, CooperativeGame
+from src.algorithms.strategy_synthesis import AdversarialGame, GraphOfUtlCooperativeGame
 
 from src.symbolic_graphs import PartitionedDFA, ADDPartitionedDFA
 from src.symbolic_graphs import PartitionedFrankaTransitionSystem, DynamicFrankaTransitionSystem, BndDynamicFrankaTransitionSystem
@@ -64,12 +63,18 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
                          plot=plot,
                          create_lbls=create_lbls)
         
+        # graph of utility handle
+        self.graph_of_utls_handle: SymbolicGraphOfUtility = None
+
         # create during the first abstraction construction call
         self.mod_act_dict = None
 
         # maps each action to int weight
         self.int_weight_dict = None
         self.task_boxes: List[str] = [] 
+
+        self.min_energy_budget: Union[int, float] = math.inf
+        self.reg_energy_budget: Union[int, float] = math.inf
     
 
     def build_abstraction(self, draw_causal_graph: bool = False, dynamic_env: bool = False, bnd_dynamic_env: bool = False, max_human_int: int = 0):
@@ -115,6 +120,7 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
         # update the predicate dictionary accordingly
         num_of_preds: int = len(self.pred_int_map.keys())
         self.pred_int_map['(trap-state)'] = num_of_preds
+        num_of_preds += 1
 
         # throw warning if there is exactly one human (hbox) location
         if len(_causal_graph_instance.task_intervening_locations) <= 1:
@@ -153,7 +159,10 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
         for _id, b in enumerate(box_preds.keys()):
             # We also add an `empty` label that only correpsonds to the trap state.
             # As we create dedicated bVars for each box, we have to create empty for each box
-            box_preds[b] = box_preds[b] + [f'(on b{_id} empty)'] 
+            box_preds[b] = box_preds[b] + [f'(on b{_id} empty)']
+            # update the predicate int map
+            self.pred_int_map[f'(on b{_id} empty)'] = num_of_preds
+            num_of_preds += 1
             ts_lbl_vars.append(self._create_symbolic_lbl_vars(state_lbls=box_preds[b],
                                                               state_var_name=f'b{_id}_',
                                                               add_flag=add_flag))                                                   
@@ -309,13 +318,13 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
         """
         # compute the minmax value of the game
         min_max_handle = AdversarialGame(ts_handle=self.ts_handle,
-                                             dfa_handle=self.dfa_handle,
-                                             ts_curr_vars=self.ts_x_list,
-                                             dfa_curr_vars=self.dfa_x_list,
-                                             ts_obs_vars=self.ts_obs_list,
-                                             sys_act_vars=self.ts_robot_vars,
-                                             env_act_vars=self.ts_human_vars,
-                                             cudd_manager=self.manager)
+                                         dfa_handle=self.dfa_handle,
+                                         ts_curr_vars=self.ts_x_list,
+                                         dfa_curr_vars=self.dfa_x_list,
+                                         ts_obs_vars=self.ts_obs_list,
+                                         sys_act_vars=self.ts_robot_vars,
+                                         env_act_vars=self.ts_human_vars,
+                                         cudd_manager=self.manager)
         
         win_str: ADD = min_max_handle.solve(verbose=verbose)
 
@@ -324,16 +333,18 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
                 min_max_handle.roll_out_strategy(strategy=win_str, verbose=False)
 
         # min max value
-        min_energy_budget: int = min_max_handle.init_state_value
+        self.min_energy_budget = min_max_handle.init_state_value
         assert min_max_handle != math.inf, "No winning strategy exists. Before running regret game, make sure there existd a winning strategy."
 
         # regret budget
-        reg_budget = math.ceil(min_energy_budget * 2.0)
+        self.reg_energy_budget = math.ceil(self.min_energy_budget * 2.0)
 
         # construct additional boolean variables used during the construction of the new graph
-        ts_utls_vars: List[ADD] = self._create_symbolic_lbl_vars(state_lbls=list(range(reg_budget + 1)),
-                                                                    state_var_name='k',
-                                                                    add_flag=True)
+        ts_utls_vars: List[ADD] = self._create_symbolic_lbl_vars(state_lbls=list(range(self.reg_energy_budget + 1)),
+                                                                 state_var_name='k',
+                                                                 add_flag=True)
+
+        print(f"# of States in the Original graph: {len(self.ts_handle.adj_map.keys())}")
 
         # get the max action cost
         max_action_cost: int = min_max_handle._get_max_tr_action_cost()
@@ -359,13 +370,19 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
                                                       dfa_handle=self.dfa_handle,
                                                       ts_handle=self.ts_handle,
                                                       int_weight_dict=self.int_weight_dict,
-                                                      budget=reg_budget)
+                                                      budget=self.reg_energy_budget)
         
+        start: float = time.time()
         graph_of_utls_handle.construct_graph_of_utility(mod_act_dict=self.mod_act_dict,
                                                         boxes=self.task_boxes,
-                                                        verbose=True,
+                                                        verbose=False,
                                                         debug=True)
+        stop: float = time.time()
+        print("Time took for constructing the Graph of Utility: ", stop - start)
 
+        self.graph_of_utls_handle = graph_of_utls_handle
+
+        print(f"************************** Energy Budget: {self.reg_energy_budget} **************************")
     
 
     def solve(self, verbose: bool = False):
@@ -375,3 +392,20 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
 
         # constuct graph of utility
         self.build_add_graph_of_utility(verbose=verbose)
+
+        # compute the min-min value from each state
+        gou_min_min_handle = GraphOfUtlCooperativeGame(prod_handle=self.graph_of_utls_handle,
+                                                        ts_handle=self.ts_handle,
+                                                        dfa_handle=self.dfa_handle,
+                                                        ts_curr_vars=self.ts_x_list,
+                                                        dfa_curr_vars=self.dfa_x_list,
+                                                        sys_act_vars=self.ts_robot_vars,
+                                                        env_act_vars=self.ts_human_vars,
+                                                        ts_obs_vars=self.ts_obs_list,
+                                                        ts_utls_vars=self.graph_of_utls_handle.sym_vars_ults,
+                                                        cudd_manager=self.manager)
+        
+        # compute the cooperative value from each prod state in the graph of utility
+        gou_min_min_handle.solve(verbose=False)
+
+        assert gou_min_min_handle.init_state_value == self.min_energy_budget, "Error computing CVal on Graph of Utility. Mismatch in Init stat value. Fix This!!!"

@@ -92,6 +92,10 @@ class SymbolicGraphOfUtility(DynWeightedPartitionedFrankaAbs):
 
         # count # of state in this graph
         self.scount = 0
+
+        self.leaf_nodes: ADD = self.manager.plusInfinity()
+        self.leaf_vals = set()
+        self.lcount = 0
     
 
     def _initialize_add_for_state_utls(self):
@@ -294,11 +298,6 @@ class SymbolicGraphOfUtility(DynWeightedPartitionedFrankaAbs):
 
         # used to break the loop
         empty_bucket_counter: int = 0
-
-        leaf_node: ADD  = self.manager.plusInfinity()
-
-        # counter to keep track of leaf nodes
-        lcount = 0
         
         while True:
 
@@ -329,10 +328,10 @@ class SymbolicGraphOfUtility(DynWeightedPartitionedFrankaAbs):
                         print(f"Adding leaf node ({curr_ts_exp_states},{curr_dfa_tuple}) with value {layer}")
                         # before adding the leaf node, convert it to (state-val) - infinity ADD
                         full_prod_state_val: ADD = (curr_prod_sym_state & self.predicate_sym_map_utls[layer]).ite(self.manager.addConst(layer), self.manager.plusInfinity())
-                        leaf_node = leaf_node.min(full_prod_state_val)
-                        
+                        self.leaf_nodes = self.leaf_nodes.min(full_prod_state_val)
+                        self.leaf_vals.add(layer)
                         # update counter
-                        lcount += 1
+                        self.lcount += 1
                         continue
                         
                     # update the closed set
@@ -432,7 +431,7 @@ class SymbolicGraphOfUtility(DynWeightedPartitionedFrankaAbs):
 
                             # add this (vT, lbl, DFA state) to the list leaf node
                             full_prod_state_val: ADD = (next_prod_sym_state & self.predicate_sym_map_utls[self.energy_budget]).ite(self.manager.addConst(self.energy_budget), self.manager.plusInfinity())
-                            leaf_node = leaf_node.min(full_prod_state_val)
+                            self.leaf_nodes = self.leaf_nodes.min(full_prod_state_val)
 
                             # update closed list for book keeping purposes
                             closed |= next_prod_sym_state & self.predicate_sym_map_utls[self.energy_budget]
@@ -458,7 +457,7 @@ class SymbolicGraphOfUtility(DynWeightedPartitionedFrankaAbs):
                 empty_bucket_counter += 1
                 # If Cmax consecutive layers are empty. . .
                 if empty_bucket_counter == self.max_ts_action_cost:
-                    print(f"Done Computing the Graph of Utility! Accepting Leaf nodes {lcount}; Total states {self.ecount}")
+                    print(f"Done Computing the Graph of Utility! Accepting Leaf nodes {self.lcount}; Total states {self.scount}; Total edges {self.ecount}")
                     break
 
 
