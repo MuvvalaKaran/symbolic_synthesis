@@ -137,29 +137,27 @@ class FrankaPartitionedWorld(FrankaWorld):
         return _seg_action
     
 
-    def _create_weight_dict(self, mod_action) -> Dict[str, int]:
+    def _create_weight_dict(self, mod_action, **kwargs) -> Dict[str, int]:
         """
          A function that loop over all the paramterized manipulator actions and
           assigns their corresponding weights from the weight dictionary specified as input.
         """
+        task = kwargs["task"]
         new_weight_dict = {}
-        for op in mod_action:
+        for op in task.operators:
             # extract the action name
-            if 'transit' in op:
-                # if 'b0' in op:
-                #     weight: int = 100
-                # else:
+            if 'transit' in op.name:
                 weight: int = self.weight_dict['transit']
-            elif 'transfer' in op:
+            elif 'transfer' in op.name:
                 weight: int = self.weight_dict['transfer']
-            elif 'grasp' in op:
+            elif 'grasp' in op.name:
                 weight: int = self.weight_dict['grasp']
-            elif 'release' in op:
+            elif 'release' in op.name:
                 weight: int = self.weight_dict['release']
             else:
                 weight: int = self.weight_dict['human']
             
-            new_weight_dict[op] = weight
+            new_weight_dict[op.name] = weight
 
         return new_weight_dict
 
@@ -407,7 +405,7 @@ class FrankaPartitionedWorld(FrankaWorld):
     
 
     def build_add_abstraction_dynamic(self, draw_causal_graph: bool = False, print_facts: bool = True) \
-         -> Tuple[DynWeightedPartitionedFrankaAbs, List[BDD], List[BDD], List[BDD], List[BDD]]:
+         -> Tuple[DynWeightedPartitionedFrankaAbs, List[ADD], List[ADD], List[ADD], List[ADD]]:
         """
          Main Function to Build Two-player Transition System with edge weights.
         """
@@ -420,7 +418,7 @@ class FrankaPartitionedWorld(FrankaWorld):
         org_to_mod_act: dict = self.get_act_to_mod_act_dict(task=task)
         
         # get the actual parameterized actions and add their corresponding weights
-        new_weight_dict = self._create_weight_dict(mod_action=modified_actions['robot'])
+        new_weight_dict = self._create_weight_dict(mod_action=modified_actions['robot'], task=task)
 
         # sort them according to their weights and then convert them in to addConst; reverse will sort the weights in descending order
         weight_dict = {k: v for k, v in sorted(new_weight_dict.items(), key=lambda item: item[1], reverse=True)}
@@ -614,6 +612,10 @@ class FrankaPartitionedWorld(FrankaWorld):
             # sys.exit(-1)
             if win_str:
                 reachability_handle.roll_out_strategy(transducer=win_str, verbose=True)
+            
+            # need to do this when testing 
+            del reachability_handle.stra_list
+            del reachability_handle.winning_states
 
         elif self.algorithm == 'quant-adv':
             min_max_handle = AdversarialGame(ts_handle=self.ts_handle,

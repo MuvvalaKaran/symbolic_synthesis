@@ -137,12 +137,16 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
         """
         # initiate BDDs for all the action 
         action_idx_map = bidict()
-        _actions = self.actions
-        for _idx, _action in enumerate(_actions):
-            action_idx_map[_action] = _idx
+        num_of_acts: int = 0
+
+        for act in self.task.operators:
+            action_idx_map[act.name] = num_of_acts
+            num_of_acts += 1
         
         self.tr_action_idx_map = action_idx_map
-        self.sym_tr_actions = [[self.manager.bddZero() for _ in range(sum([len(listElem) for listElem in self.sym_vars_lbl]) + len(self.sym_vars_curr))] for _ in range(len(self.actions))]
+
+        num_ts_state_vars: int = sum([len(listElem) for listElem in self.sym_vars_lbl]) + len(self.sym_vars_curr)
+        self.sym_tr_actions = [[self.manager.bddZero() for _ in range(num_ts_state_vars)] for _ in range(num_of_acts)]
     
 
     def get_mod_act_name(self, org_act_name: str) -> str:
@@ -240,7 +244,7 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
         if human_action_name != '':
             # get the modified human action name
             mod_haction_name: str = self.get_mod_act_name(org_act_name=human_action_name)
-            _tr_idx: int = self.tr_action_idx_map.get(mod_haction_name)
+            _tr_idx: int = self.tr_action_idx_map.get(human_action_name)
             
             if 'debug' in kwargs:
                 edge_exist: bool = (self.mono_tr_bdd & curr_state_sym & robot_move & self.predicate_sym_map_human[mod_haction_name]).isZero()
@@ -250,7 +254,7 @@ class DynamicFrankaTransitionSystem(PartitionedFrankaTransitionSystem):
                 
                 self.mono_tr_bdd |= curr_state_sym & robot_move & self.predicate_sym_map_human[mod_haction_name]
         else:
-            _tr_idx: int = self.tr_action_idx_map.get(mod_raction_name)
+            _tr_idx: int = self.tr_action_idx_map.get(robot_action_name)
             if 'debug' in kwargs:
                 edge_exist: bool = (self.mono_tr_bdd & curr_state_sym & robot_move & no_human_move).isZero()
                 
@@ -677,12 +681,17 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
         """
         # initiate BDDs for all the action 
         action_idx_map = bidict()
-        _actions = self.actions
-        for _idx, _action in enumerate(_actions):
-            action_idx_map[_action] = _idx
+        num_of_acts: int = 0
         
+        for act in self.task.operators:
+            action_idx_map[act.name] = num_of_acts
+            num_of_acts += 1
+
         self.tr_action_idx_map = action_idx_map
-        self.sym_tr_actions = [[self.manager.bddZero() for _ in range(sum([len(listElem) for listElem in self.sym_vars_lbl]) + len(self.sym_vars_curr) + len(self.sym_vars_hint))] for _ in range(len(self.actions))]
+
+        # we also have boolean vars related to human intervention 
+        num_ts_state_vars: int = sum([len(listElem) for listElem in self.sym_vars_lbl]) + len(self.sym_vars_curr) + len(self.sym_vars_hint)
+        self.sym_tr_actions = [[self.manager.bddZero() for _ in range(num_ts_state_vars)] for _ in range(num_of_acts)]
 
 
     def _initialize_bdd_for_human_int(self):
@@ -746,7 +755,7 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
             # get the modified human action name
             mod_haction_name: str = self.get_mod_act_name(org_act_name=human_action_name)
             nxt_state_sym = nxt_state_sym & self.predicate_sym_map_hint[curr_hint - 1]
-            _tr_idx: int = self.tr_action_idx_map.get(mod_haction_name)
+            _tr_idx: int = self.tr_action_idx_map.get(human_action_name)
 
             if 'debug' in kwargs:
                 edge_exist: bool = (self.mono_tr_bdd & curr_state_sym & robot_move & self.predicate_sym_map_human[mod_haction_name] & self.predicate_sym_map_hint[curr_hint]).isZero()
@@ -757,7 +766,7 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
                 self.mono_tr_bdd |= curr_state_sym & self.predicate_sym_map_human[mod_haction_name] & self.predicate_sym_map_hint[curr_hint]
         else:
             nxt_state_sym = nxt_state_sym & self.predicate_sym_map_hint[curr_hint]
-            _tr_idx: int = self.tr_action_idx_map.get(mod_raction_name)
+            _tr_idx: int = self.tr_action_idx_map.get(robot_action_name)
 
             if 'debug' in kwargs:
                 edge_exist: bool = (self.mono_tr_bdd &  curr_state_sym & robot_move & no_human_move & self.predicate_sym_map_hint[curr_hint]).isZero()
