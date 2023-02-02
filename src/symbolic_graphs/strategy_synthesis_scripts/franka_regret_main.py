@@ -406,6 +406,15 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
                                                         cudd_manager=self.manager)
         
         # compute the cooperative value from each prod state in the graph of utility
-        gou_min_min_handle.solve(verbose=False)
+        cvals: ADD = gou_min_min_handle.solve(verbose=False)
 
         assert gou_min_min_handle.init_state_value == self.min_energy_budget, "Error computing CVal on Graph of Utility. Mismatch in Init stat value. Fix This!!!"
+
+        start: float = time.time()
+        # compute the best alternative from each edge for cumulative payoff
+        self.graph_of_utls_handle.get_best_alternatives(cooperative_vals=cvals, mod_act_dict=self.mod_act_dict, verbose=False)
+        stop: float = time.time()
+        print("Time took for computing the set of best alternatives: ", stop - start)
+
+
+        # compute the best alternative from each edge for cumulative payoff

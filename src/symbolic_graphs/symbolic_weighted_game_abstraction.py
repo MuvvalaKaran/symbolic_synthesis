@@ -81,6 +81,8 @@ class DynWeightedPartitionedFrankaAbs():
 
         self.state_cube = reduce(lambda x, y: x & y, self.sym_vars_curr)
         self.lbl_cube = reduce(lambda x, y: x & y, [lbl for sym_vars_list in self.sym_vars_lbl for lbl in sym_vars_list])
+        self.sys_cube: ADD = reduce(lambda x, y: x & y, self.sym_vars_robot)
+        self.env_cube: ADD = reduce(lambda x, y: x & y, self.sym_vars_human)
 
         # adding support and top location. Useful during arch construction to chekc for valid human intervention.
         self.sup_locs = sup_locs

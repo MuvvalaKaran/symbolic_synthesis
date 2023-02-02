@@ -517,9 +517,6 @@ class GraphOfUtlCooperativeGame(BaseSymbolicSearch):
 
             # update counter 
             layer += 1
-
-
-
     
     def roll_out_strategy(self, strategy: ADD, verbose: bool = False):
         raise NotImplementedError()
