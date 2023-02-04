@@ -64,6 +64,16 @@ class FrankaWorld(BaseSymMain):
         # support and top locations referred during the Arch Abstarction construction
         self.sup_locs = sup_locs
         self.top_locs = top_locs
+
+        self.ts_handle: Union[SymbolicFrankaTransitionSystem, SymbolicWeightedFrankaTransitionSystem] = None
+        self.dfa_handle_list: Union[SymbolicDFAFranka, SymbolicAddDFAFranka] = None
+
+        self.ts_x_list: List[ADD] = None
+        self.ts_y_list: List[ADD] = None
+        self.ts_obs_list: List[ADD] = None
+
+        self.dfa_x_list: List[ADD] = None
+        self.dfa_y_list: List[ADD] = None
     
 
     def build_abstraction(self, draw_causal_graph: bool = False):
@@ -87,15 +97,15 @@ class FrankaWorld(BaseSymMain):
             warnings.warn("Please enter a valid graph search algorthim. Currently Available - bfs (BDD), dijkstras (BDD/ADD), astar (BDD/ADD)")
 
 
-        self.ts_handle: Union[SymbolicFrankaTransitionSystem, SymbolicWeightedFrankaTransitionSystem] = sym_tr
-        self.dfa_handle_list: Union[SymbolicDFAFranka, SymbolicAddDFAFranka] = dfa_tr
+        self.ts_handle = sym_tr
+        self.dfa_handle_list = dfa_tr
 
-        self.ts_x_list: List[ADD] = ts_curr_state
-        self.ts_y_list: List[ADD] = ts_next_state
-        self.ts_obs_list: List[ADD] = ts_lbl_states
+        self.ts_x_list = ts_curr_state
+        self.ts_y_list = ts_next_state
+        self.ts_obs_list = ts_lbl_states
 
-        self.dfa_x_list: List[ADD] = dfa_curr_state
-        self.dfa_y_list: List[ADD] = dfa_next_state
+        self.dfa_x_list = dfa_curr_state
+        self.dfa_y_list = dfa_next_state
 
 
         if self.dyn_var_ordering:

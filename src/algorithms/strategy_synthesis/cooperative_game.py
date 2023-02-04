@@ -448,7 +448,6 @@ class GraphOfUtlCooperativeGame(BaseSymbolicSearch):
         strategy = strategy.min(accp_states)
 
         layer: int = 0
-        # c_max: int = self.prod_handle.max_ts_action_cost
 
         sym_lbl_cubes = self._create_lbl_cubes()
 

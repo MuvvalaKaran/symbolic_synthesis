@@ -77,7 +77,7 @@ class DynWeightedPartitionedFrankaAbs():
         # refered during graph of utility construction
         self.org_adj_map = defaultdict(lambda: defaultdict(lambda: {}))
         # edge counter
-        self.ecount = 0
+        self.ecount: int = 0
 
         self.state_cube = reduce(lambda x, y: x & y, self.sym_vars_curr)
         self.lbl_cube = reduce(lambda x, y: x & y, [lbl for sym_vars_list in self.sym_vars_lbl for lbl in sym_vars_list])

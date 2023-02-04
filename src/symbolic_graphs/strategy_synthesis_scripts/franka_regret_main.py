@@ -66,6 +66,7 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
         # graph of utility handle
         self.graph_of_utls_handle: SymbolicGraphOfUtility = None
 
+        # Map to store org act name to mod act name
         # create during the first abstraction construction call
         self.mod_act_dict = None
 
@@ -75,6 +76,10 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
 
         self.min_energy_budget: Union[int, float] = math.inf
         self.reg_energy_budget: Union[int, float] = math.inf
+
+        # keep track of utility and best alternative response
+        self.prod_utls_vars: List[ADD] = None
+        self.prod_ba_vars: List[ADD] = None
     
 
     def build_abstraction(self, draw_causal_graph: bool = False, dynamic_env: bool = False, bnd_dynamic_env: bool = False, max_human_int: int = 0):
@@ -204,44 +209,44 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
                     if len(locs) == 0:
                         weight: int = self.weight_dict['transit']
                     elif locs[0] in causal_instance.task_intervening_locations:
-                        weight: int = 2 * self.weight_dict['transit']
-                    else:
                         weight: int = self.weight_dict['transit']
+                    else:
+                        weight: int = 2 * self.weight_dict['transit']
                 else:
                     if locs[1] in causal_instance.task_intervening_locations:
-                        weight: int = 2 * self.weight_dict['transit']     
+                        weight: int = self.weight_dict['transit']     
                     else:
-                        weight: int = self.weight_dict['transit']
+                        weight: int = 2 * self.weight_dict['transit']
 
                 
             elif 'transfer' in op.name:
                 locs: List[str] = re.findall(_loc_pattern, op.name)
                 if 'else' in op.name:
                     if locs[0] in causal_instance.task_intervening_locations:
-                        weight: int = 2 * self.weight_dict['transfer']
-                    else:
                         weight: int = self.weight_dict['transfer']
+                    else:
+                        weight: int = 2 * self.weight_dict['transfer']
                 else:
                     if locs[1] in causal_instance.task_intervening_locations:
-                        weight: int = 2 * self.weight_dict['transfer']
-                    else:
                         weight: int = self.weight_dict['transfer']
+                    else:
+                        weight: int = 2 * self.weight_dict['transfer']
             
             elif 'grasp' in op.name:
                 locs: List[str] = re.findall(_loc_pattern, op.name)
                 if 'else' in op.name:
                     weight: int = self.weight_dict['grasp']
                 elif locs[0] in causal_instance.task_intervening_locations:
-                    weight: int = 2* self.weight_dict['grasp']
-                else:
                     weight: int = self.weight_dict['grasp']
+                else:
+                    weight: int = 2 * self.weight_dict['grasp']
             
             elif 'release' in op.name:
                 locs: List[str] = re.findall(_loc_pattern, op.name)
                 if locs[0] in causal_instance.task_intervening_locations:
-                    weight: int = 2* self.weight_dict['release']
-                else:
                     weight: int = self.weight_dict['release']
+                else:
+                    weight: int = 2 * self.weight_dict['release']
                 
             else:
                 weight: int = self.weight_dict['human']
@@ -340,7 +345,7 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
         self.reg_energy_budget = math.ceil(self.min_energy_budget * 2.0)
 
         # construct additional boolean variables used during the construction of the new graph
-        ts_utls_vars: List[ADD] = self._create_symbolic_lbl_vars(state_lbls=list(range(self.reg_energy_budget + 1)),
+        self.prod_utls_vars = self._create_symbolic_lbl_vars(state_lbls=list(range(self.reg_energy_budget + 1)),
                                                                  state_var_name='k',
                                                                  add_flag=True)
 
@@ -352,7 +357,7 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
         # construct the graph of utilty
         graph_of_utls_handle = SymbolicGraphOfUtility(curr_vars=self.ts_x_list,
                                                       lbl_vars=self.ts_obs_list,
-                                                      state_utls_vars=ts_utls_vars,
+                                                      state_utls_vars=self.prod_utls_vars,
                                                       robot_action_vars=self.ts_robot_vars,
                                                       human_action_vars=self.ts_human_vars,
                                                       task=self.ts_handle.task,
@@ -402,7 +407,7 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
                                                         sys_act_vars=self.ts_robot_vars,
                                                         env_act_vars=self.ts_human_vars,
                                                         ts_obs_vars=self.ts_obs_list,
-                                                        ts_utls_vars=self.graph_of_utls_handle.sym_vars_ults,
+                                                        ts_utls_vars=self.prod_utls_vars,
                                                         cudd_manager=self.manager)
         
         # compute the cooperative value from each prod state in the graph of utility
@@ -416,5 +421,14 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
         stop: float = time.time()
         print("Time took for computing the set of best alternatives: ", stop - start)
 
+        # construct addiotnal boolean vars for set of best alternative values
+        ts_ba_vars: List[ADD] = self._create_symbolic_lbl_vars(state_lbls=self.graph_of_utls_handle.ba_set,
+                                                               state_var_name='r',
+                                                               add_flag=True)
+
+
+        # we do need more boolean variables than the # of utility vars as ba_set is subset of utls vars
+        assert len(ts_ba_vars) <= len(self.prod_utls_vars), "We should NOT create more boolean vars for Best alternative than Utility Vars. Fix this!!!"
 
         # compute the best alternative from each edge for cumulative payoff
+        print("Done!!")
