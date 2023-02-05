@@ -13,7 +13,7 @@ from cudd import Cudd, BDD, ADD
 
 from src.explicit_graphs import CausalGraph, Ltlf2MonaDFA
 
-from src.algorithms.strategy_synthesis import AdversarialGame, GraphOfUtlCooperativeGame
+from src.algorithms.strategy_synthesis import AdversarialGame, GraphOfUtlCooperativeGame, GraphofBRAdvGame
 
 from src.symbolic_graphs import ADDPartitionedDFA
 from src.symbolic_graphs import DynWeightedPartitionedFrankaAbs
@@ -392,7 +392,7 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
 
     def solve(self, verbose: bool = False):
         """
-         OVerides base method to first construct the required graph and then run ValueIteration
+         Overides base method to first construct the required graph and then run ValueIteration
         """
 
         # constuct graph of utility
@@ -456,4 +456,21 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
         print("Time took for costructing the Graph of best Response: ", stop - start)
 
 
-        print("Done!!")
+        # compute regret-minmizing strategies
+        gbr_min_max_handle =  GraphofBRAdvGame(prod_gbr_handle=graph_of_br_handle,
+                                                prod_gou_handle=self.graph_of_utls_handle,
+                                                ts_handle=self.ts_handle,
+                                                dfa_handle=self.dfa_handle,
+                                                ts_curr_vars=self.ts_x_list,
+                                                dfa_curr_vars=self.dfa_x_list,
+                                                ts_obs_vars=self.ts_obs_list,
+                                                prod_utls_vars=self.prod_utls_vars,
+                                                prod_ba_vars=self.prod_ba_vars,
+                                                sys_act_vars=self.ts_robot_vars,
+                                                env_act_vars=self.ts_human_vars,
+                                                cudd_manager=self.manager)
+        
+        start: float = time.time()
+        reg_str: ADD = gbr_min_max_handle.solve(verbose=False)
+        stop: float = time.time()
+        print("Time took for computing min-max strs on the Graph of best Response: ", stop - start)

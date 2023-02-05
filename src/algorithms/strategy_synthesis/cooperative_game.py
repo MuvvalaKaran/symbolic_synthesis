@@ -303,22 +303,16 @@ class GraphOfUtlCooperativeGame(BaseSymbolicSearch):
         self.prod_trans_func_list: List[List[ADD]] = prod_handle.sym_tr_actions
         self.prod_bdd_trans_func_list: List[List[BDD]] = []
 
-        # self.dfa_transition_fun_list: List[ADD] = dfa_handle.tr_state_adds
-
-        # need these two during preimage computation 
+        # need this during preimage computation 
         self.dfa_bdd_x_list = [i.bddPattern() for i in dfa_curr_vars]
-        # self.dfa_bdd_transition_fun_list: List[BDD] = [i.bddPattern() for i in self.dfa_transition_fun_list]
 
         self.ts_action_idx_map: bidict = ts_handle.tr_action_idx_map
 
         self.ts_sym_to_curr_state_map: bidict = ts_handle.predicate_sym_map_curr.inv
-        self.ts_sym_to_S2obs_map: bidict = ts_handle.predicate_sym_map_lbl.inv
         self.dfa_sym_to_curr_state_map: bidict = dfa_handle.dfa_predicate_add_sym_map_curr.inv
 
         self.ts_sym_to_human_act_map: bidict = ts_handle.predicate_sym_map_human.inv
         self.ts_sym_to_robot_act_map: bidict = ts_handle.predicate_sym_map_robot.inv
-
-        self.obs_add: ADD = ts_handle.sym_state_labels
         
         self.ts_handle = ts_handle
         self.dfa_handle = dfa_handle
@@ -427,10 +421,10 @@ class GraphOfUtlCooperativeGame(BaseSymbolicSearch):
          Compute the pre-image on the product graph
         """
         pre_prod_state: BDD = self.manager.bddZero()
-        count = 0
+        
         for ts_transition in self.prod_bdd_trans_func_list:
             pre_prod_state |= From.vectorCompose(self.prod_bdd_curr_list, [*ts_transition])
-            count += 1   # adding for debugging purposes
+            
         return pre_prod_state
 
     
@@ -516,6 +510,7 @@ class GraphOfUtlCooperativeGame(BaseSymbolicSearch):
 
             # update counter 
             layer += 1
+    
     
     def roll_out_strategy(self, strategy: ADD, verbose: bool = False):
         raise NotImplementedError()
