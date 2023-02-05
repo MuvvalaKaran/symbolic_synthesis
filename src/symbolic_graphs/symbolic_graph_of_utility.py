@@ -6,6 +6,7 @@ import sys
 import time
 import warnings
 
+from math import inf
 from bidict import bidict
 from functools import reduce
 from itertools import product
@@ -15,6 +16,7 @@ from typing import Union, List, Tuple, Dict
 from cudd import Cudd, BDD, ADD
 
 from src.symbolic_graphs import DynWeightedPartitionedFrankaAbs
+from src.symbolic_graphs import ADDPartitionedDFA
 
 
 class SymbolicGraphOfUtility(DynWeightedPartitionedFrankaAbs):
@@ -38,8 +40,8 @@ class SymbolicGraphOfUtility(DynWeightedPartitionedFrankaAbs):
                  sup_locs: List[str],
                  top_locs: List[str],
                  budget: int,
-                 dfa_handle,
-                 ts_handle,
+                 dfa_handle: ADDPartitionedDFA,
+                 ts_handle: DynWeightedPartitionedFrankaAbs,
                  int_weight_dict: Dict[str, int],
                  **kwargs):
         super().__init__(curr_vars,
@@ -58,10 +60,9 @@ class SymbolicGraphOfUtility(DynWeightedPartitionedFrankaAbs):
                          sup_locs,
                          top_locs,
                          **kwargs)
-
-        self.dfa_handle = dfa_handle
-        self.ts_handle = ts_handle
-
+        self.ts_handle: DynWeightedPartitionedFrankaAbs = ts_handle
+        self.dfa_handle: ADDPartitionedDFA = dfa_handle
+        
         self.int_weight_dict = int_weight_dict
 
         # need these two during image computation 
@@ -544,3 +545,5 @@ class SymbolicGraphOfUtility(DynWeightedPartitionedFrankaAbs):
         # sanity check. The set of best alternative values should be subset of utility values
         assert self.ba_set.issubset(self.leaf_vals), "Error computing set of beat alternatives. The BA set should be a subset of utility values "
 
+        # add infinity to the set of best responses
+        self.ba_set.add(inf)

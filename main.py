@@ -126,7 +126,6 @@ if __name__ == "__main__":
                 "release" : 1,
                 "human": 0
                 }
-            
 
 
             # partitioned frankaworld stuff
@@ -191,7 +190,7 @@ if __name__ == "__main__":
             
             regret_synthesis_handle.build_abstraction()
             regret_synthesis_handle.solve(verbose=False)
-            # print(f"****************** # Total Boolean Variables: { cudd_manager.size()} ******************")
+            print(f"****************** # Total Boolean Variables: { cudd_manager.size()} ******************")
             # regret_synthesis_handle.solve(verbose=False)
 
         else:

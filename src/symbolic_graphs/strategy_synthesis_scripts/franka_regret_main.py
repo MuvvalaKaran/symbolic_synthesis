@@ -15,10 +15,9 @@ from src.explicit_graphs import CausalGraph, Ltlf2MonaDFA
 
 from src.algorithms.strategy_synthesis import AdversarialGame, GraphOfUtlCooperativeGame
 
-from src.symbolic_graphs import PartitionedDFA, ADDPartitionedDFA
-from src.symbolic_graphs import PartitionedFrankaTransitionSystem, DynamicFrankaTransitionSystem, BndDynamicFrankaTransitionSystem
+from src.symbolic_graphs import ADDPartitionedDFA
 from src.symbolic_graphs import DynWeightedPartitionedFrankaAbs
-from src.symbolic_graphs import SymbolicGraphOfUtility
+from src.symbolic_graphs import SymbolicGraphOfUtility, SymbolicGraphOfBR
 
 from src.symbolic_graphs.strategy_synthesis_scripts import FrankaPartitionedWorld
 
@@ -80,6 +79,7 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
         # keep track of utility and best alternative response
         self.prod_utls_vars: List[ADD] = None
         self.prod_ba_vars: List[ADD] = None
+        self.prod_succ_ba_vars: List[ADD] = None
     
 
     def build_abstraction(self, draw_causal_graph: bool = False, dynamic_env: bool = False, bnd_dynamic_env: bool = False, max_human_int: int = 0):
@@ -417,18 +417,49 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
 
         start: float = time.time()
         # compute the best alternative from each edge for cumulative payoff
-        self.graph_of_utls_handle.get_best_alternatives(cooperative_vals=cvals, mod_act_dict=self.mod_act_dict, verbose=False)
+        self.graph_of_utls_handle.get_best_alternatives(cooperative_vals=cvals,
+                                                        mod_act_dict=self.mod_act_dict,
+                                                        verbose=False)
         stop: float = time.time()
         print("Time took for computing the set of best alternatives: ", stop - start)
 
         # construct addiotnal boolean vars for set of best alternative values
-        ts_ba_vars: List[ADD] = self._create_symbolic_lbl_vars(state_lbls=self.graph_of_utls_handle.ba_set,
-                                                               state_var_name='r',
-                                                               add_flag=True)
+        self.prod_ba_vars: List[ADD] = self._create_symbolic_lbl_vars(state_lbls=self.graph_of_utls_handle.ba_set,
+                                                                      state_var_name='r',
+                                                                      add_flag=True)
+        
+        # to make transitions unique we need to create addional boolean vars
+        # self.prod_succ_ba_vars: List[ADD] = self._create_symbolic_lbl_vars(state_lbls=self.graph_of_utls_handle.ba_set,
+        #                                                                     state_var_name='s',
+        #                                                                     add_flag=True)
+        # sys.exit(-1)
+        # construct of Best response G^{br}
+        graph_of_br_handle = SymbolicGraphOfBR(curr_vars=self.ts_x_list,
+                                               lbl_vars=self.ts_obs_list,
+                                               robot_action_vars=self.ts_robot_vars,
+                                               human_action_vars=self.ts_human_vars,
+                                               task=self.ts_handle.task,
+                                               domain=self.ts_handle.domain,
+                                               ts_state_map=self.ts_handle.pred_int_map,
+                                               ts_states=self.ts_handle.ts_states,
+                                               manager=self.manager,
+                                               weight_dict=self.ts_handle.weight_dict,
+                                               seg_actions=self.ts_handle.actions,
+                                               ts_state_lbls=self.ts_handle.state_lbls,
+                                               dfa_state_vars=self.dfa_x_list,
+                                               sup_locs=self.sup_locs,
+                                               top_locs=self.top_locs,
+                                               ts_handle=self.ts_handle,
+                                               dfa_handle=self.dfa_handle,
+                                               symbolic_gou_handle=self.graph_of_utls_handle,
+                                               prod_ba_vars=self.prod_ba_vars, 
+                                               prod_succ_ba_vars=None)
 
+        start: float = time.time()
+        graph_of_br_handle.construct_graph_of_best_response(mod_act_dict=self.mod_act_dict,
+                                                            verbose=False,
+                                                            debug=True)
+        stop: float = time.time()
+        print("Time took for costructing the Graph of best Response: ", stop - start)
 
-        # we do need more boolean variables than the # of utility vars as ba_set is subset of utls vars
-        assert len(ts_ba_vars) <= len(self.prod_utls_vars), "We should NOT create more boolean vars for Best alternative than Utility Vars. Fix this!!!"
-
-        # compute the best alternative from each edge for cumulative payoff
         print("Done!!")
