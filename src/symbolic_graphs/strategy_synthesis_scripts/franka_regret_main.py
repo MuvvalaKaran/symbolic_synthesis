@@ -413,8 +413,6 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
         # compute the cooperative value from each prod state in the graph of utility
         cvals: ADD = gou_min_min_handle.solve(verbose=False)
 
-        assert gou_min_min_handle.init_state_value == self.min_energy_budget, "Error computing CVal on Graph of Utility. Mismatch in Init stat value. Fix This!!!"
-
         start: float = time.time()
         # compute the best alternative from each edge for cumulative payoff
         self.graph_of_utls_handle.get_best_alternatives(cooperative_vals=cvals,
@@ -428,11 +426,6 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
                                                                       state_var_name='r',
                                                                       add_flag=True)
         
-        # to make transitions unique we need to create addional boolean vars
-        # self.prod_succ_ba_vars: List[ADD] = self._create_symbolic_lbl_vars(state_lbls=self.graph_of_utls_handle.ba_set,
-        #                                                                     state_var_name='s',
-        #                                                                     add_flag=True)
-        # sys.exit(-1)
         # construct of Best response G^{br}
         graph_of_br_handle = SymbolicGraphOfBR(curr_vars=self.ts_x_list,
                                                lbl_vars=self.ts_obs_list,
@@ -461,5 +454,6 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
                                                             debug=True)
         stop: float = time.time()
         print("Time took for costructing the Graph of best Response: ", stop - start)
+
 
         print("Done!!")

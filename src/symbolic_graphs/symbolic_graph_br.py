@@ -298,7 +298,7 @@ class SymbolicGraphOfBR(DynWeightedPartitionedFrankaAbs):
         sym_trap_state: ADD = self.get_sym_state_from_exp_states(exp_states=['(trap-state)'])
         prod_trap_state_sym: ADD = sym_trap_state & sym_trap_state_lbl &  self.dfa_handle.sym_init_state & self.gou_handle.predicate_sym_map_utls[self.gou_handle.energy_budget] & self.predicate_sym_map_ba[inf]
 
-        # Add trap to the set of explored states
+        # Add trap-state to the set of explored states
         self.closed |= prod_trap_state_sym
 
         layer = 0
@@ -309,7 +309,6 @@ class SymbolicGraphOfBR(DynWeightedPartitionedFrankaAbs):
         
         # the init state is of the Form ((ts-tuple), DFA, Utl val, BR Value)
         self.open_list[layer].add((*init_gou_state_tuple, 0, inf))
-        self.scount += 1
 
         # prod state have TS, DFA, Utls and BA vars
         prod_curr_list: List[ADD] = [*self.dfa_handle.sym_add_vars_curr]
@@ -351,15 +350,26 @@ class SymbolicGraphOfBR(DynWeightedPartitionedFrankaAbs):
                     # create current sym prod state
                     curr_prod_sym_state: ADD = curr_ts_sym_state & curr_dfa_sym_state & curr_utls_sym & curr_ba_sym
 
+                    self.scount += 1
+
                     # for every valus successors state in the Graph of Utility. . 
                     for robot_act in self.gou_handle.prod_adj_map[(curr_ts_tuple, curr_dfa_tuple, curr_utls_tuple)]:
-
-                        # Loop through all possible BA values and add valid edges to TR
-                        # for ba_val in self.ba_set:
                         # edge corresponding to human intervention
                         no_human_move_edge: ADD = self.manager.addOne()
                         
                         valid_act_list = []
+
+                        mod_raction_name: str = mod_act_dict[robot_act]
+                        robot_move: ADD = self.ts_handle.predicate_sym_map_robot[mod_raction_name]
+
+                        # get the corresponding ba values
+                        ba_sym: ADD = curr_ts_sym_state & curr_dfa_sym_state & curr_utls_sym & robot_move & self.gou_handle.ba_strategy
+
+                        ba_cube: List[Tuple(list, int)] = list(ba_sym.generate_cubes())   
+                        assert len(ba_cube) == 1, "Error computing cube string for the symbolic representation of the next state's best alternate response. FIX THIS!!!"
+
+                        next_ba_int = min(ba_cube[0][1], curr_br_tuple)
+                        next_ba_sym = self.predicate_sym_map_ba[next_ba_int]
 
                         for human_act, next_state_tuple in self.gou_handle.prod_adj_map[(curr_ts_tuple, curr_dfa_tuple, curr_utls_tuple)][robot_act].items():
                             # first loop over all the human intervening move and then the non-intervening one
@@ -383,7 +393,6 @@ class SymbolicGraphOfBR(DynWeightedPartitionedFrankaAbs):
 
                             # get successor TS state tuple and sym repr
                             next_sym_state: ADD = self.get_sym_state_from_tuple(next_ts_tuple)
-                            # next_state_tuple = self.get_tuple_from_state(next_exp_state) 
 
                             # successor sym DFA repr
                             next_dfa_sym: ADD = self.dfa_handle.dfa_predicate_add_sym_map_curr[next_dfa_tuple]
@@ -391,15 +400,12 @@ class SymbolicGraphOfBR(DynWeightedPartitionedFrankaAbs):
                             # successor sym utls repr
                             next_utls_sym : ADD = self.gou_handle.predicate_sym_map_utls[next_utls_tuple]
 
-                            # successors sym BA repr - remains the same under human transition
-                            next_ba_sym : ADD = curr_ba_sym
-
                             # compute the next prod state
                             next_prod_sym_state: ADD = next_sym_state & next_dfa_sym & next_utls_sym & next_ba_sym
 
                             self.add_edge_to_action_tr(curr_state_tuple=curr_prod_tuple,
                                                        curr_state_sym=curr_prod_sym_state,
-                                                       next_state_tuple=(*next_state_tuple, curr_br_tuple),
+                                                       next_state_tuple=(*next_state_tuple, next_ba_int),
                                                        mod_act_dict=mod_act_dict,
                                                        nxt_state_sym=next_prod_sym_state,
                                                        human_action_name=human_act,
@@ -422,18 +428,15 @@ class SymbolicGraphOfBR(DynWeightedPartitionedFrankaAbs):
                                                             next_br_tuple=curr_br_tuple,
                                                             next_prod_sym_state=next_prod_sym_state,
                                                             verbose=verbose)
+                                self.closed |= next_prod_sym_state
                                 continue
 
                             
                             # add them to their respective bucket. . .
                             self.open_list[next_utls_tuple].add((*next_state_tuple, curr_br_tuple))
-                            
-                            # update state counter
-                            self.scount += 1
-
-
+                            self.closed |= next_prod_sym_state
                         
-                        # now add robot edhes with no human-intervention
+                        # now add robot edges with no human-intervention
                         # if there are any valid human edges from curr state
                         if len(valid_act_list) > 0:
                             valid_hact: List[ADD] = [self.ts_handle.predicate_sym_map_human[mod_act_dict[ha]] for ha in valid_act_list]
@@ -465,19 +468,6 @@ class SymbolicGraphOfBR(DynWeightedPartitionedFrankaAbs):
                         next_dfa_sym: ADD = self.dfa_handle.dfa_predicate_add_sym_map_curr[next_dfa_tuple]
                         next_utls_sym : ADD = self.gou_handle.predicate_sym_map_utls[next_utls_tuple]
 
-                        mod_raction_name: str = mod_act_dict[robot_act]
-                        robot_move: ADD = self.ts_handle.predicate_sym_map_robot[mod_raction_name]
-
-                        # get the corresponding ba values
-                        # ba_sym: ADD =  next_sym_state & next_dfa_sym & next_utls_sym & robot_move & self.gou_handle.ba_strategy
-                        ba_sym: ADD = curr_prod_sym_state & robot_move & self.gou_handle.ba_strategy
-
-                        ba_cube: List[Tuple(list, int)] = list(ba_sym.generate_cubes())   
-                        assert len(ba_cube) == 1, "Error computing cube string for the symbolic representation of the next state's best alternate response. FIX THIS!!!"
-
-                        next_ba_int = min(ba_cube[0][1], curr_br_tuple)
-                        next_ba_sym = self.predicate_sym_map_ba[next_ba_int]
-
                         # compute the next prod state as 0-1 ADD
                         next_prod_sym_state: ADD = next_sym_state & next_dfa_sym & next_utls_sym & next_ba_sym
 
@@ -504,18 +494,19 @@ class SymbolicGraphOfBR(DynWeightedPartitionedFrankaAbs):
                                                         next_br_tuple=next_ba_int,
                                                         next_prod_sym_state=next_prod_sym_state,
                                                         verbose=verbose)
+                            self.closed |= next_prod_sym_state
+
                             continue
 
                         # add them to their respective bucket. . .
                         self.open_list[next_utls_tuple].add((*next_state_tuple, next_ba_int))
+                        self.closed |= next_prod_sym_state
 
-                        # update state counter
-                        self.scount += 1
             else:
                 empty_bucket_counter += 1
                 # If Cmax consecutive layers are empty. . .
                 if empty_bucket_counter == self.gou_handle.max_ts_action_cost:
-                    print(f"Done Computing the Graph of Utility! Accepting Leaf nodes {self.lcount}; Total states {self.scount}; Total edges {self.ecount}")
+                    print(f"Done Computing the Graph of Best Response! Accepting Leaf nodes {self.lcount}; Total states {self.scount}; Total edges {self.ecount}")
                     break
             
             layer += 1
