@@ -269,12 +269,16 @@ class SymbolicGraphOfBR(DynWeightedPartitionedFrankaAbs):
         
         # create the adj map for rollout purposes
         if human_action_name != '':
-            assert self.prod_adj_map.get(curr_state_tuple, {}).get(robot_action_name, {}).get(human_action_name) is None, "Error Computing Adj Dictionary, Fix this!!!"
-            self.prod_adj_map[curr_state_tuple][robot_action_name][human_action_name] = next_state_tuple
+            # assert self.prod_adj_map.get(curr_state_tuple, {}).get(robot_action_name, {}).get(human_action_name) is None, "Error Computing Adj Dictionary, Fix this!!!"
+            # self.prod_adj_map[curr_state_tuple][robot_action_name][human_action_name] = next_state_tuple
+            assert self.prod_adj_map.get(curr_state_tuple, {}).get(mod_raction_name, {}).get(mod_haction_name) is None, "Error Computing Adj Dictionary, Fix this!!!"
+            self.prod_adj_map[curr_state_tuple][mod_raction_name][mod_haction_name] = next_state_tuple
         
         else:
-            assert self.prod_adj_map.get(curr_state_tuple, {}).get(robot_action_name, {}).get('r') is None, "Error Computing Adj Dictionary, Fix this!!!"
-            self.prod_adj_map[curr_state_tuple][robot_action_name]['r'] = next_state_tuple
+            # assert self.prod_adj_map.get(curr_state_tuple, {}).get(robot_action_name, {}).get('r') is None, "Error Computing Adj Dictionary, Fix this!!!"
+            # self.prod_adj_map[curr_state_tuple][robot_action_name]['r'] = next_state_tuple
+            assert self.prod_adj_map.get(curr_state_tuple, {}).get(mod_raction_name, {}).get('r') is None, "Error Computing Adj Dictionary, Fix this!!!"
+            self.prod_adj_map[curr_state_tuple][mod_raction_name]['r'] = next_state_tuple
 
         # update edge count 
         self.ecount += 1
@@ -321,8 +325,8 @@ class SymbolicGraphOfBR(DynWeightedPartitionedFrankaAbs):
         
         while True:
             if len(self.open_list[layer]) > 0:
-                if verbose:
-                    print(f"********************Layer: {layer}**************************")
+                # if verbose:
+                print(f"********************Layer: {layer}**************************")
                 
                 # reset the empty bucket counter 
                 empty_bucket_counter = 0

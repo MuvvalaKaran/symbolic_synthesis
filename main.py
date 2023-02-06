@@ -182,14 +182,14 @@ if __name__ == "__main__":
                                                             weight_dict=wgt_dict,
                                                             ltlf_flag=USE_LTLF,
                                                             dyn_var_ord=DYNAMIC_VAR_ORDERING,
-                                                            algorithm=GAME_ALGORITHM,
+                                                            algorithm=None,
                                                             verbose=False,
                                                             plot_ts=False,
                                                             plot_obs=False,
                                                             plot=False)
             
             regret_synthesis_handle.build_abstraction()
-            regret_synthesis_handle.solve(verbose=False)
+            regret_synthesis_handle.solve(verbose=False, just_adv_game=False)
             print(f"****************** # Total Boolean Variables: { cudd_manager.size()} ******************")
             # regret_synthesis_handle.solve(verbose=False)
 

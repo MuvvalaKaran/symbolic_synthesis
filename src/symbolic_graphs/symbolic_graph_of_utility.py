@@ -303,8 +303,8 @@ class SymbolicGraphOfUtility(DynWeightedPartitionedFrankaAbs):
         while True:
 
             if len(self.open_list[layer]) > 0:
-                if verbose:
-                    print(f"********************Layer: {layer}**************************")
+                # if verbose:
+                print(f"********************Layer: {layer}**************************")
                 
                 # reset the empty bucket counter 
                 empty_bucket_counter = 0
@@ -326,7 +326,8 @@ class SymbolicGraphOfUtility(DynWeightedPartitionedFrankaAbs):
 
                     # if the current prod state is an accepting state then add it to the leaf ADD along with the state value 
                     if not (curr_dfa_sym_state & self.dfa_handle.sym_goal_state).isZero():
-                        print(f"Adding leaf node ({curr_ts_exp_states}, {curr_dfa_tuple}) with value {layer}")
+                        if verbose: 
+                            print(f"Adding leaf node ({curr_ts_exp_states}, {curr_dfa_tuple}) with value {layer}")
                         # before adding the leaf node, convert it to (state-val) - infinity ADD
                         full_prod_state_val: ADD = (curr_prod_sym_state & self.predicate_sym_map_utls[layer]).ite(self.manager.addConst(layer), self.manager.plusInfinity())
                         self.leaf_nodes = self.leaf_nodes.min(full_prod_state_val)

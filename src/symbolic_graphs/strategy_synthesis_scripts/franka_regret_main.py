@@ -312,7 +312,7 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
         return sym_tr, ts_curr_vars, ts_robot_vars, ts_human_vars, ts_lbl_vars
     
 
-    def build_add_graph_of_utility(self, verbose: bool = False):
+    def build_add_graph_of_utility(self, verbose: bool = False, just_adv_game: bool = False):
         """
          Main method that first plays the min-max game over the original graph. 
         
@@ -335,14 +335,17 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
 
         if win_str:
             if True:
-                min_max_handle.roll_out_strategy(strategy=win_str, verbose=False)
+                min_max_handle.roll_out_strategy(strategy=win_str, verbose=True)
+            
+            if just_adv_game:
+                sys.exit(-1)
 
         # min max value
         self.min_energy_budget = min_max_handle.init_state_value
         assert min_max_handle != math.inf, "No winning strategy exists. Before running regret game, make sure there existd a winning strategy."
 
         # regret budget
-        self.reg_energy_budget = math.ceil(self.min_energy_budget * 2.0)
+        self.reg_energy_budget = math.ceil(self.min_energy_budget * 1.5)
 
         # construct additional boolean variables used during the construction of the new graph
         self.prod_utls_vars = self._create_symbolic_lbl_vars(state_lbls=list(range(self.reg_energy_budget + 1)),
@@ -390,13 +393,15 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
         print(f"************************** Energy Budget: {self.reg_energy_budget} **************************")
     
 
-    def solve(self, verbose: bool = False):
+    def solve(self, verbose: bool = False, just_adv_game: bool = False):
         """
-         Overides base method to first construct the required graph and then run ValueIteration
+         Overides base method to first construct the required graph and then run ValueIteration. 
+
+         Set just_adv_game flag to True if you want to play an adversarial game.
         """
 
         # constuct graph of utility
-        self.build_add_graph_of_utility(verbose=verbose)
+        self.build_add_graph_of_utility(verbose=verbose, just_adv_game=just_adv_game)
 
         # compute the min-min value from each state
         gou_min_min_handle = GraphOfUtlCooperativeGame(prod_handle=self.graph_of_utls_handle,
@@ -474,3 +479,7 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
         reg_str: ADD = gbr_min_max_handle.solve(verbose=False)
         stop: float = time.time()
         print("Time took for computing min-max strs on the Graph of best Response: ", stop - start)
+
+        if reg_str:
+            gbr_min_max_handle.roll_out_strategy(strategy=reg_str, verbose=True)
+            print("Done Rolling out.")
