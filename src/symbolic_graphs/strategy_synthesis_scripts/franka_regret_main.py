@@ -192,6 +192,10 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
     def _create_weight_dict(self, mod_action: dict, **kwargs) -> Dict[str, int]:
         """
          Override the base method make action ti and within human region twice as expensive as the robot region. 
+
+         Current Implementation: 
+         1. Transit and Transfer action to Robot region, irrespective of from loc is twice as expeensive.
+         2. Grasping and Releasing in Robot region is twice as expensive as well.
         """
         causal_instance: CausalGraph = kwargs['causal_graph']
         task = kwargs['task']
@@ -349,8 +353,8 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
 
         # construct additional boolean variables used during the construction of the new graph
         self.prod_utls_vars = self._create_symbolic_lbl_vars(state_lbls=list(range(self.reg_energy_budget + 1)),
-                                                                 state_var_name='k',
-                                                                 add_flag=True)
+                                                             state_var_name='k',
+                                                             add_flag=True)
 
         print(f"# of States in the Original graph: {len(self.ts_handle.adj_map.keys())}")
 
@@ -395,7 +399,7 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
 
     def solve(self, verbose: bool = False, just_adv_game: bool = False):
         """
-         Overides base method to first construct the required graph and then run ValueIteration. 
+         Overides base method to first construct the required graph and then run Value Iteration. 
 
          Set just_adv_game flag to True if you want to play an adversarial game.
         """

@@ -495,6 +495,10 @@ class SymbolicGraphOfUtility(DynWeightedPartitionedFrankaAbs):
 
                     # get the sym repr of the DFA state
                     curr_dfa_sym_state: ADD = self.dfa_handle.dfa_predicate_add_sym_map_curr[curr_dfa_tuple]
+
+                    # Do not compute best alternative from an accepting state(leaf node in Graph of utility)
+                    if not (curr_dfa_sym_state & self.dfa_handle.sym_goal_state).isZero():
+                        continue
                     
                     # get sym repr of current and next state
                     curr_ts_sym_state: ADD = self.get_sym_state_from_tuple(curr_state_tuple)
@@ -538,7 +542,6 @@ class SymbolicGraphOfUtility(DynWeightedPartitionedFrankaAbs):
                 empty_bucket_counter += 1
                 # If Cmax consecutive layers are empty. . .
                 if empty_bucket_counter == self.max_ts_action_cost:
-                    print(f"Done Computing the Graph of Utility! Accepting Leaf nodes {self.lcount}; Total states {self.scount}; Total edges {self.ecount}")
                     break
             
             layer += 1

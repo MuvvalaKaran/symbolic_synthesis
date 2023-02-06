@@ -420,7 +420,7 @@ class SymbolicGraphOfBR(DynWeightedPartitionedFrankaAbs):
                                 next_ts_exp_state = self.get_state_from_tuple(next_ts_tuple)
                                 print(f"Adding Human edge: " \
                                      f"({curr_ts_exp_states}, {curr_dfa_tuple}, {curr_utls_tuple}, {curr_br_tuple})" \
-                                     f"-------{robot_act} {human_act}------> ({next_ts_exp_state}, {next_dfa_tuple}, {next_utls_tuple}, {curr_br_tuple})")
+                                     f"-------{robot_act} {human_act}------> ({next_ts_exp_state}, {next_dfa_tuple}, {next_utls_tuple}, {next_ba_int})")
                             
                             
                             # if the successor prod state is an accepting state then add it to the leaf ADD along with the state value as described in the docstring
@@ -429,7 +429,7 @@ class SymbolicGraphOfBR(DynWeightedPartitionedFrankaAbs):
                                                             next_ts_tuple=next_ts_tuple,
                                                             next_dfa_tuple=next_dfa_tuple,
                                                             next_utls_tuple=next_utls_tuple,
-                                                            next_br_tuple=curr_br_tuple,
+                                                            next_br_tuple=next_ba_int,
                                                             next_prod_sym_state=next_prod_sym_state,
                                                             verbose=verbose)
                                 self.closed |= next_prod_sym_state
@@ -437,7 +437,7 @@ class SymbolicGraphOfBR(DynWeightedPartitionedFrankaAbs):
 
                             
                             # add them to their respective bucket. . .
-                            self.open_list[next_utls_tuple].add((*next_state_tuple, curr_br_tuple))
+                            self.open_list[next_utls_tuple].add((*next_state_tuple, next_ba_int))
                             self.closed |= next_prod_sym_state
                         
                         # now add robot edges with no human-intervention
@@ -488,7 +488,9 @@ class SymbolicGraphOfBR(DynWeightedPartitionedFrankaAbs):
 
                         if verbose:
                             next_ts_exp_state = self.get_state_from_tuple(next_ts_tuple)
-                            print(f"Adding Robot edge: ({curr_ts_exp_states}, {curr_dfa_tuple}, {curr_utls_tuple}, {curr_br_tuple}) -------{robot_act}------> ({next_ts_exp_state}, {next_dfa_tuple}, {next_utls_tuple}, {next_ba_int})")
+                            print(f"Adding Robot edge: "\
+                                 f"({curr_ts_exp_states}, {curr_dfa_tuple}, {curr_utls_tuple}, {curr_br_tuple})" \
+                                 f"-------{robot_act}------> ({next_ts_exp_state}, {next_dfa_tuple}, {next_utls_tuple}, {next_ba_int})")
                         
                         if not (next_dfa_sym & self.dfa_handle.sym_goal_state).isZero():
                             self.add_state_to_leaf_node(curr_utls_tuple=curr_utls_tuple,
