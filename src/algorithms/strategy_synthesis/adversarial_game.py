@@ -685,19 +685,109 @@ class GraphofBRAdvGame(BaseSymbolicSearch):
 
         assert not (prod_state_sym).isZero(), "Error constructing symbolic prod repr from prod state tuple. Fix This!!!"
 
-        return prod_state_sym        
+        return prod_state_sym
+
+
+    def get_strategy_and_val(self, strategy: ADD, max_layer: int, curr_prod_state: ADD) -> Tuple[ADD, int]:
+        """
+         A helper function, that given the current state in the as 0-1 ADD compute the action to take the reg value assocated with the current state.
+        """
+        # get the state with its minimum state value
+        if curr_prod_state & self.winning_states[max_layer] == self.manager.addZero():
+            # states can optimal value zero regreyt
+            curr_prod_state_sval = 0
+            act_cube: ADD = strategy.restrict(curr_prod_state).bddInterval(0, 0).toADD()
+        else:
+            opt_sval_cube =  list((curr_prod_state & self.winning_states[max_layer]).generate_cubes())[0]
+            curr_prod_state_sval: int = opt_sval_cube[1]
+
+            # this gives us a sval-infinity ADD
+            curr_state_act_cubes: ADD =  strategy.restrict(curr_prod_state)
+
+            # get the 0-1 version
+            act_cube: ADD = curr_state_act_cubes.bddInterval(curr_prod_state_sval, curr_prod_state_sval).toADD()
+        
+
+        return act_cube, curr_prod_state_sval
+    
+
+    def get_random_hact(self, curr_prod_tuple: tuple, curr_prod_sym: ADD, ract_name: str, sym_lbl_cubes: List[ADD], curr_prod_state_sval: int, verbose: bool = False) -> ADD:
+        """
+         A helper function that will randomly choose human interventions by tossing a coin.
+        """
+        assert len(curr_prod_tuple) == 4, \
+         "Encountered an invalid prod state tuple. The encoding should be of length 4: <ts-tuple>.<dfa state>.<utl val>.<ba val>. Fix this!!!"
+
+        curr_ts_tuple = curr_prod_tuple[0]
+        curr_dfa_tuple = curr_prod_tuple[1]
+        curr_prod_utl = curr_prod_tuple[2]
+        curr_prod_ba = curr_prod_tuple[3]
+
+        valid_acts = set(self.prod_gbr_handle.prod_adj_map.get((curr_ts_tuple, curr_dfa_tuple, curr_prod_utl, curr_prod_ba), {}).get(ract_name, {}).keys())
+        human_acts = valid_acts.difference('r')
+
+        if len(human_acts) > 0:
+            next_prod_sym, hact_name = self.human_intervention(ract_name=ract_name,
+                                                                curr_prod_tuple=(curr_ts_tuple, curr_dfa_tuple, curr_prod_utl, curr_prod_ba),
+                                                                valid_human_acts=human_acts)
+            print("Human Moved: ")
+            self.get_state_value_from_dd(dd_func=next_prod_sym, sym_lbl_cubes=sym_lbl_cubes, state_val='')
+            print(f"Act: {hact_name}")
+        
+            return next_prod_sym
+        
+        return curr_prod_sym
 
     
+    def get_hact_from_user(self, curr_prod_tuple: tuple, curr_prod_sym: ADD, ract_name: str,  sym_lbl_cubes: List[ADD], strategy: ADD, max_layer: int):
+        """
+         A helper function that asks the user for next human action.
+        """
+        # print all the possible actions
+        assert len(curr_prod_tuple) == 4, \
+         "Encountered an invalid prod state tuple. The encoding should be of length 4: <ts-tuple>.<dfa state>.<utl val>.<ba val>. Fix this!!!"
+
+        curr_ts_tuple = curr_prod_tuple[0]
+        curr_dfa_tuple = curr_prod_tuple[1]
+        curr_prod_utl = curr_prod_tuple[2]
+        curr_prod_ba = curr_prod_tuple[3]
+
+        valid_acts = set(self.prod_gbr_handle.prod_adj_map.get((curr_ts_tuple, curr_dfa_tuple, curr_prod_utl, curr_prod_ba), {}).get(ract_name, {}).keys())
+        human_acts = valid_acts.difference('r')
+
+        if len(human_acts) > 0:
+            sym_prod_list = []
+            print("===================================================================================")
+            # for hidx, hact in enumerate(human_acts):
+            for hidx, hact in enumerate(valid_acts):
+                nxt_prod_tuple: tuple = self.prod_gbr_handle.prod_adj_map[curr_prod_tuple][ract_name][hact]
+                nxt_prod_sym: ADD = self.get_sym_prod_state_from_tuple(nxt_prod_tuple)
+                _ , reg_val = self.get_strategy_and_val(strategy=strategy, max_layer=max_layer, curr_prod_state=nxt_prod_sym)
+                print(f"[{hidx}] {hact}")
+                # self.get_state_value_from_dd(dd_func=nxt_prod_sym, sym_lbl_cubes=sym_lbl_cubes, state_val=reg_val)
+
+                sym_prod_list.append(nxt_prod_sym)
+            print("===================================================================================")
+            # ask for user input 
+            nxt_state_idx = int(input("Enter Next state id: "))
+
+            while nxt_state_idx > len(sym_prod_list):
+                print("Please enter a valid index")
+                nxt_state_idx = int(input("Enter Next state id: "))
+
+            return sym_prod_list[nxt_state_idx]
+        
+        return curr_prod_sym
+
 
     def human_intervention(self,
                            ract_name: str,
-                        #    rnext_prod_tuple: tuple,
                            curr_prod_tuple: tuple,
-                        #    curr_dfa_state: ADD,
-                           valid_human_acts: list,
-                           verbose: bool = False) -> Tuple[ADD, str]:
+                           valid_human_acts: list) -> Tuple[ADD, str]:
         """
-         Evolve on the game as per human intervention
+         Evolve on the game as per human intervention.
+
+         Return the 0-1 ADD repr of the next state, and the human action string
         """
 
         for hact in valid_human_acts:
@@ -787,7 +877,6 @@ class GraphofBRAdvGame(BaseSymbolicSearch):
             # now take univ abstraction to remove edges to states with infinity value
             upre_states: ADD = pre_states.univAbstract(self.env_cube)
 
-            # tmp_strategy: ADD = upre_states.ite(self.manager.addOne(), self.manager.plusInfinity())
             tmp_strategy: ADD = upre_states.ite(self.manager.addZero(), self.manager.plusInfinity())
 
             for sval, apre_s in _pre_buckets.items():
@@ -823,7 +912,7 @@ class GraphofBRAdvGame(BaseSymbolicSearch):
             layer += 1
     
 
-    def roll_out_strategy(self, strategy: ADD, verbose: bool = False):
+    def roll_out_strategy(self, strategy: ADD, ask_usr_input: bool = False, verbose: bool = False):
         """
          A helper function to roll out the optimal regret minimizing strategy.
         """
@@ -851,58 +940,60 @@ class GraphofBRAdvGame(BaseSymbolicSearch):
             curr_prod_utl: int = self.prod_gou_handle.predicate_sym_map_utls.inv[curr_prod_state.existAbstract(self.ts_xcube & self.ts_obs_cube & self.dfa_xcube & self.prod_ba_cube)]
             curr_prod_ba: int = self.prod_gbr_handle.predicate_sym_map_ba.inv[curr_prod_state.existAbstract(self.ts_xcube & self.ts_obs_cube & self.dfa_xcube & self.prod_utls_cube)]
             
-            # get the state with its minimum state value
-            if curr_prod_state & self.winning_states[max_layer] == self.manager.addZero():
-                # states can optimal value zero regreyt
-                curr_prod_state_sval = 0
-                act_cube: ADD = strategy.restrict(curr_prod_state).bddInterval(0, 0).toADD()
-            else:
-                opt_sval_cube =  list((curr_prod_state & self.winning_states[max_layer]).generate_cubes())[0]
-                curr_prod_state_sval: int = opt_sval_cube[1]
-
-                # this gives us a sval-infinity ADD
-                # does this work when the optimal strategy has zero value?? Need to verify this!!!
-                curr_state_act_cubes: ADD =  strategy.restrict(curr_prod_state)
-
-                # get the 0-1 version
-                act_cube: ADD = curr_state_act_cubes.bddInterval(curr_prod_state_sval, curr_prod_state_sval).toADD()
+            # get the action. . .
+            act_cube, curr_prod_state_sval = self.get_strategy_and_val(strategy=strategy, max_layer=max_layer, curr_prod_state=curr_prod_state)
 
             list_act_cube = self.convert_add_cube_to_func(act_cube, curr_state_list=self.sys_act_vars)
 
             # if multiple winning actions exisit from same state
             if len(list_act_cube) > 1:
-                ract_name = None
-                while ract_name is None:
-                    ract_dd: List[int] = random.choice(list_act_cube)
-                    ract_name = self.ts_sym_to_robot_act_map.get(ract_dd, None)
+                # ract_name = None
+                # while ract_name is None:
+                ract_list = []
+                for ridx, ract_dd in enumerate(list_act_cube):
+                    # ract_dd: List[int] = random.choice(list_act_cube)
+                    ract_name = self.ts_sym_to_robot_act_map[ract_dd]
+                    print(f"{ridx}: {ract_name}")
+                    ract_list.append(ract_name)
+                
+                if ask_usr_input:
+                    nxt_act_idx = int(input("Enter Next action id: "))
+                    ract_name: str = ract_list[nxt_act_idx]
+                else:
+                    ract_name: str = random.choice(ract_list)
+                
             
             else:
-                ract_name = self.ts_sym_to_robot_act_map[act_cube]
+                ract_name: str = self.ts_sym_to_robot_act_map[act_cube]
 
             if verbose:
                 print(f"Step {counter}")
                 self.get_state_value_from_dd(dd_func=curr_prod_state, sym_lbl_cubes=sym_lbl_cubes, state_val=curr_prod_state_sval)
                 print(f"Act: {ract_name}")
-                # print(f"Step {counter}: Conf: {self.ts_handle.get_state_from_tuple(curr_ts_tuple)} Act: {ract_name}")
+                
             
             # look up the next tuple 
             next_prod_tuple = self.prod_gbr_handle.prod_adj_map[(curr_ts_tuple, curr_dfa_tuple, curr_prod_utl, curr_prod_ba)][ract_name]['r']
             next_prod_sym = self.get_sym_prod_state_from_tuple(next_prod_tuple)
+            
+            if not ask_usr_input:
+                coin = random.randint(0, 1)
+                # coin = 1
 
-            coin = random.randint(0, 1)
-
-            if coin:
-                valid_acts = set(self.prod_gbr_handle.prod_adj_map.get((curr_ts_tuple, curr_dfa_tuple, curr_prod_utl, curr_prod_ba), {}).get(ract_name, {}).keys())
-                human_acts = valid_acts.difference('r')
-
-                if len(human_acts) > 0:
-                    next_prod_sym, hact_name = self.human_intervention(ract_name=ract_name,
-                                                            curr_prod_tuple=(curr_ts_tuple, curr_dfa_tuple, curr_prod_utl, curr_prod_ba),
-                                                            valid_human_acts=human_acts,
-                                                            verbose=verbose)
-                    print("Human Moved: ")
-                    self.get_state_value_from_dd(dd_func=next_prod_sym, sym_lbl_cubes=sym_lbl_cubes, state_val=curr_prod_state_sval)
-                    print(f"Act: {hact_name}")
+                if coin:
+                    next_prod_sym = self.get_random_hact(curr_prod_tuple=(curr_ts_tuple, curr_dfa_tuple, curr_prod_utl, curr_prod_ba),
+                                                         curr_prod_sym=next_prod_sym,
+                                                         ract_name=ract_name,
+                                                         sym_lbl_cubes=sym_lbl_cubes,
+                                                         curr_prod_state_sval=curr_prod_state_sval,
+                                                         verbose=verbose)
+            else:
+                next_prod_sym = self.get_hact_from_user(curr_prod_tuple=(curr_ts_tuple, curr_dfa_tuple, curr_prod_utl, curr_prod_ba),
+                                                        curr_prod_sym=next_prod_sym,
+                                                        sym_lbl_cubes=sym_lbl_cubes,
+                                                        ract_name=ract_name,
+                                                        strategy=strategy,
+                                                        max_layer=max_layer)
 
             curr_prod_state = next_prod_sym
             

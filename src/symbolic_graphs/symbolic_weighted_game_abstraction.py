@@ -428,15 +428,17 @@ class DynWeightedPartitionedFrankaAbs():
         """
         _loc_pattern = "[l|L][\d]+"
         _box_pattern = "[b|B][\d]+"
-
+        box_state: str = re.search(_box_pattern, action_name).group()
         if 'transfer' in action_name: 
             locs: List[str] = re.findall(_loc_pattern, action_name)
             if 'else' in action_name:
-                return f'transfer {locs[0]}'
+                dloc: str = locs[0]
+                # return f'transfer {locs[0]}'
             else:
-                return f'transfer {locs[1]}'
+                dloc = locs[1]
+                # return f'transfer {locs[1]}'
         elif 'release' in action_name:
-            box_state: str = re.search(_box_pattern, action_name).group()
+            # box_state: str = re.search(_box_pattern, action_name).group()
             dloc: str = re.search(_loc_pattern, action_name).group()
             
         tmp_copy = [_b for _b in boxes if _b != box_state]

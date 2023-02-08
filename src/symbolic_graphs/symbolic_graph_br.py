@@ -170,7 +170,7 @@ class SymbolicGraphOfBR(DynWeightedPartitionedFrankaAbs):
                                next_utls_tuple: int,
                                next_br_tuple: int,
                                next_prod_sym_state: ADD,
-                               verbose: bool = False) -> None:
+                               only_leaf_nodes: bool = False) -> None:
         """
          A helper function that adds an accepting state to the set of leaf nodes.
         """
@@ -180,7 +180,7 @@ class SymbolicGraphOfBR(DynWeightedPartitionedFrankaAbs):
         
         next_ts_exp_state = self.get_state_from_tuple(next_ts_tuple)
         
-        if verbose:
+        if only_leaf_nodes:
             print(f"Adding leaf node ({next_ts_exp_state}, {next_dfa_tuple}, {next_utls_tuple}, {next_br_tuple}) with edge weight {accp_w}")
         
         # create (state-val) - infinity ADD
@@ -284,7 +284,7 @@ class SymbolicGraphOfBR(DynWeightedPartitionedFrankaAbs):
         self.ecount += 1
 
 
-    def construct_graph_of_best_response(self, mod_act_dict: dict, verbose: bool = False, debug: bool = True):
+    def construct_graph_of_best_response(self, mod_act_dict: dict, print_leaf_nodes: bool = True, verbose: bool = False, debug: bool = True):
         """
          Main function to construct the Graph of Best Response. We construct all the possible state (S, B) where S is a state in the product graph
           and B is the Best reponse at the current state. From (S, B), we add an edge to (S', B') iff (S, S') is a valid edge on Graph of Utility and 
@@ -310,6 +310,10 @@ class SymbolicGraphOfBR(DynWeightedPartitionedFrankaAbs):
         # creating monolithinc tr bdd to keep track all the transition we are creating to detect nondeterminism
         if debug:
             self.mono_tr_bdd = self.manager.addZero() 
+        
+        # if verbose flag is True then print leaf nodes too.
+        if verbose:
+            print_leaf_nodes= True
         
         # the init state is of the Form ((ts-tuple), DFA, Utl val, BR Value)
         self.open_list[layer].add((*init_gou_state_tuple, 0, inf))
@@ -431,7 +435,7 @@ class SymbolicGraphOfBR(DynWeightedPartitionedFrankaAbs):
                                                             next_utls_tuple=next_utls_tuple,
                                                             next_br_tuple=next_ba_int,
                                                             next_prod_sym_state=next_prod_sym_state,
-                                                            verbose=verbose)
+                                                            only_leaf_nodes=print_leaf_nodes)
                                 self.closed |= next_prod_sym_state
                                 continue
 
@@ -499,7 +503,7 @@ class SymbolicGraphOfBR(DynWeightedPartitionedFrankaAbs):
                                                         next_utls_tuple=next_utls_tuple,
                                                         next_br_tuple=next_ba_int,
                                                         next_prod_sym_state=next_prod_sym_state,
-                                                        verbose=verbose)
+                                                        only_leaf_nodes=print_leaf_nodes)
                             self.closed |= next_prod_sym_state
 
                             continue

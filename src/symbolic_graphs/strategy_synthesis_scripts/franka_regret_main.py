@@ -44,7 +44,9 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
                  plot_obs: bool = False,
                  plot_dfa: bool = False,
                  plot: bool = False,
-                 create_lbls: bool = True):
+                 create_lbls: bool = True,
+                 weighting_factor: int = 1,
+                 reg_factor: float = 1):
         super().__init__(domain_file=domain_file,
                          problem_file=problem_file,
                          formulas=formulas,
@@ -80,7 +82,12 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
         self.prod_utls_vars: List[ADD] = None
         self.prod_ba_vars: List[ADD] = None
         self.prod_succ_ba_vars: List[ADD] = None
-    
+        
+        # factor to scale weights by
+        self.scale_weights: int = weighting_factor
+        self.scale_reg_budget: float = reg_factor
+
+
 
     def build_abstraction(self, draw_causal_graph: bool = False, dynamic_env: bool = False, bnd_dynamic_env: bool = False, max_human_int: int = 0):
         """
@@ -162,7 +169,7 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
         # box_preds has predicates segregated as per boxes
         ts_lbl_vars = []
         for _id, b in enumerate(box_preds.keys()):
-            # We also add an `empty` label that only correpsonds to the trap state.
+            # We also add an `empty` label that only correpsonds to the trap state.0
             # As we create dedicated bVars for each box, we have to create empty for each box
             box_preds[b] = box_preds[b] + [f'(on b{_id} empty)']
             # update the predicate int map
@@ -200,6 +207,10 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
         causal_instance: CausalGraph = kwargs['causal_graph']
         task = kwargs['task']
 
+        factor = self.scale_weights
+
+        assert factor >= 1 and isinstance(factor, int), "Please an integer scaling factor!" 
+
         _loc_pattern = "[l|L][\d]+"
 
         new_weight_dict = {}
@@ -215,12 +226,12 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
                     elif locs[0] in causal_instance.task_intervening_locations:
                         weight: int = self.weight_dict['transit']
                     else:
-                        weight: int = 2 * self.weight_dict['transit']
+                        weight: int = factor * self.weight_dict['transit']
                 else:
                     if locs[1] in causal_instance.task_intervening_locations:
                         weight: int = self.weight_dict['transit']     
                     else:
-                        weight: int = 2 * self.weight_dict['transit']
+                        weight: int = factor * self.weight_dict['transit']
 
                 
             elif 'transfer' in op.name:
@@ -229,12 +240,12 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
                     if locs[0] in causal_instance.task_intervening_locations:
                         weight: int = self.weight_dict['transfer']
                     else:
-                        weight: int = 2 * self.weight_dict['transfer']
+                        weight: int = factor * self.weight_dict['transfer']
                 else:
                     if locs[1] in causal_instance.task_intervening_locations:
                         weight: int = self.weight_dict['transfer']
                     else:
-                        weight: int = 2 * self.weight_dict['transfer']
+                        weight: int = factor * self.weight_dict['transfer']
             
             elif 'grasp' in op.name:
                 locs: List[str] = re.findall(_loc_pattern, op.name)
@@ -243,14 +254,14 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
                 elif locs[0] in causal_instance.task_intervening_locations:
                     weight: int = self.weight_dict['grasp']
                 else:
-                    weight: int = 2 * self.weight_dict['grasp']
+                    weight: int = factor * self.weight_dict['grasp']
             
             elif 'release' in op.name:
                 locs: List[str] = re.findall(_loc_pattern, op.name)
                 if locs[0] in causal_instance.task_intervening_locations:
                     weight: int = self.weight_dict['release']
                 else:
-                    weight: int = 2 * self.weight_dict['release']
+                    weight: int = factor * self.weight_dict['release']
                 
             else:
                 weight: int = self.weight_dict['human']
@@ -312,7 +323,7 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
         
         if print_facts:
             print(f"******************# of Edges in Franka Abstraction: {sym_tr.ecount}******************")
-
+        # sys.exit(-1)
         return sym_tr, ts_curr_vars, ts_robot_vars, ts_human_vars, ts_lbl_vars
     
 
@@ -334,12 +345,14 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
                                          sys_act_vars=self.ts_robot_vars,
                                          env_act_vars=self.ts_human_vars,
                                          cudd_manager=self.manager)
-        
+        start = time.time()
         win_str: ADD = min_max_handle.solve(verbose=verbose)
+        stop = time.time()
+        print("Time for solving the Adv. game on Original Graph: ", stop - start)
 
         if win_str:
             if True:
-                min_max_handle.roll_out_strategy(strategy=win_str, verbose=True)
+                min_max_handle.roll_out_strategy(strategy=win_str, verbose=verbose)
             
             if just_adv_game:
                 sys.exit(-1)
@@ -349,7 +362,9 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
         assert min_max_handle != math.inf, "No winning strategy exists. Before running regret game, make sure there existd a winning strategy."
 
         # regret budget
-        self.reg_energy_budget = math.ceil(self.min_energy_budget * 1.5)
+        self.reg_energy_budget = math.ceil(self.min_energy_budget * self.scale_reg_budget)
+
+        print(f"************************** Energy Budget: {self.reg_energy_budget} **************************")
 
         # construct additional boolean variables used during the construction of the new graph
         self.prod_utls_vars = self._create_symbolic_lbl_vars(state_lbls=list(range(self.reg_energy_budget + 1)),
@@ -357,6 +372,8 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
                                                              add_flag=True)
 
         print(f"# of States in the Original graph: {len(self.ts_handle.adj_map.keys())}")
+
+        print("******************Constructing Graph of utility******************")
 
         # get the max action cost
         max_action_cost: int = min_max_handle._get_max_tr_action_cost()
@@ -393,35 +410,41 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
         print("Time took for constructing the Graph of Utility: ", stop - start)
 
         self.graph_of_utls_handle = graph_of_utls_handle
-
-        print(f"************************** Energy Budget: {self.reg_energy_budget} **************************")
     
 
-    def solve(self, verbose: bool = False, just_adv_game: bool = False):
+    def solve(self, verbose: bool = False, just_adv_game: bool = False, run_monitor: bool = False):
         """
          Overides base method to first construct the required graph and then run Value Iteration. 
 
          Set just_adv_game flag to True if you want to play an adversarial game.
+
+         Set run_monitor to True if you want the human to choose strategy for both player.
+          Note, for Robot player, we are restricted to regret minimizing strategies only. For Human player. we can select any strategy. 
         """
 
         # constuct graph of utility
         self.build_add_graph_of_utility(verbose=verbose, just_adv_game=just_adv_game)
-
+        
+        print("******************Computing cVals on Graph of utility******************")
         # compute the min-min value from each state
         gou_min_min_handle = GraphOfUtlCooperativeGame(prod_handle=self.graph_of_utls_handle,
-                                                        ts_handle=self.ts_handle,
-                                                        dfa_handle=self.dfa_handle,
-                                                        ts_curr_vars=self.ts_x_list,
-                                                        dfa_curr_vars=self.dfa_x_list,
-                                                        sys_act_vars=self.ts_robot_vars,
-                                                        env_act_vars=self.ts_human_vars,
-                                                        ts_obs_vars=self.ts_obs_list,
-                                                        ts_utls_vars=self.prod_utls_vars,
-                                                        cudd_manager=self.manager)
+                                                       ts_handle=self.ts_handle,
+                                                       dfa_handle=self.dfa_handle,
+                                                       ts_curr_vars=self.ts_x_list,
+                                                       dfa_curr_vars=self.dfa_x_list,
+                                                       sys_act_vars=self.ts_robot_vars,
+                                                       env_act_vars=self.ts_human_vars,
+                                                       ts_obs_vars=self.ts_obs_list,
+                                                       ts_utls_vars=self.prod_utls_vars,
+                                                       cudd_manager=self.manager)
         
         # compute the cooperative value from each prod state in the graph of utility
+        start: float = time.time()
         cvals: ADD = gou_min_min_handle.solve(verbose=False)
+        stop: float = time.time()
+        print("Time took for computing cVals is: ", stop - start)
 
+        print("******************Computing BA Vals on Graph of utility******************")
         start: float = time.time()
         # compute the best alternative from each edge for cumulative payoff
         self.graph_of_utls_handle.get_best_alternatives(cooperative_vals=cvals,
@@ -435,6 +458,7 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
                                                                       state_var_name='r',
                                                                       add_flag=True)
         
+        print("******************Constructing Graph of Best Response******************")
         # construct of Best response G^{br}
         graph_of_br_handle = SymbolicGraphOfBR(curr_vars=self.ts_x_list,
                                                lbl_vars=self.ts_obs_list,
@@ -459,6 +483,7 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
 
         start: float = time.time()
         graph_of_br_handle.construct_graph_of_best_response(mod_act_dict=self.mod_act_dict,
+                                                            print_leaf_nodes=False,
                                                             verbose=False,
                                                             debug=True)
         stop: float = time.time()
@@ -479,11 +504,12 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
                                                 env_act_vars=self.ts_human_vars,
                                                 cudd_manager=self.manager)
         
+        print("******************Computing Regret Minimizing strategies on Graph of Best Response******************")
         start: float = time.time()
         reg_str: ADD = gbr_min_max_handle.solve(verbose=False)
         stop: float = time.time()
         print("Time took for computing min-max strs on the Graph of best Response: ", stop - start)
 
         if reg_str:
-            gbr_min_max_handle.roll_out_strategy(strategy=reg_str, verbose=True)
+            gbr_min_max_handle.roll_out_strategy(strategy=reg_str, verbose=True, ask_usr_input=run_monitor)
             print("Done Rolling out.")

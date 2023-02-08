@@ -482,8 +482,8 @@ class SymbolicGraphOfUtility(DynWeightedPartitionedFrankaAbs):
         layer = 0
         while True:
             if len(self.open_list[layer]) > 0:
-                if verbose:
-                    print(f"********************Layer: {layer}**************************")
+                # if verbose:
+                print(f"********************Layer: {layer}**************************")
                 
                 # reset the empty bucket counter 
                 empty_bucket_counter = 0
