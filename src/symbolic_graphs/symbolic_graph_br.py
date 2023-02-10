@@ -176,7 +176,8 @@ class SymbolicGraphOfBR(DynWeightedPartitionedFrankaAbs):
         """
         # if not  (next_dfa_sym & self.dfa_handle.sym_goal_state).isZero():
         # compute edge weight.
-        accp_w: int =  curr_utls_tuple - min(curr_utls_tuple, next_br_tuple)
+        # accp_w: int =  curr_utls_tuple - min(curr_utls_tuple, next_br_tuple)
+        accp_w: int =  next_utls_tuple - min(next_utls_tuple, next_br_tuple)
         
         next_ts_exp_state = self.get_state_from_tuple(next_ts_tuple)
         

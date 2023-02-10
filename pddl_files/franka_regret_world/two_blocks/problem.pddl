@@ -14,7 +14,7 @@
     ; NOTE: The way pyperplan parses the PDDL file, you need atleast two human locs to construct `human-move` action
 
     l6 - hbox_loc
-    l7 - hbox_loc
+    l7 - box_loc
     l8 - hbox_loc
     ;l9 - hbox_loc
     ;l10 - hbox_loc
@@ -22,7 +22,7 @@
 
     b0 - box
     b1 - box
-    ;b2 - box
+    b2 - box
     ;b3 - box
     ;b4 - box
     ;b5 - box
@@ -35,9 +35,9 @@
 (:init
     (ready else)
     
-    (on b0 l0)
+    (on b0 else)
     (on b1 l6)
-    ;(on b2 l6)
+    (on b2 else)
     ;(on b3 l6)
     ;(on b4 l3)
     ;(on b5 l5)

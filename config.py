@@ -27,8 +27,8 @@ OBSTACLE: bool = False  # flag to load the obstacle gridworld and color the grid
 DYNAMIC_VAR_ORDERING: bool = False
 
 ##################### Franka Declare supports and top location for valid Human Int. #########################
-# SUP_LOC = ['l0', 'l1']   # support for Arch
-# TOP_LOC = ['l2']         # top location for Arch
+# SUP_LOC = ['l6', 'l7']   # support for Arch
+# TOP_LOC = ['l8']         # top location for Arch
 SUP_LOC = []
 TOP_LOC = []
 
@@ -53,8 +53,20 @@ TOP_LOC = []
 
 ### BENCHMARKING formulas
 # formulas = ['F(p00 & p11 & p22 & p33 & p44)']  # 5 boxes one
-# formulas = ['F(p00 & p11 & p22 & p33)']
-formulas = ['F(p00)']
+# formulas = ['F(p00 & p11 & p22)']
+# formulas = ['F(p06 & F(p07 & F(p06)))']
+
+### TESTING Straight line alignment
+# formulas = ['F(p01 & p20 & p42) | F(p36 & p17 & p48)']   # straight line from ICRA22
+# formulas = ['F(p01 & p10 & p32) | F(p26 & p38)']   # straight line from ICRA22 - modified
+# formulas = ['F(p01 | p17)']   # smaller version of straight line alignment for sanity checking
+
+#### Testing Arch constrcution example
+# formulas = ['( F(p01 & p20 & p12) & G(~(p01 & p20) -> ~(p12)) ) | ( F(p36 & p07 & p18) & G(~(p36 & p07) -> ~(p18)) )']
+# formulas = ['( F(p01 & p20 & p12) ) | ( F(p36 & p07 & p18) )']
+
+##### TESTING two block regret formulas
+formulas = ['F(p00 & XF(p21)) | F(p18 & p06)']
 
 
 ### BENCHMARKING formulas

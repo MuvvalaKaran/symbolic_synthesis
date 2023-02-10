@@ -686,12 +686,54 @@ class GraphofBRAdvGame(BaseSymbolicSearch):
         assert not (prod_state_sym).isZero(), "Error constructing symbolic prod repr from prod state tuple. Fix This!!!"
 
         return prod_state_sym
+    
+
+    def get_reg_val_prod_state(self, max_layer: int, prod_state: ADD) -> int:
+        """
+         A helper function that computes the Reg valuea associated with a state
+        """
+        if prod_state & self.winning_states[max_layer] == self.manager.addZero():
+            # states can optimal value zero regret
+            curr_prod_state_sval = 0
+        else:
+            opt_sval_cube =  list((prod_state & self.winning_states[max_layer]).generate_cubes())[0]
+            curr_prod_state_sval: int = opt_sval_cube[1]
+        
+        return curr_prod_state_sval
 
 
-    def get_strategy_and_val(self, strategy: ADD, max_layer: int, curr_prod_state: ADD) -> Tuple[ADD, int]:
+    def get_strategy_and_val(self, strategy: ADD, max_layer: int, curr_prod_state: ADD, print_all_act_vals: bool = False, curr_prod_tuple: tuple = ()) -> Tuple[ADD, int]:
         """
-         A helper function, that given the current state in the as 0-1 ADD compute the action to take the reg value assocated with the current state.
+         A helper function, that given the current state as 0-1 ADD computes the action to take and the reg value assocated with the current state.
         """
+
+        if print_all_act_vals:
+            valid_acts = set(self.prod_gbr_handle.prod_adj_map[curr_prod_tuple].keys())
+            # loop through all valid actions and print the reg value associated with each action
+            ract_cube_list = []
+            ract_val_list = []
+            for ridx, ract in enumerate(valid_acts):
+                # get the sym repre
+                _act_dd = self.ts_sym_to_robot_act_map.inv[ract]
+                _act_cube: ADD = strategy.restrict(curr_prod_state & _act_dd)
+                if _act_cube == self.manager.addZero():
+                    print(f"[{ridx}] {ract}: reg val: {0}")
+                    ract_val_list.append(0)
+                else:
+                    _act_cube_string = list(_act_cube.generate_cubes())
+                    assert len(_act_cube_string) == 1, "Error computing act cubes during rollout. Fix This!!!"
+                    print(f"[{ridx}] {ract}: reg val: {_act_cube_string[0][1]}")
+                    ract_val_list.append(_act_cube_string[0][1])
+                
+                ract_cube_list.append(_act_dd)
+                
+            
+            # if we want to manully play the game
+            nxt_act_idx = int(input("Enter Next action id: "))
+            # ract_name: str = ract_cube_list[nxt_act_idx]
+            return ract_cube_list[nxt_act_idx], ract_val_list[nxt_act_idx]
+
+
         # get the state with its minimum state value
         if curr_prod_state & self.winning_states[max_layer] == self.manager.addZero():
             # states can optimal value zero regreyt
@@ -762,7 +804,7 @@ class GraphofBRAdvGame(BaseSymbolicSearch):
             for hidx, hact in enumerate(valid_acts):
                 nxt_prod_tuple: tuple = self.prod_gbr_handle.prod_adj_map[curr_prod_tuple][ract_name][hact]
                 nxt_prod_sym: ADD = self.get_sym_prod_state_from_tuple(nxt_prod_tuple)
-                _ , reg_val = self.get_strategy_and_val(strategy=strategy, max_layer=max_layer, curr_prod_state=nxt_prod_sym)
+                # _ , reg_val = self.get_strategy_and_val(strategy=strategy, max_layer=max_layer, curr_prod_state=nxt_prod_sym)
                 print(f"[{hidx}] {hact}")
                 # self.get_state_value_from_dd(dd_func=nxt_prod_sym, sym_lbl_cubes=sym_lbl_cubes, state_val=reg_val)
 
@@ -793,9 +835,6 @@ class GraphofBRAdvGame(BaseSymbolicSearch):
         for hact in valid_human_acts:
             nxt_prod_tuple: tuple = self.prod_gbr_handle.prod_adj_map[curr_prod_tuple][ract_name][hact]
             nxt_prod_sym: ADD = self.get_sym_prod_state_from_tuple(nxt_prod_tuple)
-
-            # if verbose:
-            #     print(f"Human Moved: New Conf. {self.ts_handle.get_state_from_tuple(nxt_ts_tuple)}")
 
             return nxt_prod_sym, hact
     
@@ -941,28 +980,32 @@ class GraphofBRAdvGame(BaseSymbolicSearch):
             curr_prod_ba: int = self.prod_gbr_handle.predicate_sym_map_ba.inv[curr_prod_state.existAbstract(self.ts_xcube & self.ts_obs_cube & self.dfa_xcube & self.prod_utls_cube)]
             
             # get the action. . .
-            act_cube, curr_prod_state_sval = self.get_strategy_and_val(strategy=strategy, max_layer=max_layer, curr_prod_state=curr_prod_state)
+            act_cube, curr_prod_state_sval = self.get_strategy_and_val(strategy=strategy,
+                                                                       max_layer=max_layer,
+                                                                       curr_prod_state=curr_prod_state,
+                                                                       curr_prod_tuple=(curr_ts_tuple, curr_dfa_tuple, curr_prod_utl, curr_prod_ba),
+                                                                       print_all_act_vals=True)
 
             list_act_cube = self.convert_add_cube_to_func(act_cube, curr_state_list=self.sys_act_vars)
 
-            # if multiple winning actions exisit from same state
+            # if multiple winning actions exists from same state
             if len(list_act_cube) > 1:
-                # ract_name = None
-                # while ract_name is None:
                 ract_list = []
                 for ridx, ract_dd in enumerate(list_act_cube):
-                    # ract_dd: List[int] = random.choice(list_act_cube)
                     ract_name = self.ts_sym_to_robot_act_map[ract_dd]
+                    next_prod_tuple = self.prod_gbr_handle.prod_adj_map[(curr_ts_tuple, curr_dfa_tuple, curr_prod_utl, curr_prod_ba)][ract_name]['r']
+                    next_prod_sym = self.get_sym_prod_state_from_tuple(next_prod_tuple)
+                    # next_reg_val = self.get_reg_val_prod_state(max_layer=max_layer, prod_state=next_prod_sym) 
                     print(f"{ridx}: {ract_name}")
+                    # self.get_state_value_from_dd(dd_func=next_prod_sym, sym_lbl_cubes=sym_lbl_cubes, state_val=next_reg_val)
                     ract_list.append(ract_name)
-                
+            
                 if ask_usr_input:
                     nxt_act_idx = int(input("Enter Next action id: "))
                     ract_name: str = ract_list[nxt_act_idx]
                 else:
                     ract_name: str = random.choice(ract_list)
                 
-            
             else:
                 ract_name: str = self.ts_sym_to_robot_act_map[act_cube]
 

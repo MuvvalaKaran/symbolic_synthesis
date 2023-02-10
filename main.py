@@ -162,8 +162,11 @@ if __name__ == "__main__":
             frankapartition_handle.solve(verbose=False)
 
         elif REGRET_SYNTHESIS:
-            domain_file_path = PROJECT_ROOT + "/pddl_files/franka_regret_world/domain.pddl"
-            problem_file_path = PROJECT_ROOT + "/pddl_files/franka_regret_world/problem.pddl"
+            domain_file_path = PROJECT_ROOT + "/pddl_files/franka_regret_world/two_blocks/domain.pddl"
+            problem_file_path = PROJECT_ROOT + "/pddl_files/franka_regret_world/two_blocks/problem.pddl"
+
+            # domain_file_path = PROJECT_ROOT + "/pddl_files/franka_regret_world/arch/domain.pddl"
+            # problem_file_path = PROJECT_ROOT + "/pddl_files/franka_regret_world/arch/problem.pddl"
 
             wgt_dict = {
                 "transit" : 1,
@@ -182,6 +185,8 @@ if __name__ == "__main__":
                                                             weight_dict=wgt_dict,
                                                             ltlf_flag=USE_LTLF,
                                                             dyn_var_ord=DYNAMIC_VAR_ORDERING,
+                                                            weighting_factor=1,
+                                                            reg_factor=1.25,
                                                             algorithm=None,
                                                             verbose=False,
                                                             plot_ts=False,
@@ -189,7 +194,7 @@ if __name__ == "__main__":
                                                             plot=False)
             
             regret_synthesis_handle.build_abstraction()
-            regret_synthesis_handle.solve(verbose=False, just_adv_game=False)
+            regret_synthesis_handle.solve(verbose=False, just_adv_game=False, run_monitor=True)
             print(f"****************** # Total Boolean Variables: { cudd_manager.size()} ******************")
             # regret_synthesis_handle.solve(verbose=False)
 
