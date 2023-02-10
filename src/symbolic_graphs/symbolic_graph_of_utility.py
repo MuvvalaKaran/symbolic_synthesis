@@ -6,6 +6,7 @@ import sys
 import time
 import warnings
 
+from math import inf
 from bidict import bidict
 from functools import reduce
 from itertools import product
@@ -15,6 +16,7 @@ from typing import Union, List, Tuple, Dict
 from cudd import Cudd, BDD, ADD
 
 from src.symbolic_graphs import DynWeightedPartitionedFrankaAbs
+from src.symbolic_graphs import ADDPartitionedDFA
 
 
 class SymbolicGraphOfUtility(DynWeightedPartitionedFrankaAbs):
@@ -38,8 +40,8 @@ class SymbolicGraphOfUtility(DynWeightedPartitionedFrankaAbs):
                  sup_locs: List[str],
                  top_locs: List[str],
                  budget: int,
-                 dfa_handle,
-                 ts_handle,
+                 dfa_handle: ADDPartitionedDFA,
+                 ts_handle: DynWeightedPartitionedFrankaAbs,
                  int_weight_dict: Dict[str, int],
                  **kwargs):
         super().__init__(curr_vars,
@@ -58,10 +60,9 @@ class SymbolicGraphOfUtility(DynWeightedPartitionedFrankaAbs):
                          sup_locs,
                          top_locs,
                          **kwargs)
-
-        self.dfa_handle = dfa_handle
-        self.ts_handle = ts_handle
-
+        self.ts_handle: DynWeightedPartitionedFrankaAbs = ts_handle
+        self.dfa_handle: ADDPartitionedDFA = dfa_handle
+        
         self.int_weight_dict = int_weight_dict
 
         # need these two during image computation 
@@ -72,13 +73,14 @@ class SymbolicGraphOfUtility(DynWeightedPartitionedFrankaAbs):
         self.sym_vars_ults: List[ADD] = state_utls_vars
         self.energy_budget: int = budget
 
+        self.sym_trap_state_lbl: ADD = None
+
         # index to determine where the state vars start 
         self.state_start_idx: int =  len(self.sym_vars_human) + len(self.sym_vars_robot)
 
         self.predicate_sym_map_utls: bidict = {}
         self.utls_cube = reduce(lambda x, y: x & y, self.sym_vars_ults)
 
-        # overide the base class's adj dictionary
         self.prod_adj_map = defaultdict(lambda: defaultdict(lambda: {}))
 
         # the # of vars in the TS state has increased as we have additional varibale associted with state utility. 
@@ -89,18 +91,24 @@ class SymbolicGraphOfUtility(DynWeightedPartitionedFrankaAbs):
 
         # create state util look up dictionary
         self._initialize_add_for_state_utls()
+        self.open_list = defaultdict(lambda: set())
+        self.closed = self.manager.addZero()
 
         # count # of state in this graph
-        self.scount = 0
+        self.scount: int = 0
 
         self.leaf_nodes: ADD = self.manager.plusInfinity()
         self.leaf_vals = set()
-        self.lcount = 0
+        self.lcount: int = 0
+
+        # beast alternative ADD and set
+        self.ba_strategy: ADD = self.manager.plusInfinity()
+        self.ba_set = set()
     
 
     def _initialize_add_for_state_utls(self):
         """
-         This function initializes ADD that represents the state utility at each state. 
+         This function initializes ADD that represents the Prod state utility value at each state. 
         """
         # create all combinations of 1-true and 0-false
         boolean_str = list(product([1, 0], repeat=len(self.sym_vars_ults)))
@@ -244,12 +252,12 @@ class SymbolicGraphOfUtility(DynWeightedPartitionedFrankaAbs):
 
         # create the adj map for rollout purposes
         if human_action_name != '':
-            assert self.prod_adj_map.get(curr_state_tuple, {}).get(mod_raction_name, {}).get(mod_haction_name) is None, "Error Computing Adj Dictionary, Fix this!!!"
-            self.prod_adj_map[(*curr_state_tuple, curr_state_val)][mod_raction_name][mod_haction_name] = (*next_state_tuple, next_state_val)
+            assert self.prod_adj_map.get(curr_state_tuple, {}).get(robot_action_name, {}).get(human_action_name) is None, "Error Computing Adj Dictionary, Fix this!!!"
+            self.prod_adj_map[(*curr_state_tuple, curr_state_val)][robot_action_name][human_action_name] = (*next_state_tuple, next_state_val)
         
         else:
-            assert self.prod_adj_map.get(curr_state_tuple, {}).get(mod_raction_name, {}).get('r') is None, "Error Computing Adj Dictionary, Fix this!!!"
-            self.prod_adj_map[(*curr_state_tuple, curr_state_val)][mod_raction_name]['r'] = (*next_state_tuple, next_state_val)
+            assert self.prod_adj_map.get(curr_state_tuple, {}).get(robot_action_name, {}).get('r') is None, "Error Computing Adj Dictionary, Fix this!!!"
+            self.prod_adj_map[(*curr_state_tuple, curr_state_val)][robot_action_name]['r'] = (*next_state_tuple, next_state_val)
         
         # update edge count 
         self.ecount += 1
@@ -272,25 +280,18 @@ class SymbolicGraphOfUtility(DynWeightedPartitionedFrankaAbs):
         is u. All the other edges have an edge weight 0. (Remember this is a TWA with non-zero edge weights on edges
         transiting to the target states.)
         """
-
-        open_list = defaultdict(lambda: set())
-
-        # keep track of states as we expand
-        closed = self.manager.addZero()
-
         init_state_tuple = self.get_tuple_from_state(self.init)
         init_dfa_state = (self.dfa_handle.init[0])
 
-        sym_trap_state_lbl: ADD = self.get_trap_state_lbl(boxes)
+        self.sym_trap_state_lbl: ADD = self.get_trap_state_lbl(boxes)
 
         layer = 0
 
         # creating monolithinc tr bdd to keep track all the transition we are creating to detect nondeterminism
         if debug:
             self.mono_tr_bdd = self.manager.addZero() 
-        
 
-        open_list[layer].add((init_state_tuple, init_dfa_state))
+        self.open_list[layer].add((init_state_tuple, init_dfa_state))
 
         prod_curr_list: List[ADD] = [*self.dfa_handle.sym_add_vars_curr]
         prod_curr_list.extend([lbl for sym_vars_list in self.sym_vars_lbl for lbl in sym_vars_list])
@@ -301,15 +302,15 @@ class SymbolicGraphOfUtility(DynWeightedPartitionedFrankaAbs):
         
         while True:
 
-            if len(open_list[layer]) > 0:
-                if verbose:
-                    print(f"********************Layer: {layer}**************************")
+            if len(self.open_list[layer]) > 0:
+                # if verbose:
+                print(f"********************Layer: {layer}**************************")
                 
                 # reset the empty bucket counter 
                 empty_bucket_counter = 0
 
-                # look over all the valid actions from each state from the current layer, 
-                for curr_prod_tuple in open_list[layer]:
+                # loop over all the valid actions from each state from the current layer, 
+                for curr_prod_tuple in self.open_list[layer]:
                     curr_state_tuple = curr_prod_tuple[0]
                     curr_dfa_tuple = curr_prod_tuple[1]
                     
@@ -325,18 +326,20 @@ class SymbolicGraphOfUtility(DynWeightedPartitionedFrankaAbs):
 
                     # if the current prod state is an accepting state then add it to the leaf ADD along with the state value 
                     if not (curr_dfa_sym_state & self.dfa_handle.sym_goal_state).isZero():
-                        print(f"Adding leaf node ({curr_ts_exp_states},{curr_dfa_tuple}) with value {layer}")
+                        if verbose: 
+                            print(f"Adding leaf node ({curr_ts_exp_states}, {curr_dfa_tuple}) with value {layer}")
                         # before adding the leaf node, convert it to (state-val) - infinity ADD
                         full_prod_state_val: ADD = (curr_prod_sym_state & self.predicate_sym_map_utls[layer]).ite(self.manager.addConst(layer), self.manager.plusInfinity())
                         self.leaf_nodes = self.leaf_nodes.min(full_prod_state_val)
                         self.leaf_vals.add(layer)
                         # update counter
                         self.lcount += 1
+                        self.closed |= curr_prod_sym_state & self.predicate_sym_map_utls[layer]
                         continue
                         
                     # update the closed set
-                    assert (closed & curr_prod_sym_state & self.predicate_sym_map_utls[layer]).isZero(), "Error unrolling the graph. Encountered a twice during unrolling. FIX THIS!!!"
-                    closed |= curr_prod_sym_state & self.predicate_sym_map_utls[layer]
+                    assert (self.closed & curr_prod_sym_state & self.predicate_sym_map_utls[layer]).isZero(), "Error unrolling the graph. Encountered a twice during unrolling. FIX THIS!!!"
+                    self.closed |= curr_prod_sym_state & self.predicate_sym_map_utls[layer]
 
                     self.scount += 1
 
@@ -365,7 +368,7 @@ class SymbolicGraphOfUtility(DynWeightedPartitionedFrankaAbs):
                                 # get the DFA state
                                 next_dfa_sym, next_dfa_tuple = self.get_dfa_evolution(next_sym_state=next_sym_state, curr_dfa_sym=curr_dfa_sym_state)
 
-                                # compute the next pros state
+                                # compute the next prod state
                                 next_prod_sym_state: ADD = next_sym_state & next_dfa_sym
 
                                 self.add_edge_to_action_tr(curr_state_tuple=curr_prod_tuple,
@@ -385,7 +388,7 @@ class SymbolicGraphOfUtility(DynWeightedPartitionedFrankaAbs):
 
                                 
                                 # add them to their respective bucket. . .
-                                open_list[succ_utl].add((next_state_tuple, next_dfa_tuple))
+                                self.open_list[succ_utl].add((next_state_tuple, next_dfa_tuple))
                 
                             # if there are any valid human edges from curr state
                             if len(valid_act_list) > 0:
@@ -420,21 +423,21 @@ class SymbolicGraphOfUtility(DynWeightedPartitionedFrankaAbs):
                                 print(f"Adding Robot edge: ({curr_ts_exp_states}, {curr_dfa_tuple})[{layer}] -------{robot_act}------> ({next_exp_state}, {next_dfa_tuple})[{succ_utl}]")
                             
                             # add them to their respective bucket. . .
-                            open_list[succ_utl].add((next_state_tuple, next_dfa_tuple))
+                            self.open_list[succ_utl].add((next_state_tuple, next_dfa_tuple))
 
                         else:
                             # add an edge to the trap state
                             next_sym_state: ADD = self.get_sym_state_from_exp_states(exp_states=['(trap-state)'])
                             next_state_tuple: tuple = (self.pred_int_map['(trap-state)'])
 
-                            next_prod_sym_state: ADD = next_sym_state & sym_trap_state_lbl & curr_dfa_sym_state
+                            next_prod_sym_state: ADD = next_sym_state & self.sym_trap_state_lbl & curr_dfa_sym_state
 
                             # add this (vT, lbl, DFA state) to the list leaf node
                             full_prod_state_val: ADD = (next_prod_sym_state & self.predicate_sym_map_utls[self.energy_budget]).ite(self.manager.addConst(self.energy_budget), self.manager.plusInfinity())
                             self.leaf_nodes = self.leaf_nodes.min(full_prod_state_val)
 
                             # update closed list for book keeping purposes
-                            closed |= next_prod_sym_state & self.predicate_sym_map_utls[self.energy_budget]
+                            self.closed |= next_prod_sym_state & self.predicate_sym_map_utls[self.energy_budget]
 
                             self.add_edge_to_action_tr(curr_state_tuple=curr_prod_tuple,
                                                         next_state_tuple=(next_state_tuple, curr_dfa_tuple),
@@ -450,8 +453,6 @@ class SymbolicGraphOfUtility(DynWeightedPartitionedFrankaAbs):
                         
                             if verbose:
                                 print(f"Adding Trap edge: ({curr_ts_exp_states}, {curr_dfa_tuple})[{layer}] -------{robot_act}------> (vT)")
-
-                layer += 1
             
             else:
                 empty_bucket_counter += 1
@@ -459,5 +460,94 @@ class SymbolicGraphOfUtility(DynWeightedPartitionedFrankaAbs):
                 if empty_bucket_counter == self.max_ts_action_cost:
                     print(f"Done Computing the Graph of Utility! Accepting Leaf nodes {self.lcount}; Total states {self.scount}; Total edges {self.ecount}")
                     break
+            
+            layer += 1
+        
 
+    def get_best_alternatives(self, cooperative_vals: ADD, mod_act_dict: dict, verbose: bool = False):
+        """
+         A function that computes the best alternative from each valid edge in the Graph of Utility.  
 
+         ba(s, s') is defined as minimum of all the cooperative values for successors s'' s.t. s'' not equal to s'.
+         If there is no alternate edge to choose from, then ba(s, s') = +inf.
+         
+         The cooperate values are stored in the winning states ADD along with their optimal values.
+        """
+        # gives the bdd version of all states as 0-1 ADD
+        coop_bdd_vals: BDD = cooperative_vals.bddInterval(1, self.energy_budget)
+
+        assert coop_bdd_vals.existAbstract(self.sys_cube.bddPattern()) == self.closed.bddPattern(), "Error computing BDD of optimal state vals. Fix this!!!"
+
+        # loop through the open_list dict computed above
+        layer = 0
+        while True:
+            if len(self.open_list[layer]) > 0:
+                # if verbose:
+                print(f"********************Layer: {layer}**************************")
+                
+                # reset the empty bucket counter 
+                empty_bucket_counter = 0
+
+                # look over all the valid actions from each state from the current layer, 
+                for curr_prod_tuple in self.open_list[layer]:
+                    curr_state_tuple = curr_prod_tuple[0]
+                    curr_dfa_tuple = curr_prod_tuple[1]
+
+                    # get the sym repr of the DFA state
+                    curr_dfa_sym_state: ADD = self.dfa_handle.dfa_predicate_add_sym_map_curr[curr_dfa_tuple]
+
+                    # Do not compute best alternative from an accepting state(leaf node in Graph of utility)
+                    if not (curr_dfa_sym_state & self.dfa_handle.sym_goal_state).isZero():
+                        continue
+                    
+                    # get sym repr of current and next state
+                    curr_ts_sym_state: ADD = self.get_sym_state_from_tuple(curr_state_tuple)
+
+                    # construct the prod state (s, z, u)
+                    curr_prod_sym_state: ADD = curr_ts_sym_state & curr_dfa_sym_state & self.predicate_sym_map_utls[layer]
+                    
+                    
+                    # if alternate edge exists then loop over all valid robot actions
+                    if len(self.ts_handle.org_adj_map[curr_state_tuple].keys()) > 1:
+                        for robot_act_name in self.ts_handle.org_adj_map[curr_state_tuple].keys():
+                            # get the modified robot action name
+                            mod_raction_name: str = mod_act_dict[robot_act_name]
+
+                            # 0-1 ADD
+                            curr_state_act: ADD = curr_prod_sym_state & self.ts_handle.predicate_sym_map_robot[mod_raction_name]
+
+                            bdd_curr_state_act: BDD = curr_state_act.bddPattern()
+
+                            # get the alt edges
+                            alt_edges: BDD = coop_bdd_vals & ~bdd_curr_state_act
+
+                            # get all the alternate edges (s, (a_s)') from the current state 
+                            alt_edges_state: ADD = alt_edges.toADD() & curr_prod_sym_state
+                            alt_edges_state =  alt_edges_state.ite(self.manager.addOne(), self.manager.plusInfinity())
+                            min_val: ADD = (alt_edges_state & cooperative_vals).findMin()
+                            
+                            assert min_val != self.manager.addZero(), "Error computing best alternative value. This should never be zero. Fix this!!!"
+                            
+                            self.ba_strategy = self.ba_strategy.min( (curr_state_act).ite(min_val, self.manager.plusInfinity()))
+
+                            ## add the ba value to set
+                            int_min_val: int =  list(min_val.generate_cubes())[0][1]
+                            self.ba_set.add(int_min_val)
+
+                            if verbose:
+                                curr_ts_exp_states = self.get_state_from_tuple(curr_state_tuple)
+                                print(f"******************** Best Alternate Val ({curr_ts_exp_states}, {curr_dfa_tuple})[{layer}] ---{robot_act_name}--->: [{int_min_val}] ")
+            
+            else:
+                empty_bucket_counter += 1
+                # If Cmax consecutive layers are empty. . .
+                if empty_bucket_counter == self.max_ts_action_cost:
+                    break
+            
+            layer += 1
+
+        # sanity check. The set of best alternative values should be subset of utility values
+        assert self.ba_set.issubset(self.leaf_vals), "Error computing set of beat alternatives. The BA set should be a subset of utility values "
+
+        # add infinity to the set of best responses
+        self.ba_set.add(inf)

@@ -915,7 +915,6 @@ class BndDynamicFrankaTransitionSystem(DynamicFrankaTransitionSystem):
          A function that loops through all the human edges and add the valid moves to the symbolic TR.
          We then return the list of valid TS actions to create the valid robot edges from the symbolic state.  
         """
-        # curr_state_tuple, curr_hint = self.get_state_tuple_from_sym_state(sym_state=curr_sym_state, sym_lbl_xcube_list=sym_lbl_cubes)
         curr_exp_states = frozenset(self.get_state_from_tuple(curr_state_tuple))
         # get valid pres from current state tuple
         pre_robot_conf = self.get_conds_from_state(curr_state_tuple, only_robot_conf=True)
