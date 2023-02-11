@@ -25,7 +25,8 @@ from src.symbolic_graphs.strategy_synthesis_scripts import FrankaPartitionedWorl
 class FrankaRegretSynthesis(FrankaPartitionedWorld):
     """
       Main script that constructs the Main Graph in a partitioned fashion, then constructs the graph of utility (G^{u}) and
-       finally the Graph of best response (G^{br}). 
+       finally the Graph of best response (G^{br}). Both these graph are constrcuted in a Hybrid Fashion. We unroll the
+       graph explcitly and then construct the Symbplic TR for each graph for synthesis. 
     """
 
     def __init__(self,
