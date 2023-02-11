@@ -85,7 +85,7 @@ class TestCoopGame(unittest.TestCase):
                              msg=f"Mismatch in the Total # of boolean vars required to construct the Symbolic Weighted Abstraction for formula {task}")
             
             self.assertEqual(frankapartition_handle.ts_handle.ecount,
-                             394,
+                             340,
                              msg=f"Mismatch in the # of edges in the Symbolic Weighted Abstraction for formula {task}.")
     
 

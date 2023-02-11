@@ -13,7 +13,8 @@ from bidict import bidict
 from cudd import Cudd, BDD, ADD
 
 from src.symbolic_graphs import ADDPartitionedDFA
-from src.symbolic_graphs import DynWeightedPartitionedFrankaAbs, SymbolicGraphOfUtility
+from src.symbolic_graphs import DynWeightedPartitionedFrankaAbs
+from src.symbolic_graphs.hybrid_regret_graphs import HybridGraphOfUtility
 
 from src.algorithms.base import BaseSymbolicSearch
 from src.algorithms.strategy_synthesis import AdversarialGame
@@ -275,7 +276,7 @@ class GraphOfUtlCooperativeGame(BaseSymbolicSearch):
     """
 
     def __init__(self,
-                 prod_handle: SymbolicGraphOfUtility,
+                 prod_handle: HybridGraphOfUtility,
                  ts_handle: DynWeightedPartitionedFrankaAbs,
                  dfa_handle: ADDPartitionedDFA,
                  ts_curr_vars: List[ADD],

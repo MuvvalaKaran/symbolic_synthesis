@@ -18,10 +18,10 @@ from cudd import Cudd, BDD, ADD
 
 from src.symbolic_graphs import DynWeightedPartitionedFrankaAbs
 from src.symbolic_graphs import ADDPartitionedDFA
-from src.symbolic_graphs import SymbolicGraphOfUtility
+from src.symbolic_graphs.hybrid_regret_graphs import HybridGraphOfUtility
 
 
-class SymbolicGraphOfBR(DynWeightedPartitionedFrankaAbs):
+class HybridGraphOfBR(DynWeightedPartitionedFrankaAbs):
 
 
     def __init__(self,
@@ -41,7 +41,7 @@ class SymbolicGraphOfBR(DynWeightedPartitionedFrankaAbs):
                  top_locs: List[str],
                  ts_handle: DynWeightedPartitionedFrankaAbs,
                  dfa_handle: ADDPartitionedDFA,
-                 symbolic_gou_handle: SymbolicGraphOfUtility,
+                 symbolic_gou_handle: HybridGraphOfUtility,
                  prod_ba_vars: List[ADD],
                  prod_succ_ba_vars: List[ADD],
                  **kwargs):
@@ -62,7 +62,7 @@ class SymbolicGraphOfBR(DynWeightedPartitionedFrankaAbs):
                          **kwargs)
         self.ts_handle: DynWeightedPartitionedFrankaAbs = ts_handle
         self.dfa_handle: ADDPartitionedDFA = dfa_handle
-        self.gou_handle: SymbolicGraphOfUtility = symbolic_gou_handle
+        self.gou_handle: HybridGraphOfUtility = symbolic_gou_handle
 
         self.ba_set: set = symbolic_gou_handle.ba_set
         # ba vars for current state

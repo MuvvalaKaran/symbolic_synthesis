@@ -17,7 +17,7 @@ from src.algorithms.strategy_synthesis import AdversarialGame, GraphOfUtlCoopera
 
 from src.symbolic_graphs import ADDPartitionedDFA
 from src.symbolic_graphs import DynWeightedPartitionedFrankaAbs
-from src.symbolic_graphs import SymbolicGraphOfUtility, SymbolicGraphOfBR
+from src.symbolic_graphs.hybrid_regret_graphs import HybridGraphOfUtility, HybridGraphOfBR
 
 from src.symbolic_graphs.strategy_synthesis_scripts import FrankaPartitionedWorld
 
@@ -65,7 +65,7 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
                          create_lbls=create_lbls)
         
         # graph of utility handle
-        self.graph_of_utls_handle: SymbolicGraphOfUtility = None
+        self.graph_of_utls_handle: HybridGraphOfUtility = None
 
         # Map to store org act name to mod act name
         # create during the first abstraction construction call
@@ -126,8 +126,6 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
 
         # add a terminal-state to the set of valid robot preds
         robot_preds.append('(trap-state)')
-
-        # box_preds.append('(empty)')
 
         # update the predicate dictionary accordingly
         num_of_preds: int = len(self.pred_int_map.keys())
@@ -379,7 +377,7 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
         max_action_cost: int = min_max_handle._get_max_tr_action_cost()
 
         # construct the graph of utilty
-        graph_of_utls_handle = SymbolicGraphOfUtility(curr_vars=self.ts_x_list,
+        graph_of_utls_handle = HybridGraphOfUtility(curr_vars=self.ts_x_list,
                                                       lbl_vars=self.ts_obs_list,
                                                       state_utls_vars=self.prod_utls_vars,
                                                       robot_action_vars=self.ts_robot_vars,
@@ -460,7 +458,7 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
         
         print("******************Constructing Graph of Best Response******************")
         # construct of Best response G^{br}
-        graph_of_br_handle = SymbolicGraphOfBR(curr_vars=self.ts_x_list,
+        graph_of_br_handle = HybridGraphOfBR(curr_vars=self.ts_x_list,
                                                lbl_vars=self.ts_obs_list,
                                                robot_action_vars=self.ts_robot_vars,
                                                human_action_vars=self.ts_human_vars,

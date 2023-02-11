@@ -19,7 +19,7 @@ from src.symbolic_graphs import DynWeightedPartitionedFrankaAbs
 from src.symbolic_graphs import ADDPartitionedDFA
 
 
-class SymbolicGraphOfUtility(DynWeightedPartitionedFrankaAbs):
+class HybridGraphOfUtility(DynWeightedPartitionedFrankaAbs):
 
     def __init__(self,
                  curr_vars: List[ADD],

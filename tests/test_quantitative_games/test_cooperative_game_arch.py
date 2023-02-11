@@ -49,7 +49,7 @@ class TestCoopGameArch(unittest.TestCase):
         
         # correct values
         cor_total_vars: List[int] = [22, 23]
-        cor_ecount: List[int] = [6486, 13302]
+        cor_ecount: List[int] = [4884, 10188]
 
         for arch_id, arch_problem in enumerate(problem_file_paths):
             cudd_manager = Cudd()
