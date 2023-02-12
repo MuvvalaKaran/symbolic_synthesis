@@ -15,6 +15,7 @@ from cudd import Cudd, BDD, ADD
 from src.symbolic_graphs import ADDPartitionedDFA
 from src.symbolic_graphs import DynWeightedPartitionedFrankaAbs
 from src.symbolic_graphs.hybrid_regret_graphs import HybridGraphOfUtility
+from src.symbolic_graphs.symbolic_regret_graphs import SymbolicGraphOfUtility
 
 from src.algorithms.base import BaseSymbolicSearch
 from src.algorithms.strategy_synthesis import AdversarialGame
@@ -512,6 +513,240 @@ class GraphOfUtlCooperativeGame(BaseSymbolicSearch):
             # update counter 
             layer += 1
     
+    
+    def roll_out_strategy(self, strategy: ADD, verbose: bool = False):
+        raise NotImplementedError()
+
+
+
+class SymbolicGraphOfUtlCooperativeGame(CooperativeGame):
+
+    def __init__(self,
+                 gou_handle: SymbolicGraphOfUtility,
+                 ts_handle: DynWeightedPartitionedFrankaAbs,
+                 dfa_handle: ADDPartitionedDFA,
+                 ts_curr_vars: List[ADD],
+                 dfa_curr_vars: List[ADD],
+                 ts_obs_vars: List[ADD],
+                 ts_utls_vars: List[ADD],
+                 sys_act_vars: List[ADD],
+                 env_act_vars: List[ADD],
+                 cudd_manager: Cudd) -> None:
+        super().__init__(ts_handle=ts_handle,
+                         dfa_handle=dfa_handle,
+                         ts_curr_vars=ts_curr_vars,
+                         dfa_curr_vars=dfa_curr_vars,
+                         sys_act_vars=sys_act_vars,
+                         env_act_vars=env_act_vars,
+                         ts_obs_vars=ts_obs_vars,
+                         cudd_manager=cudd_manager)
+
+
+        self.init_prod = self.init_TS & self.init_DFA & gou_handle.predicate_sym_map_utls[0]
+
+        self.ts_utls_list = ts_utls_vars
+
+        self.utls_trans_func_list: List[List[ADD]] = gou_handle.sym_tr_actions
+        self.ults_bdd_trans_func_list: List[List[BDD]] = []
+
+        self.gou_handle = gou_handle
+        
+        # create corresponding cubes to avoid repetition
+        self.ts_utls_cube: ADD = reduce(lambda x, y: x & y, self.ts_utls_list)
+
+        # energy budget
+        self.energy_budget: int = gou_handle.energy_budget
+      
+
+        # create ts and dfa combines cube
+        self.prod_xlist: list =  self.dfa_x_list + [lbl for sym_vars_list in self.ts_obs_list for lbl in sym_vars_list] + self.ts_x_list + self.ts_utls_list
+        self.prod_xcube: ADD = reduce(lambda x, y: x & y, self.prod_xlist)
+
+        # # get the bdd variant
+        # self.prod_bdd_curr_list = [_avar.bddPattern() for _avar in self.prod_xlist]
+        
+        # get the bdd version of the transition function as vectorComposition only works with
+        for act in self.utls_trans_func_list:
+            act_ls = []
+            for avar in act:
+                act_ls.append(avar.bddPattern())
+        
+            self.ults_bdd_trans_func_list.append(act_ls)
+    
+
+    def get_state_value_from_dd(self, dd_func: ADD, **kwargs) -> None:
+        """
+         A helper function that print the value associated with each state.
+          
+          @param: dd_func is wining_state ADD with minimum value at any given iteration
+        """
+
+        addVars = []
+        for cube, sval in dd_func.generate_cubes():
+            if sval == math.inf:
+                continue
+            _amb_var = []
+            var_list = []
+            for _idx, var in enumerate(cube):
+                if var == 2 and self.manager.addVar(_idx) not in self.prod_xlist:
+                    continue
+                
+                elif self.manager.addVar(_idx) in self.prod_xlist:
+                    if var == 2:
+                        _amb_var.append([self.manager.addVar(_idx), ~self.manager.addVar(_idx)])
+                    elif var == 0:
+                        var_list.append(~self.manager.addVar(_idx))
+                    elif var == 1:
+                        var_list.append(self.manager.addVar(_idx))
+                    else:
+                        print("CUDD ERRROR, A variable is assigned an unaccounted integret assignment. FIX THIS!!")
+                        sys.exit(-1)
+
+            # check if it is not full defined
+            if len(_amb_var) != 0:
+                cart_prod = list(product(*_amb_var))
+                for _ele in cart_prod:
+                    var_list.extend(_ele)
+                    addVars.append((reduce(lambda a, b: a & b, var_list), sval))
+                    var_list = list(set(var_list) - set(_ele))
+            else:
+                addVars.append((reduce(lambda a, b: a & b, var_list), sval))
+        
+        
+        for cube, val in addVars: 
+            # convert to 0-1 ADD
+            ts_cube = cube.existAbstract(self.dfa_xcube & self.ts_utls_cube) #.bddPattern().toADD()
+            _ts_tuple = self.ts_handle.get_state_tuple_from_sym_state(ts_cube, kwargs['sym_lbl_cubes'])
+            _ts_name = self.ts_handle.get_state_from_tuple(_ts_tuple)
+            assert _ts_name is not None, "Couldn't convert TS Cube to its corresponding State. FIX THIS!!!"
+
+            _ts_utl: int = self.gou_handle.predicate_sym_map_utls.inv[cube.existAbstract(self.ts_xcube & self.ts_obs_cube & self.dfa_xcube)] #.bddPattern().toADD()]
+
+            _dfa_name = self._look_up_dfa_name(prod_dd=cube.existAbstract(self.ts_utls_cube), #.bddPattern().toADD(),
+                                               dfa_dict=self.dfa_sym_to_curr_state_map,
+                                               ADD_flag=False,
+                                               **kwargs)
+            
+            print(f"[({_ts_name}, {_dfa_name}), {_ts_utl}] {val}")
+
+
+    def get_pre_states(self, ts_action: List[BDD], From: BDD, prod_curr_list=None, **kwargs) -> BDD:
+        """
+         Compute the pre-image on the product graph
+        """
+        ults_tr = kwargs['utls_tr']
+        # # first evolve over DFA and then evolve over the TS and utility values
+        # mod_win_state: BDD = From.vectorCompose(self.dfa_bdd_x_list, self.dfa_bdd_transition_fun_list)
+        
+        pre_prod_state: BDD = From.vectorCompose(prod_curr_list, [*ts_action, *ults_tr])
+            
+        return pre_prod_state
+    
+
+    def solve(self, verbose: bool = False) -> ADD:
+        """
+         Compute cVals on the Symbolic Graph of utility.
+        """
+        
+        ts_states: ADD = self.obs_add
+        accp_states: ADD = ts_states & self.target_DFA
+
+        # convert it to 0 - Infinity ADD
+        # accp_states = accp_states.ite(self.manager.addZero(), self.manager.plusInfinity())
+
+        # strategy - optimal (state & robot-action) pair stored in the ADD
+        strategy: ADD  = self.manager.plusInfinity()
+
+        # initializes accepting states
+        for sval in range(self.energy_budget + 1):
+            # augment the accepting states with utility vars
+            tmp_accp_states = accp_states & self. gou_handle.predicate_sym_map_utls[sval]
+            tmp_accp_states = tmp_accp_states.ite(self.manager.addConst(int(sval)), self.manager.plusInfinity())
+            self.winning_states[0] |= self.winning_states[0].min(tmp_accp_states)
+        
+            strategy |= strategy.min(tmp_accp_states)
+
+        layer: int = 0
+
+        sym_lbl_cubes = self._create_lbl_cubes()
+
+        prod_curr_list = []
+        prod_curr_list.extend([lbl for sym_vars_list in self.ts_obs_list for lbl in sym_vars_list])
+        prod_curr_list.extend(self.ts_x_list)
+        prod_curr_list.extend(self.ts_utls_list)
+        
+        prod_bdd_curr_list = [_avar.bddPattern() for _avar in prod_curr_list]
+
+        while True:
+            if self.winning_states[layer].compare(self.winning_states[layer - 1], 2):
+                print(f"**************************Reached a Fixed Point in {layer} layers**************************")
+                init_state_cube = list((self.init_prod & self.winning_states[layer]).generate_cubes())[0]
+                init_val: int = init_state_cube[1]
+                self.init_state_value = init_val
+                if init_val != math.inf:
+                    print(f"A Winning Strategy Exists!!. The Min Energy is {init_val}")
+                    return strategy
+                else:
+                    print("No Winning Strategy Exists!!!")
+                    # need to delete this dict that holds cudd object to avoid segfaults after exiting python code
+                    del self.winning_states
+                    return
+            
+
+            print(f"**************************Layer: {layer}**************************")
+
+            _win_state_bucket: Dict[BDD] = defaultdict(lambda: self.manager.bddZero())
+            
+            # convert the winning states into buckets of BDD
+            for sval in range(self.gou_handle.energy_budget + 1):
+                # get the states with state value equal to sval and store them in their respective bukcets
+                win_sval = self.winning_states[layer].bddInterval(sval, sval)
+
+                if not win_sval.isZero():
+                    _win_state_bucket[sval] |= win_sval
+            
+
+            _pre_buckets: Dict[ADD] = defaultdict(lambda: self.manager.addZero())
+
+            # compute the predecessor and store them by successor cost
+            for sval, succ_states in _win_state_bucket.items():
+                # first evolve over DFA and then evolve over the TS and utility values
+                mod_win_state: BDD = succ_states.vectorCompose(self.dfa_bdd_x_list, self.dfa_bdd_transition_fun_list)
+                for tr_action, utls_tr in zip(self.ts_bdd_transition_fun_list, self.ults_bdd_trans_func_list):
+                    pre_states: BDD = self.get_pre_states(ts_action=tr_action, From=mod_win_state, prod_curr_list=prod_bdd_curr_list, utls_tr=utls_tr)
+    
+                    if not pre_states.isZero():
+                        _pre_buckets[sval] |= pre_states.toADD()
+            
+            # unions of all predecessors
+            pre_states: ADD = reduce(lambda x, y: x | y, _pre_buckets.values())
+
+            tmp_strategy: ADD = pre_states.ite(self.manager.addOne(), self.manager.plusInfinity())
+
+            for sval, apre_s in _pre_buckets.items():
+                tmp_strategy = tmp_strategy.max(apre_s.ite(self.manager.addConst(int(sval)), self.manager.addZero()))
+
+            new_tmp_strategy: ADD = tmp_strategy
+
+            # go over all the human actions and preserve the minimum one
+            for human_tr_dd in self.ts_sym_to_human_act_map.keys():
+                new_tmp_strategy = new_tmp_strategy.min(tmp_strategy.restrict(human_tr_dd)) 
+
+            # compute the minimum of state action pairs
+            strategy = strategy.min(new_tmp_strategy)
+
+            self.winning_states[layer + 1] |= self.winning_states[layer]
+
+            for tr_dd in self.ts_sym_to_robot_act_map.keys():
+                # remove the dependency for that action and preserve the minimum value for every state
+                self.winning_states[layer + 1] = self.winning_states[layer  + 1].min(strategy.restrict(tr_dd))
+            
+            if verbose:
+                print(f"Minimum State value at Iteration {layer +1}")
+                self.get_state_value_from_dd(dd_func=self.winning_states[layer + 1], sym_lbl_cubes=sym_lbl_cubes)
+
+            # update counter 
+            layer += 1
     
     def roll_out_strategy(self, strategy: ADD, verbose: bool = False):
         raise NotImplementedError()

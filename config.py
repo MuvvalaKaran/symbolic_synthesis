@@ -8,6 +8,8 @@ GRIDWORLD: bool = False   # Set this flag to true when using gridworld example f
 FRANKAWORLD: bool = False  # Set this flag to true when using manipulator scenarios for graph search
 STRATEGY_SYNTHESIS: bool = False  # Set this flag to true when  when using manipulator scenarios for Strategy synthesis
 REGRET_SYNTHESIS: bool = True  # Set this flag to true when you want compute regret minimizing strategies
+REGRET_HYBRID: bool = False  # Set this flag to true when you contruvt graph of utility and best response explicitly
+
 
 TWO_PLAYER_GAME: bool = True # Set this flag to true when you want to contruct a two-player game env.
 TWO_PLAYER_GAME_BND: bool = False  # Set this flag to true when you want to construct som bounded no. off human interventions.
@@ -67,6 +69,9 @@ TOP_LOC = []
 
 ##### TESTING two block regret formulas
 formulas = ['F(p00 & XF(p21)) | F(p18 & p06)']
+
+##### Simple Formula
+# formulas = ['F(p01)']
 
 
 ### BENCHMARKING formulas

@@ -238,7 +238,7 @@ class AdversarialGame(BaseSymbolicSearch):
                 print(f"({_ts_name}, {_dfa_name})  ----{ract_name} & {hact_name}")
     
 
-    def get_pre_states(self, ts_action: List[BDD], From: BDD, prod_curr_list=None) -> BDD:
+    def get_pre_states(self, ts_action: List[BDD], From: BDD, prod_curr_list=None, **kwargs) -> BDD:
         """
          Compute the predecessors using the compositional approach. From is a collection of 0-1 ADD.
           As vectorCompose functionality only works for bdd, we have to first comvert From to 0-1 BDD, 
@@ -985,7 +985,7 @@ class GraphofBRAdvGame(BaseSymbolicSearch):
                                                                        max_layer=max_layer,
                                                                        curr_prod_state=curr_prod_state,
                                                                        curr_prod_tuple=(curr_ts_tuple, curr_dfa_tuple, curr_prod_utl, curr_prod_ba),
-                                                                       print_all_act_vals=True)
+                                                                       print_all_act_vals=ask_usr_input)
 
             list_act_cube = self.convert_add_cube_to_func(act_cube, curr_state_list=self.sys_act_vars)
 
