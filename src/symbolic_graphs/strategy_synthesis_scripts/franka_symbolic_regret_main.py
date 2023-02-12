@@ -67,14 +67,13 @@ class FrankaSymbolicRegretSynthesis(FrankaRegretSynthesis):
         """
          Override parent method to constrcut Graph of Utility in symbolic fashion.
         """
-
-        print("******************Constructing Graph of utility******************")
-
+        print("******************Computing Min-Max (aVal) on the original graph******************")
         min_max_handle = self.get_energy_budget(verbose=verbose, just_adv_game=just_adv_game)
 
         # get the max action cost
-        # max_action_cost: int = min_max_handle._get_max_tr_action_cost()
+        max_action_cost: int = min_max_handle._get_max_tr_action_cost()
 
+        print("******************Constructing Graph of utility******************")
         graph_of_utls_handle = SymbolicGraphOfUtility(curr_vars=self.ts_x_list,
                                                     lbl_vars=self.ts_obs_list,
                                                     state_utls_vars=self.prod_utls_vars,
@@ -91,9 +90,11 @@ class FrankaSymbolicRegretSynthesis(FrankaRegretSynthesis):
                                                     dfa_state_vars=self.dfa_x_list,
                                                     sup_locs=self.sup_locs,
                                                     top_locs=self.top_locs,
+                                                    dfa_handle=self.dfa_handle,
                                                     ts_handle=self.ts_handle,
                                                     int_weight_dict=self.int_weight_dict,
-                                                    budget=self.reg_energy_budget)
+                                                    budget=self.reg_energy_budget,
+                                                    max_ts_action_cost=max_action_cost)
         
 
         start: float = time.time()
@@ -101,6 +102,12 @@ class FrankaSymbolicRegretSynthesis(FrankaRegretSynthesis):
                                                    verbose=False)
         stop: float = time.time()
         print("Time took for constructing the Sym TR for Graph of Utility: ", stop - start)
+
+        # compute reach states from the init state
+        start: float = time.time()
+        graph_of_utls_handle.compute_graph_of_utility_reachable_states(verbose=False)
+        stop: float = time.time()
+        print("Time took for constructing Reachable states on Graph of Utility: ", stop - start)
 
         self.graph_of_utls_handle = graph_of_utls_handle
     
@@ -137,6 +144,9 @@ class FrankaSymbolicRegretSynthesis(FrankaRegretSynthesis):
         cvals: ADD = gou_min_min_handle.solve(verbose=False)
         stop: float = time.time()
         print("Time took for computing cVals is: ", stop - start)
+
+        # sanity checking
+        # cvals & gou_min_min_handle.init_prod
 
         # sys.exit(-1)
 

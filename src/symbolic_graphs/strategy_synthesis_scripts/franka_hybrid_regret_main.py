@@ -384,13 +384,14 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
             the nodes of G'. The utility information added to the nodes is uniquely determined by the path used to reach
             the current  position.
         """
-        print("******************Constructing Graph of utility******************")
+        print("******************Computing Min-Max (aVal) on the original graph******************")
 
         min_max_handle = self.get_energy_budget(verbose=verbose, just_adv_game=just_adv_game)
 
         # get the max action cost
         max_action_cost: int = min_max_handle._get_max_tr_action_cost()
 
+        print("******************Constructing Graph of utility******************")
         # construct the graph of utilty
         graph_of_utls_handle = HybridGraphOfUtility(curr_vars=self.ts_x_list,
                                                     lbl_vars=self.ts_obs_list,
@@ -421,7 +422,6 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
                                                         debug=True)
         stop: float = time.time()
         print("Time took for constructing the Graph of Utility: ", stop - start)
-        sys.exit(-1)
 
         self.graph_of_utls_handle = graph_of_utls_handle
     
@@ -438,6 +438,7 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
 
         # constuct graph of utility
         self.build_add_graph_of_utility(verbose=verbose, just_adv_game=just_adv_game)
+        # sys.exit(-1)
         
         print("******************Computing cVals on Graph of utility******************")
         # compute the min-min value from each state
@@ -457,7 +458,7 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
         cvals: ADD = gou_min_min_handle.solve(verbose=False)
         stop: float = time.time()
         print("Time took for computing cVals is: ", stop - start)
-
+        sys.exit(-1)
         print("******************Computing BA Vals on Graph of utility******************")
         start: float = time.time()
         # compute the best alternative from each edge for cumulative payoff

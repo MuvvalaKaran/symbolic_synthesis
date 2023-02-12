@@ -39,8 +39,10 @@ class SymbolicGraphOfUtility(DynWeightedPartitionedFrankaAbs):
                  sup_locs: List[str],
                  top_locs: List[str],
                  budget: int,
+                 dfa_handle: ADDPartitionedDFA,
                  ts_handle: DynWeightedPartitionedFrankaAbs,
                  int_weight_dict: Dict[str, int],
+                 max_ts_action_cost: int,
                  **kwargs):
         super().__init__(curr_vars,
                          lbl_vars,
@@ -59,11 +61,14 @@ class SymbolicGraphOfUtility(DynWeightedPartitionedFrankaAbs):
                          top_locs,
                          **kwargs)
         self.ts_handle: DynWeightedPartitionedFrankaAbs = ts_handle
+        self.dfa_handle: ADDPartitionedDFA = dfa_handle
 
         self.int_weight_dict = int_weight_dict
 
         self.sym_vars_ults: List[ADD] = state_utls_vars
         self.energy_budget: int = budget
+
+        self.max_ts_action_cost: int = max_ts_action_cost
 
         # index to determine where the state vars start 
         self.state_start_idx: int =  len(self.sym_vars_human) + len(self.sym_vars_robot) + len(dfa_state_vars) + sum([len(listElem) for listElem in self.sym_vars_lbl]) +  len(self.sym_vars_curr)
@@ -74,8 +79,22 @@ class SymbolicGraphOfUtility(DynWeightedPartitionedFrankaAbs):
         num_of_acts = len(list(self.tr_action_idx_map.keys()))
         self.sym_tr_actions = [[self.manager.addZero() for _ in range(len(state_utls_vars))] for _ in range(num_of_acts)]
 
+        # need these two during dfa image computation 
+        self.dfa_bdd_x_list: List[BDD] = [i.bddPattern() for i in dfa_state_vars]
+        self.dfa_bdd_transition_fun_list: List[BDD] = [i.bddPattern() for i in self.dfa_handle.tr_state_adds]
+
         # create state util look up dictionary
         self._initialize_add_for_state_utls()
+        self.open_list = defaultdict(lambda: set())
+        self.closed = self.manager.addZero()
+
+        # count # of state in this graph
+        self.scount: int = 0
+
+        # self.leaf_nodes: ADD = self.manager.plusInfinity()
+        self.leaf_node_list = defaultdict(lambda: self.manager.addZero())
+        self.leaf_vals = set()
+        self.lcount: int = 0
     
 
     def _initialize_add_for_state_utls(self):
@@ -138,9 +157,6 @@ class SymbolicGraphOfUtility(DynWeightedPartitionedFrankaAbs):
                 warnings.warn("Encountered an ambiguous varible during TR construction. FIX THIS!!!")
                 sys.exit(-1)
         
-        
-        
-    
 
     def create_sym_tr_actions(self, mod_act_dict: dict, verbose: bool = False) -> None:
         """
@@ -174,3 +190,129 @@ class SymbolicGraphOfUtility(DynWeightedPartitionedFrankaAbs):
 
                 if verbose:
                     print(f"Adding edge {curr_utl} ------{ts_action}-----> {succ_utl}")
+    
+
+    def get_dfa_evolution(self, next_sym_state: ADD, curr_dfa_sym: ADD) -> ADD:
+        """
+         A helper function that given the evolution on the TS (next state), checks if it satisfies any of the DFA edges or not.
+          If yes, return the new DFA state.
+        """
+        # convert the 0-1 ADD to BDD for DFA edge checking
+        curr_ts_lbl: BDD = next_sym_state.existAbstract(self.state_cube & self.utls_cube).bddPattern()
+
+        # create DFA edge and check if it satisfies any of the edges or not
+        for dfa_state in self.dfa_handle.dfa_predicate_add_sym_map_curr.values():
+            bdd_dfa_state: BDD = dfa_state.bddPattern()
+            dfa_pre: BDD = bdd_dfa_state.vectorCompose(self.dfa_bdd_x_list, self.dfa_bdd_transition_fun_list)
+            edge_exists: bool = not (dfa_pre & (curr_dfa_sym.bddPattern() & curr_ts_lbl)).isZero()
+
+            if edge_exists:
+                curr_dfa_sym: ADD = dfa_state
+                break
+        
+        return curr_dfa_sym, self.dfa_handle.dfa_predicate_add_sym_map_curr.inv[curr_dfa_sym]
+    
+
+    def compute_graph_of_utility_reachable_states(self, verbose: bool = False):
+        """
+        A function to construct the graph of utility given an Edge Weighted Arena (EWA).
+            
+        We populate all the states with all the possible utilities. A position may be reachable by several paths,
+         therefore it will be duplicated as many times as there are different path utilities.
+         This duplication is bounded the value B = 2 * W * |S|. Refer to Lemma 4 of the paper for more details.
+
+        Constructing G' (Graph of utility (TWA)):
+        
+        S' = S x [B]; Where B is the an positive integer defined as above
+        An edge between two states (s, u),(s, u') exists iff s to s' is a valid edge in G and u' = u + w(s, s')
+        
+        C' = S' ∩ [C1 x [B]] are the target states in G'. The edge weight of edges transiting to a target state (s, u)
+        is u. All the other edges have an edge weight 0. (Remember this is a TWA with non-zero edge weights on edges
+        transiting to the target states.)
+        """
+        init_state_tuple = self.get_tuple_from_state(self.init)
+        init_dfa_state = (self.dfa_handle.init[0])
+
+        layer = 0
+
+        self.open_list[layer].add((init_state_tuple, init_dfa_state))
+
+        prod_curr_list: List[ADD] = [*self.dfa_handle.sym_add_vars_curr]
+        prod_curr_list.extend([lbl for sym_vars_list in self.sym_vars_lbl for lbl in sym_vars_list])
+        prod_curr_list.extend([*self.sym_vars_curr, *self.sym_vars_ults])
+
+        # used to break the loop
+        empty_bucket_counter: int = 0
+        
+        while True:
+
+            if len(self.open_list[layer]) > 0:
+                # if verbose:
+                print(f"********************Layer: {layer}**************************")
+                
+                # reset the empty bucket counter 
+                empty_bucket_counter = 0
+
+                # loop over all the valid actions from each state from the current layer, 
+                for curr_prod_tuple in self.open_list[layer]:
+                    curr_state_tuple = curr_prod_tuple[0]
+                    curr_dfa_tuple = curr_prod_tuple[1]
+                    
+                    # get the sym repr of the DFA state
+                    curr_dfa_sym_state: ADD = self.dfa_handle.dfa_predicate_add_sym_map_curr[curr_dfa_tuple]
+                    
+                    # get sym repr of current and next state
+                    curr_ts_sym_state: ADD = self.get_sym_state_from_tuple(curr_state_tuple)
+                    
+                    # create current sym prod state
+                    curr_prod_sym_state: ADD = curr_ts_sym_state & curr_dfa_sym_state
+
+                    # if the current prod state is an accepting state then add it to the leaf ADD along with the state value 
+                    if not (curr_dfa_sym_state & self.dfa_handle.sym_goal_state).isZero():
+                        if verbose:
+                            curr_ts_exp_states = self.get_state_from_tuple(curr_state_tuple) 
+                            print(f"Adding leaf node ({curr_ts_exp_states}, {curr_dfa_tuple}) with value {layer}")
+                        
+                        self.leaf_node_list[layer] |= curr_prod_sym_state & self.predicate_sym_map_utls[layer]
+                        self.leaf_vals.add(layer)
+                        # update counter
+                        self.lcount += 1
+                        self.closed |= curr_prod_sym_state & self.predicate_sym_map_utls[layer]
+                        continue
+                        
+                    # update the closed set
+                    assert (self.closed & curr_prod_sym_state & self.predicate_sym_map_utls[layer]).isZero(), "Error unrolling the graph. Encountered a twice during unrolling. FIX THIS!!!"
+                    self.closed |= curr_prod_sym_state & self.predicate_sym_map_utls[layer]
+
+                    self.scount += 1
+
+                    # loop over all valid action
+                    for robot_act in self.ts_handle.org_adj_map[curr_state_tuple].keys():
+                        # get the utility of the successor state
+                        succ_utl: int = layer + self.int_weight_dict[robot_act]
+
+                        if succ_utl <= self.energy_budget:
+
+                            for next_act, next_exp_state in self.ts_handle.org_adj_map[curr_state_tuple][robot_act].items():
+                                # first loop over all the human intervening move and then the non-intervening one
+                                next_sym_state: ADD = self.get_sym_state_from_exp_states(exp_states=next_exp_state)
+                                next_state_tuple = self.get_tuple_from_state(next_exp_state) 
+
+                                # get the DFA state
+                                _, next_dfa_tuple = self.get_dfa_evolution(next_sym_state=next_sym_state, curr_dfa_sym=curr_dfa_sym_state)
+                                
+                                if verbose:
+                                    curr_ts_exp_states = self.get_state_from_tuple(curr_state_tuple)
+                                    print(f"Adding Human edge: ({curr_ts_exp_states}, {curr_dfa_tuple})[{layer}] -------{robot_act}{next_act}------> ({next_exp_state},{next_dfa_tuple})[{succ_utl}]")
+
+                                # add them to their respective bucket. . .
+                                self.open_list[succ_utl].add((next_state_tuple, next_dfa_tuple))
+
+            else:
+                empty_bucket_counter += 1
+                # If Cmax consecutive layers are empty. . .
+                if empty_bucket_counter == self.max_ts_action_cost:
+                    print(f"Done Computing the Graph of Utility! Accepting Leaf nodes {self.lcount}; Total states {self.scount}")
+                    break
+            
+            layer += 1

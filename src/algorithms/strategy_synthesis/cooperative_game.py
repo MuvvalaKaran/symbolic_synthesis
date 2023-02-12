@@ -561,9 +561,6 @@ class SymbolicGraphOfUtlCooperativeGame(CooperativeGame):
         # create ts and dfa combines cube
         self.prod_xlist: list =  self.dfa_x_list + [lbl for sym_vars_list in self.ts_obs_list for lbl in sym_vars_list] + self.ts_x_list + self.ts_utls_list
         self.prod_xcube: ADD = reduce(lambda x, y: x & y, self.prod_xlist)
-
-        # # get the bdd variant
-        # self.prod_bdd_curr_list = [_avar.bddPattern() for _avar in self.prod_xlist]
         
         # get the bdd version of the transition function as vectorComposition only works with
         for act in self.utls_trans_func_list:
@@ -635,8 +632,6 @@ class SymbolicGraphOfUtlCooperativeGame(CooperativeGame):
          Compute the pre-image on the product graph
         """
         ults_tr = kwargs['utls_tr']
-        # # first evolve over DFA and then evolve over the TS and utility values
-        # mod_win_state: BDD = From.vectorCompose(self.dfa_bdd_x_list, self.dfa_bdd_transition_fun_list)
         
         pre_prod_state: BDD = From.vectorCompose(prod_curr_list, [*ts_action, *ults_tr])
             
@@ -651,20 +646,27 @@ class SymbolicGraphOfUtlCooperativeGame(CooperativeGame):
         ts_states: ADD = self.obs_add
         accp_states: ADD = ts_states & self.target_DFA
 
-        # convert it to 0 - Infinity ADD
-        # accp_states = accp_states.ite(self.manager.addZero(), self.manager.plusInfinity())
-
         # strategy - optimal (state & robot-action) pair stored in the ADD
         strategy: ADD  = self.manager.plusInfinity()
+        # strategy: ADD  = self.manager.addConst(self.energy_budget)
 
         # initializes accepting states
         for sval in range(self.energy_budget + 1):
-            # augment the accepting states with utility vars
-            tmp_accp_states = accp_states & self. gou_handle.predicate_sym_map_utls[sval]
-            tmp_accp_states = tmp_accp_states.ite(self.manager.addConst(int(sval)), self.manager.plusInfinity())
-            self.winning_states[0] |= self.winning_states[0].min(tmp_accp_states)
-        
-            strategy |= strategy.min(tmp_accp_states)
+            # augment the accepting states with utility vars by computing the fully defined 0-1 ADD
+            tmp_accp_states = accp_states & self.gou_handle.predicate_sym_map_utls[sval]
+            
+            # if a leaf node with this utility value is reachable from the init prod state.
+            if sval in self.gou_handle.leaf_node_list.keys():
+                # only keep the reachable states
+                tmp_accp_states = tmp_accp_states & self.gou_handle.leaf_node_list[sval]
+
+                tmp_accp_states = tmp_accp_states.ite(self.manager.addConst(int(sval)), self.manager.plusInfinity())
+                self.winning_states[0] |= self.winning_states[0].min(tmp_accp_states)
+            
+                strategy |= strategy.min(tmp_accp_states)
+
+        # reachable states
+        gou_reachable_states: BDD = self.gou_handle.closed.bddPattern()
 
         layer: int = 0
 
@@ -714,6 +716,8 @@ class SymbolicGraphOfUtlCooperativeGame(CooperativeGame):
                 mod_win_state: BDD = succ_states.vectorCompose(self.dfa_bdd_x_list, self.dfa_bdd_transition_fun_list)
                 for tr_action, utls_tr in zip(self.ts_bdd_transition_fun_list, self.ults_bdd_trans_func_list):
                     pre_states: BDD = self.get_pre_states(ts_action=tr_action, From=mod_win_state, prod_curr_list=prod_bdd_curr_list, utls_tr=utls_tr)
+
+                    pre_states = gou_reachable_states & pre_states
     
                     if not pre_states.isZero():
                         _pre_buckets[sval] |= pre_states.toADD()
