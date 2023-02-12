@@ -101,7 +101,7 @@ class HybridGraphOfUtility(DynWeightedPartitionedFrankaAbs):
         self.leaf_vals = set()
         self.lcount: int = 0
 
-        # beast alternative ADD and set
+        # best alternative ADD and set
         self.ba_strategy: ADD = self.manager.plusInfinity()
         self.ba_set = set()
     
@@ -221,7 +221,7 @@ class HybridGraphOfUtility(DynWeightedPartitionedFrankaAbs):
                 edge_exist: bool = (self.mono_tr_bdd & curr_state_sym & sym_curr_state_val & robot_move & no_human_move).isZero()
                 
                 if not edge_exist:
-                    print(f"Nondeterminism due to Human Action: {curr_str_state}[{curr_state_val}] ---{robot_action_name}---> {next_str_state}[{next_state_val}]")
+                    print(f"Nondeterminism due to Robot Action: {curr_str_state}[{curr_state_val}] ---{robot_action_name}---> {next_str_state}[{next_state_val}]")
 
                 self.mono_tr_bdd |= curr_state_sym & sym_curr_state_val & robot_move & no_human_move
 

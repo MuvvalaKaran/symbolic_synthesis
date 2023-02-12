@@ -13,21 +13,16 @@ from cudd import Cudd, BDD, ADD
 
 from src.explicit_graphs import CausalGraph, Ltlf2MonaDFA
 
-from src.algorithms.strategy_synthesis import AdversarialGame, GraphOfUtlCooperativeGame, GraphofBRAdvGame
+from src.algorithms.strategy_synthesis import SymbolicGraphOfUtlCooperativeGame
 
 from src.symbolic_graphs import ADDPartitionedDFA
 from src.symbolic_graphs import DynWeightedPartitionedFrankaAbs
-from src.symbolic_graphs.hybrid_regret_graphs import HybridGraphOfUtility, HybridGraphOfBR
+from src.symbolic_graphs.symbolic_regret_graphs import SymbolicGraphOfUtility
 
 from src.symbolic_graphs.strategy_synthesis_scripts import FrankaRegretSynthesis
-# from src.symbolic_graphs.strategy_synthesis_scripts import FrankaPartitionedWorld
 
 
 class FrankaSymbolicRegretSynthesis(FrankaRegretSynthesis):
-    """
-      Main script that constructs the Main Graph in a partitioned fashion, then constructs the graph of utility (G^{u}) and
-       finally the Graph of best response (G^{br}). Both these geaph will be constructed purely symbolically. 
-    """
 
     def __init__(self,
                  domain_file: str,
@@ -63,4 +58,85 @@ class FrankaSymbolicRegretSynthesis(FrankaRegretSynthesis):
                          plot_obs=plot_obs,
                          plot_dfa=plot_dfa,
                          plot=plot,
-                         create_lbls=create_lbls)
+                         create_lbls=create_lbls,
+                         weighting_factor=weighting_factor,
+                         reg_factor=reg_factor)
+    
+
+    def build_add_graph_of_utility(self, verbose: bool = False, just_adv_game: bool = False):
+        """
+         Override parent method to constrcut Graph of Utility in symbolic fashion.
+        """
+
+        print("******************Constructing Graph of utility******************")
+
+        min_max_handle = self.get_energy_budget(verbose=verbose, just_adv_game=just_adv_game)
+
+        # get the max action cost
+        # max_action_cost: int = min_max_handle._get_max_tr_action_cost()
+
+        graph_of_utls_handle = SymbolicGraphOfUtility(curr_vars=self.ts_x_list,
+                                                    lbl_vars=self.ts_obs_list,
+                                                    state_utls_vars=self.prod_utls_vars,
+                                                    robot_action_vars=self.ts_robot_vars,
+                                                    human_action_vars=self.ts_human_vars,
+                                                    task=self.ts_handle.task,
+                                                    domain=self.ts_handle.domain,
+                                                    ts_state_map=self.ts_handle.pred_int_map,
+                                                    ts_states=self.ts_handle.ts_states,
+                                                    manager=self.manager,
+                                                    weight_dict=self.ts_handle.weight_dict,
+                                                    seg_actions=self.ts_handle.actions,
+                                                    ts_state_lbls=self.ts_handle.state_lbls,
+                                                    dfa_state_vars=self.dfa_x_list,
+                                                    sup_locs=self.sup_locs,
+                                                    top_locs=self.top_locs,
+                                                    ts_handle=self.ts_handle,
+                                                    int_weight_dict=self.int_weight_dict,
+                                                    budget=self.reg_energy_budget)
+        
+
+        start: float = time.time()
+        graph_of_utls_handle.create_sym_tr_actions(mod_act_dict=self.mod_act_dict,
+                                                   verbose=False)
+        stop: float = time.time()
+        print("Time took for constructing the Sym TR for Graph of Utility: ", stop - start)
+
+        self.graph_of_utls_handle = graph_of_utls_handle
+    
+
+    def solve(self, verbose: bool = False, just_adv_game: bool = False, run_monitor: bool = False):
+        """
+         Overrides base method to first construct the required graph and then run Value Iteration. 
+
+         Set just_adv_game flag to True if you just want to play an adversarial game.
+
+         Set run_monitor to True if you want the human to choose strategy for both player.
+          Note, for Robot player, we are restricted to regret minimizing strategies only. For Human player. we can select any strategy. 
+        """
+
+        # constuct graph of utility
+        self.build_add_graph_of_utility(verbose=verbose, just_adv_game=just_adv_game)
+
+        print("******************Computing cVals on Graph of utility******************")
+
+        # compute the min-min value from each state
+        gou_min_min_handle = SymbolicGraphOfUtlCooperativeGame(gou_handle=self.graph_of_utls_handle,
+                                                               ts_handle=self.ts_handle,
+                                                               dfa_handle=self.dfa_handle,
+                                                               ts_curr_vars=self.ts_x_list,
+                                                               dfa_curr_vars=self.dfa_x_list,
+                                                               sys_act_vars=self.ts_robot_vars,
+                                                               env_act_vars=self.ts_human_vars,
+                                                               ts_obs_vars=self.ts_obs_list,
+                                                               ts_utls_vars=self.prod_utls_vars,
+                                                               cudd_manager=self.manager)
+        
+        # compute the cooperative value from each prod state in the graph of utility
+        start: float = time.time()
+        cvals: ADD = gou_min_min_handle.solve(verbose=False)
+        stop: float = time.time()
+        print("Time took for computing cVals is: ", stop - start)
+
+        # sys.exit(-1)
+
