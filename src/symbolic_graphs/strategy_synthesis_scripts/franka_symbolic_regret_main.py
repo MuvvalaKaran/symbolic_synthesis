@@ -13,11 +13,12 @@ from cudd import Cudd, BDD, ADD
 
 from src.explicit_graphs import CausalGraph, Ltlf2MonaDFA
 
-from src.algorithms.strategy_synthesis import SymbolicGraphOfUtlCooperativeGame
+from src.algorithms.strategy_synthesis import SymbolicGraphOfUtlCooperativeGame, GraphofBRAdvGame
 
 from src.symbolic_graphs import ADDPartitionedDFA
 from src.symbolic_graphs import DynWeightedPartitionedFrankaAbs
 from src.symbolic_graphs.symbolic_regret_graphs import SymbolicGraphOfUtility
+from src.symbolic_graphs.hybrid_regret_graphs import HybridGraphOfBR
 
 from src.symbolic_graphs.strategy_synthesis_scripts import FrankaRegretSynthesis
 
@@ -75,26 +76,26 @@ class FrankaSymbolicRegretSynthesis(FrankaRegretSynthesis):
 
         print("******************Constructing Graph of utility******************")
         graph_of_utls_handle = SymbolicGraphOfUtility(curr_vars=self.ts_x_list,
-                                                    lbl_vars=self.ts_obs_list,
-                                                    state_utls_vars=self.prod_utls_vars,
-                                                    robot_action_vars=self.ts_robot_vars,
-                                                    human_action_vars=self.ts_human_vars,
-                                                    task=self.ts_handle.task,
-                                                    domain=self.ts_handle.domain,
-                                                    ts_state_map=self.ts_handle.pred_int_map,
-                                                    ts_states=self.ts_handle.ts_states,
-                                                    manager=self.manager,
-                                                    weight_dict=self.ts_handle.weight_dict,
-                                                    seg_actions=self.ts_handle.actions,
-                                                    ts_state_lbls=self.ts_handle.state_lbls,
-                                                    dfa_state_vars=self.dfa_x_list,
-                                                    sup_locs=self.sup_locs,
-                                                    top_locs=self.top_locs,
-                                                    dfa_handle=self.dfa_handle,
-                                                    ts_handle=self.ts_handle,
-                                                    int_weight_dict=self.int_weight_dict,
-                                                    budget=self.reg_energy_budget,
-                                                    max_ts_action_cost=max_action_cost)
+                                                      lbl_vars=self.ts_obs_list,
+                                                      state_utls_vars=self.prod_utls_vars,
+                                                      robot_action_vars=self.ts_robot_vars,
+                                                      human_action_vars=self.ts_human_vars,
+                                                      task=self.ts_handle.task,
+                                                      domain=self.ts_handle.domain,
+                                                      ts_state_map=self.ts_handle.pred_int_map,
+                                                      ts_states=self.ts_handle.ts_states,
+                                                      manager=self.manager,
+                                                      weight_dict=self.ts_handle.weight_dict,
+                                                      seg_actions=self.ts_handle.actions,
+                                                      ts_state_lbls=self.ts_handle.state_lbls,
+                                                      dfa_state_vars=self.dfa_x_list,
+                                                      sup_locs=self.sup_locs,
+                                                      top_locs=self.top_locs,
+                                                      dfa_handle=self.dfa_handle,
+                                                      ts_handle=self.ts_handle,
+                                                      int_weight_dict=self.int_weight_dict,
+                                                      budget=self.reg_energy_budget,
+                                                      max_ts_action_cost=max_action_cost)
         
 
         start: float = time.time()
@@ -105,7 +106,9 @@ class FrankaSymbolicRegretSynthesis(FrankaRegretSynthesis):
 
         # compute reach states from the init state
         start: float = time.time()
-        graph_of_utls_handle.compute_graph_of_utility_reachable_states(verbose=False)
+        graph_of_utls_handle.compute_graph_of_utility_reachable_states(mod_act_dict=self.mod_act_dict, 
+                                                                       boxes=self.task_boxes,
+                                                                       verbose=False)
         stop: float = time.time()
         print("Time took for constructing Reachable states on Graph of Utility: ", stop - start)
 
@@ -146,7 +149,73 @@ class FrankaSymbolicRegretSynthesis(FrankaRegretSynthesis):
         print("Time took for computing cVals is: ", stop - start)
 
         # sanity checking
-        # cvals & gou_min_min_handle.init_prod
+        print("******************Computing BA Vals on Graph of utility******************")
+        start: float = time.time()
+        # compute the best alternative from each edge for cumulative payoff
+        self.graph_of_utls_handle.get_best_alternatives(mod_act_dict=self.mod_act_dict,
+                                                        cooperative_vals=cvals,
+                                                        verbose=False)
+        stop: float = time.time()
+        print("Time took for computing the set of best alternatives: ", stop - start)
+        
+        # construct additional boolean vars for set of best alternative values
+        self.prod_ba_vars: List[ADD] = self._create_symbolic_lbl_vars(state_lbls=self.graph_of_utls_handle.ba_set,
+                                                                      state_var_name='r',
+                                                                      add_flag=True)
 
-        # sys.exit(-1)
+        print("******************Constructing Graph of Best Response******************")
+        # construct of Best response G^{br}
+        graph_of_br_handle = HybridGraphOfBR(curr_vars=self.ts_x_list,
+                                               lbl_vars=self.ts_obs_list,
+                                               robot_action_vars=self.ts_robot_vars,
+                                               human_action_vars=self.ts_human_vars,
+                                               task=self.ts_handle.task,
+                                               domain=self.ts_handle.domain,
+                                               ts_state_map=self.ts_handle.pred_int_map,
+                                               ts_states=self.ts_handle.ts_states,
+                                               manager=self.manager,
+                                               weight_dict=self.ts_handle.weight_dict,
+                                               seg_actions=self.ts_handle.actions,
+                                               ts_state_lbls=self.ts_handle.state_lbls,
+                                               dfa_state_vars=self.dfa_x_list,
+                                               sup_locs=self.sup_locs,
+                                               top_locs=self.top_locs,
+                                               ts_handle=self.ts_handle,
+                                               dfa_handle=self.dfa_handle,
+                                               symbolic_gou_handle=self.graph_of_utls_handle,
+                                               prod_ba_vars=self.prod_ba_vars, 
+                                               prod_succ_ba_vars=None)
+
+        start: float = time.time()
+        graph_of_br_handle.construct_graph_of_best_response(mod_act_dict=self.mod_act_dict,
+                                                            print_leaf_nodes=False,
+                                                            verbose=False,
+                                                            debug=True)
+        stop: float = time.time()
+        print("Time took for costructing the Graph of best Response: ", stop - start)
+
+
+        # compute regret-minmizing strategies
+        gbr_min_max_handle =  GraphofBRAdvGame(prod_gbr_handle=graph_of_br_handle,
+                                                prod_gou_handle=self.graph_of_utls_handle,
+                                                ts_handle=self.ts_handle,
+                                                dfa_handle=self.dfa_handle,
+                                                ts_curr_vars=self.ts_x_list,
+                                                dfa_curr_vars=self.dfa_x_list,
+                                                ts_obs_vars=self.ts_obs_list,
+                                                prod_utls_vars=self.prod_utls_vars,
+                                                prod_ba_vars=self.prod_ba_vars,
+                                                sys_act_vars=self.ts_robot_vars,
+                                                env_act_vars=self.ts_human_vars,
+                                                cudd_manager=self.manager)
+        
+        print("******************Computing Regret Minimizing strategies on Graph of Best Response******************")
+        start: float = time.time()
+        reg_str: ADD = gbr_min_max_handle.solve(verbose=False)
+        stop: float = time.time()
+        print("Time took for computing min-max strs on the Graph of best Response: ", stop - start)
+
+        if reg_str:
+            gbr_min_max_handle.roll_out_strategy(strategy=reg_str, verbose=True, ask_usr_input=run_monitor)
+            print("Done Rolling out.")
 
