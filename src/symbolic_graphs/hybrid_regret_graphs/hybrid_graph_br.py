@@ -191,9 +191,10 @@ class HybridGraphOfBR(DynWeightedPartitionedFrankaAbs):
         self.leaf_vals.add(accp_w)
 
         # update counter
-        self.lcount += 1
+        if (self.closed & next_prod_sym_state).isZero():
+            self.lcount += 1
+        
         self.closed |= next_prod_sym_state
-
 
 
     # add code to construt the edge TR

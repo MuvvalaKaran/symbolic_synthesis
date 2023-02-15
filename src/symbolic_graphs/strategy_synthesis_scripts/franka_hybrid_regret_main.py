@@ -351,9 +351,6 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
         if win_str:
             if True:
                 min_max_handle.roll_out_strategy(strategy=win_str, verbose=verbose)
-            
-            if just_adv_game:
-                sys.exit(-1)
         
         # min max value
         self.min_energy_budget = min_max_handle.init_state_value
@@ -363,6 +360,9 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
         self.reg_energy_budget = math.ceil(self.min_energy_budget * self.scale_reg_budget)
 
         print(f"************************** Energy Budget: {self.reg_energy_budget} **************************")
+
+        if just_adv_game:
+            sys.exit(-1)
 
         # construct additional boolean variables used during the construction of the new graph
         self.prod_utls_vars = self._create_symbolic_lbl_vars(state_lbls=list(range(self.reg_energy_budget + 1)),
@@ -458,7 +458,7 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
         cvals: ADD = gou_min_min_handle.solve(verbose=False)
         stop: float = time.time()
         print("Time took for computing cVals is: ", stop - start)
-        sys.exit(-1)
+        
         print("******************Computing BA Vals on Graph of utility******************")
         start: float = time.time()
         # compute the best alternative from each edge for cumulative payoff
@@ -468,7 +468,7 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
         stop: float = time.time()
         print("Time took for computing the set of best alternatives: ", stop - start)
 
-        # construct addiotnal boolean vars for set of best alternative values
+        # construct additional boolean vars for set of best alternative values
         self.prod_ba_vars: List[ADD] = self._create_symbolic_lbl_vars(state_lbls=self.graph_of_utls_handle.ba_set,
                                                                       state_var_name='r',
                                                                       add_flag=True)

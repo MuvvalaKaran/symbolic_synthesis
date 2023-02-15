@@ -375,11 +375,6 @@ class SymbolicGraphOfUtility(DynWeightedPartitionedFrankaAbs):
          The cooperate values are stored in the winning states ADD along with their optimal values.
         """
 
-        # gives the bdd version of all states as 0-1 ADD
-        # coop_bdd_vals: BDD = cooperative_vals.bddInterval(1, self.energy_budget)
-
-        # assert coop_bdd_vals.existAbstract(self.sys_cube.bddPattern()) == self.closed.bddPattern(), "Error computing BDD of optimal state vals. Fix this!!!"
-
         # loop through the open_list dict computed above
         layer = 0
         while True:

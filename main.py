@@ -189,7 +189,7 @@ if __name__ == "__main__":
                                                                 weight_dict=wgt_dict,
                                                                 ltlf_flag=USE_LTLF,
                                                                 dyn_var_ord=DYNAMIC_VAR_ORDERING,
-                                                                weighting_factor=2,
+                                                                weighting_factor=3,
                                                                 reg_factor=1.25,
                                                                 algorithm=None,
                                                                 verbose=False,
@@ -220,7 +220,7 @@ if __name__ == "__main__":
             print(f"****************** # Total Boolean Variables: { cudd_manager.size()} ******************")
 
         else:
-            warnings.warn("Please set atleast one flag to True - GRIDWORLD, FRANKAWORLD, STRATEGY_SYNTHESIS, REGRET_SYNTHESIS!")
+            warnings.warn("Please set atleast one flag to True - GRIDWORLD, FRANKAWORLD, STRATEGY_SYNTHESIS, or REGRET_SYNTHESIS!")
             sys.exit(-1)
         
         # convert bytes to MegaBytes and print the Memory usage

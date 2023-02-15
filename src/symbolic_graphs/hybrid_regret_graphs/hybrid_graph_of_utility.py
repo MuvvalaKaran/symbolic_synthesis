@@ -333,7 +333,8 @@ class HybridGraphOfUtility(DynWeightedPartitionedFrankaAbs):
                         self.leaf_nodes = self.leaf_nodes.min(full_prod_state_val)
                         self.leaf_vals.add(layer)
                         # update counter
-                        self.lcount += 1
+                        if (self.closed & curr_prod_sym_state & self.predicate_sym_map_utls[layer]).isZero():
+                            self.lcount += 1
                         self.closed |= curr_prod_sym_state & self.predicate_sym_map_utls[layer]
                         continue
                         
