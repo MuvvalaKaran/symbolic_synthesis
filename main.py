@@ -190,9 +190,10 @@ if __name__ == "__main__":
                                                                 ltlf_flag=USE_LTLF,
                                                                 dyn_var_ord=DYNAMIC_VAR_ORDERING,
                                                                 weighting_factor=3,
-                                                                reg_factor=1.25,
+                                                                reg_factor=5,
                                                                 algorithm=None,
                                                                 verbose=False,
+                                                                print_layer=False,
                                                                 plot_ts=False,
                                                                 plot_obs=False,
                                                                 plot=False)
@@ -207,15 +208,16 @@ if __name__ == "__main__":
                                                                         ltlf_flag=USE_LTLF,
                                                                         dyn_var_ord=DYNAMIC_VAR_ORDERING,
                                                                         weighting_factor=3,
-                                                                        reg_factor=1.25,
+                                                                        reg_factor=5,
                                                                         algorithm=None,
                                                                         verbose=False,
+                                                                        print_layer=False,
                                                                         plot_ts=False,
                                                                         plot_obs=False,
                                                                         plot=False)
                         
             regret_synthesis_handle.build_abstraction()
-            regret_synthesis_handle.solve(verbose=False, just_adv_game=False, run_monitor=False)
+            regret_synthesis_handle.solve(verbose=False, just_adv_game=False, run_monitor=True, monolithic_tr=True)
 
             print(f"****************** # Total Boolean Variables: { cudd_manager.size()} ******************")
 

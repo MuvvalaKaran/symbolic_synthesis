@@ -45,6 +45,7 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
                  plot_obs: bool = False,
                  plot_dfa: bool = False,
                  plot: bool = False,
+                 print_layer: bool = False,
                  create_lbls: bool = True,
                  weighting_factor: int = 1,
                  reg_factor: float = 1):
@@ -87,6 +88,9 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
         # factor to scale weights by
         self.scale_weights: int = weighting_factor
         self.scale_reg_budget: float = reg_factor
+
+        # print progress flag
+        self.print_layers = print_layer
 
 
 
@@ -314,6 +318,7 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
                                                verbose=self.verbose,
                                                plot=self.plot_ts,
                                                print_tr=False,
+                                               print_layers=self.print_layers,
                                                debug=True,
                                                mod_act_dict=self.mod_act_dict)
         
@@ -417,6 +422,7 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
         
         start: float = time.time()
         graph_of_utls_handle.construct_graph_of_utility(mod_act_dict=self.mod_act_dict,
+                                                        print_layers=self.print_layers,
                                                         boxes=self.task_boxes,
                                                         verbose=False,
                                                         debug=True)
@@ -426,7 +432,7 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
         self.graph_of_utls_handle = graph_of_utls_handle
     
 
-    def solve(self, verbose: bool = False, just_adv_game: bool = False, run_monitor: bool = False):
+    def solve(self, verbose: bool = False, just_adv_game: bool = False, run_monitor: bool = False, monolithic_tr: bool = False):
         """
          Overides base method to first construct the required graph and then run Value Iteration. 
 
@@ -451,19 +457,21 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
                                                        env_act_vars=self.ts_human_vars,
                                                        ts_obs_vars=self.ts_obs_list,
                                                        ts_utls_vars=self.prod_utls_vars,
-                                                       cudd_manager=self.manager)
+                                                       cudd_manager=self.manager,
+                                                       monolithic_tr=monolithic_tr)
         
         # compute the cooperative value from each prod state in the graph of utility
         start: float = time.time()
-        cvals: ADD = gou_min_min_handle.solve(verbose=False)
+        cvals: ADD = gou_min_min_handle.solve(verbose=False, print_layers=self.print_layers,)
         stop: float = time.time()
         print("Time took for computing cVals is: ", stop - start)
-
+        # sys.exit(-1)
         print("******************Computing BA Vals on Graph of utility******************")
         start: float = time.time()
         # compute the best alternative from each edge for cumulative payoff
         self.graph_of_utls_handle.get_best_alternatives(cooperative_vals=cvals,
                                                         mod_act_dict=self.mod_act_dict,
+                                                        print_layers=self.print_layers,
                                                         verbose=False)
         stop: float = time.time()
         print("Time took for computing the set of best alternatives: ", stop - start)
@@ -497,6 +505,7 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
 
         start: float = time.time()
         graph_of_br_handle.construct_graph_of_best_response(mod_act_dict=self.mod_act_dict,
+                                                            print_layers=self.print_layers,
                                                             print_leaf_nodes=False,
                                                             verbose=False,
                                                             debug=True)
@@ -520,7 +529,7 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
         
         print("******************Computing Regret Minimizing strategies on Graph of Best Response******************")
         start: float = time.time()
-        reg_str: ADD = gbr_min_max_handle.solve(verbose=False)
+        reg_str: ADD = gbr_min_max_handle.solve(verbose=False, print_layers=self.print_layers)
         stop: float = time.time()
         print("Time took for computing min-max strs on the Graph of best Response: ", stop - start)
 

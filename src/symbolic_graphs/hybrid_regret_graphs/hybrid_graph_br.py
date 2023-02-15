@@ -282,7 +282,7 @@ class HybridGraphOfBR(DynWeightedPartitionedFrankaAbs):
         self.ecount += 1
 
 
-    def construct_graph_of_best_response(self, mod_act_dict: dict, print_leaf_nodes: bool = True, verbose: bool = False, debug: bool = True):
+    def construct_graph_of_best_response(self, mod_act_dict: dict, print_leaf_nodes: bool = True, verbose: bool = False, debug: bool = True, print_layers: bool = False):
         """
          Main function to construct the Graph of Best Response. We construct all the possible state (S, B) where S is a state in the product graph
           and B is the Best reponse at the current state. From (S, B), we add an edge to (S', B') iff (S, S') is a valid edge on Graph of Utility and 
@@ -311,7 +311,8 @@ class HybridGraphOfBR(DynWeightedPartitionedFrankaAbs):
         
         # if verbose flag is True then print leaf nodes too.
         if verbose:
-            print_leaf_nodes= True
+            print_leaf_nodes = True
+            print_layers = True
         
         # the init state is of the Form ((ts-tuple), DFA, Utl val, BR Value)
         self.open_list[layer].add((*init_gou_state_tuple, 0, inf))
@@ -327,8 +328,9 @@ class HybridGraphOfBR(DynWeightedPartitionedFrankaAbs):
         
         while True:
             if len(self.open_list[layer]) > 0:
-                # if verbose:
-                print(f"********************Layer: {layer}**************************")
+                
+                if print_layers:
+                    print(f"********************Layer: {layer}**************************")
                 
                 # reset the empty bucket counter 
                 empty_bucket_counter = 0

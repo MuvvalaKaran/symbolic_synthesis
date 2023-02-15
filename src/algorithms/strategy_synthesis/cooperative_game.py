@@ -48,7 +48,7 @@ class CooperativeGame(AdversarialGame):
                          cudd_manager)
     
 
-    def solve(self, verbose: bool = False) -> ADD:
+    def solve(self, verbose: bool = False, print_layers: bool = False) -> ADD:
         """
          Method that computes the optimal strategy for the system with minimum payoff under cooperative environment assumptions. 
         """
@@ -65,6 +65,9 @@ class CooperativeGame(AdversarialGame):
         self.winning_states[0] |= self.winning_states[0].min(accp_states)
         strategy = strategy.min(accp_states)
 
+        if verbose:
+            print_layers = True
+        
         layer: int = 0
         c_max: int = self._get_max_tr_action_cost()
 
@@ -91,7 +94,8 @@ class CooperativeGame(AdversarialGame):
                     del self.winning_states
                     return
             
-            print(f"**************************Layer: {layer}**************************")
+            if print_layers:
+                print(f"**************************Layer: {layer}**************************")
 
             _win_state_bucket: Dict[BDD] = defaultdict(lambda: self.manager.bddZero())
 
@@ -286,7 +290,8 @@ class GraphOfUtlCooperativeGame(BaseSymbolicSearch):
                  ts_utls_vars: List[ADD],
                  sys_act_vars: List[ADD],
                  env_act_vars: List[ADD],
-                 cudd_manager: Cudd) -> None:
+                 cudd_manager: Cudd,
+                 monolithic_tr: bool = False) -> None:
         super().__init__(ts_obs_vars, cudd_manager)
         self.init_TS = ts_handle.sym_init_states
         self.target_DFA = dfa_handle.sym_goal_state
@@ -351,6 +356,18 @@ class GraphOfUtlCooperativeGame(BaseSymbolicSearch):
         
         # mimimum energy required from the init states
         self.init_state_value: Union[int, float] = math.inf
+
+        # construct one gaint TR
+        if monolithic_tr:
+            num_of_bvars: int = len(self.prod_bdd_trans_func_list[0])
+            self.mono_prod_bdd_trans_func_list: List[BDD] = [self.manager.bddZero() for _ in range(num_of_bvars)]
+            
+            for act in self.prod_bdd_trans_func_list:
+                for var_id, var_dd in enumerate(act):
+                    self.mono_prod_bdd_trans_func_list[var_id] |= var_dd
+            
+            # override original bdd transition 
+            self.prod_bdd_trans_func_list = self.mono_prod_bdd_trans_func_list
 
     
     def _create_lbl_cubes(self) -> List[ADD]:
@@ -424,15 +441,24 @@ class GraphOfUtlCooperativeGame(BaseSymbolicSearch):
         """
         pre_prod_state: BDD = self.manager.bddZero()
         
-        for ts_transition in self.prod_bdd_trans_func_list:
-            pre_prod_state |= From.vectorCompose(self.prod_bdd_curr_list, [*ts_transition])
+        # Monolithic TR
+        if isinstance(self.prod_bdd_trans_func_list[0], BDD):
+            pre_prod_state |= From.vectorCompose(self.prod_bdd_curr_list, self.prod_bdd_trans_func_list)
+        
+        # Partitioned TR 
+        else:
+            for ts_transition in self.prod_bdd_trans_func_list:
+                pre_prod_state |= From.vectorCompose(self.prod_bdd_curr_list, [*ts_transition])
             
         return pre_prod_state
 
     
-    def solve(self, verbose: bool = False) -> ADD:
+    def solve(self, verbose: bool = False, print_layers: bool = False) -> ADD:
         """
          Method to compute optimal strategies for the robot assuming human to Cooperative for given prod graph
+        
+         print_layers: set this flag to True to see Value Iteration progress
+         verbose: set this flag to True to print values of states at each iteration.
         """
         accp_states = self.prod_handle.leaf_nodes
 
@@ -444,6 +470,9 @@ class GraphOfUtlCooperativeGame(BaseSymbolicSearch):
         strategy = strategy.min(accp_states)
 
         layer: int = 0
+
+        if verbose:
+            print_layers = True
 
         sym_lbl_cubes = self._create_lbl_cubes()
 
@@ -462,7 +491,8 @@ class GraphOfUtlCooperativeGame(BaseSymbolicSearch):
                     del self.winning_states
                     return
             
-            print(f"**************************Layer: {layer}**************************")
+            if print_layers:
+                print(f"**************************Layer: {layer}**************************")
 
             _win_state_bucket: Dict[BDD] = defaultdict(lambda: self.manager.bddZero())
             
@@ -531,7 +561,8 @@ class SymbolicGraphOfUtlCooperativeGame(CooperativeGame):
                  ts_utls_vars: List[ADD],
                  sys_act_vars: List[ADD],
                  env_act_vars: List[ADD],
-                 cudd_manager: Cudd) -> None:
+                 cudd_manager: Cudd,
+                 monolithic_tr: bool = False) -> None:
         super().__init__(ts_handle=ts_handle,
                          dfa_handle=dfa_handle,
                          ts_curr_vars=ts_curr_vars,
@@ -569,7 +600,9 @@ class SymbolicGraphOfUtlCooperativeGame(CooperativeGame):
                 act_ls.append(avar.bddPattern())
         
             self.utls_bdd_trans_func_list.append(act_ls)
-    
+
+        if monolithic_tr:
+            raise NotImplementedError()
 
     def get_state_value_from_dd(self, dd_func: ADD, **kwargs) -> None:
         """
@@ -638,9 +671,12 @@ class SymbolicGraphOfUtlCooperativeGame(CooperativeGame):
         return pre_prod_state
     
 
-    def solve(self, verbose: bool = False) -> ADD:
+    def solve(self, verbose: bool = False, print_layers: bool = False) -> ADD:
         """
          Compute cVals on the Symbolic Graph of utility.
+
+         print_layer: set this flag to True to see Value Iteration progress
+         verbose: set this flag to True to print values of states at each iteration.
         """
         
         ts_states: ADD = self.obs_add
@@ -668,6 +704,9 @@ class SymbolicGraphOfUtlCooperativeGame(CooperativeGame):
         # reachable states
         gou_reachable_states: BDD = self.gou_handle.closed.bddPattern()
 
+        if verbose:
+            print_layers = True
+        
         layer: int = 0
 
         sym_lbl_cubes = self._create_lbl_cubes()
@@ -694,8 +733,8 @@ class SymbolicGraphOfUtlCooperativeGame(CooperativeGame):
                     del self.winning_states
                     return
             
-
-            print(f"**************************Layer: {layer}**************************")
+            if print_layers:
+                print(f"**************************Layer: {layer}**************************")
 
             _win_state_bucket: Dict[BDD] = defaultdict(lambda: self.manager.bddZero())
             

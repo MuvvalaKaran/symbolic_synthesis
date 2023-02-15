@@ -302,9 +302,12 @@ class AdversarialGame(BaseSymbolicSearch):
         return rnext_tuple
     
 
-    def solve(self, verbose: bool = False) -> ADD:
+    def solve(self, verbose: bool = False, print_layers: bool = False) -> ADD:
         """
          Method that computes the optimal strategy for the system with minimum payoff under adversarial environment assumptions. 
+
+         print_layer: set this flag to True to see Value Iteration progress
+         verbose: set this flag to True to print values of states at each iteration.
         """
 
         ts_states: ADD = self.obs_add
@@ -319,6 +322,9 @@ class AdversarialGame(BaseSymbolicSearch):
         # initializes accepting states to be zero
         self.winning_states[0] |= self.winning_states[0].min(accp_states)
         strategy = strategy.min(accp_states)
+
+        if verbose:
+            print_layers = True
 
         layer: int = 0
         c_max: int = self._get_max_tr_action_cost()
@@ -348,7 +354,8 @@ class AdversarialGame(BaseSymbolicSearch):
                     del self.winning_states
                     return
             
-            print(f"**************************Layer: {layer}**************************")
+            if print_layers:
+                print(f"**************************Layer: {layer}**************************")
 
             _win_state_bucket: Dict[BDD] = defaultdict(lambda: self.manager.bddZero())
 
@@ -528,7 +535,8 @@ class GraphofBRAdvGame(BaseSymbolicSearch):
                  prod_ba_vars: List[ADD],
                  sys_act_vars: List[ADD],
                  env_act_vars: List[ADD],
-                 cudd_manager: Cudd):
+                 cudd_manager: Cudd,
+                 monolithic_tr: bool = False):
         super().__init__(ts_obs_vars, cudd_manager)
 
         self.init_TS = ts_handle.sym_init_states
@@ -549,10 +557,6 @@ class GraphofBRAdvGame(BaseSymbolicSearch):
         self.prod_trans_func_list: List[List[ADD]] = prod_gbr_handle.sym_tr_actions
         self.prod_bdd_trans_func_list: List[List[BDD]] = []
 
-        # need this during preimage computation 
-        # self.dfa_bdd_x_list = [i.bddPattern() for i in dfa_curr_vars]
-
-        # self.ts_action_idx_map: bidict = ts_handle.tr_action_idx_map
 
         self.ts_sym_to_curr_state_map: bidict = ts_handle.predicate_sym_map_curr.inv
         # self.ts_sym_to_S2obs_map: bidict = ts_handle.predicate_sym_map_lbl.inv
@@ -598,6 +602,18 @@ class GraphofBRAdvGame(BaseSymbolicSearch):
         
         # mimimum energy required from the init states
         self.init_state_value: Union[int, float] = math.inf
+
+        if monolithic_tr:
+            num_of_bvars: int = len(self.prod_bdd_trans_func_list[0])
+            self.mono_prod_bdd_trans_func_list: List[BDD] = [self.manager.bddZero() for _ in range(num_of_bvars)]
+            
+            for act in self.prod_bdd_trans_func_list:
+                for var_id, var_dd in enumerate(act):
+                    self.mono_prod_bdd_trans_func_list[var_id] |= var_dd
+            
+            # override original bdd transition 
+            self.prod_bdd_trans_func_list = self.mono_prod_bdd_trans_func_list
+
     
 
     def _create_lbl_cubes(self) -> List[ADD]:
@@ -846,13 +862,19 @@ class GraphofBRAdvGame(BaseSymbolicSearch):
         """
         pre_prod_state: BDD = self.manager.bddZero()
         
-        for ts_transition in self.prod_bdd_trans_func_list:
-            pre_prod_state |= From.vectorCompose(self.prod_bdd_curr_list, [*ts_transition])
+        # Monolithic TR
+        if isinstance(self.prod_bdd_trans_func_list[0], BDD):
+            pre_prod_state |= From.vectorCompose(self.prod_bdd_curr_list, self.prod_bdd_trans_func_list)
+        
+        # Partitioned TR 
+        else:
+            for ts_transition in self.prod_bdd_trans_func_list:
+                pre_prod_state |= From.vectorCompose(self.prod_bdd_curr_list, [*ts_transition])
             
         return pre_prod_state
     
 
-    def solve(self, verbose: bool = False) -> ADD:
+    def solve(self, verbose: bool = False, print_layers: bool = False) -> ADD:
         """
          Method to compute optimal strategies for the robot assuming human to Adversarial for given graph of best response
         """
@@ -864,6 +886,9 @@ class GraphofBRAdvGame(BaseSymbolicSearch):
         # initializes accepting states to be zero
         self.winning_states[0] |= self.winning_states[0].min(accp_states)
         strategy = strategy.min(accp_states)
+
+        if verbose:
+            print_layers = True
 
         layer: int = 0
 
@@ -889,7 +914,8 @@ class GraphofBRAdvGame(BaseSymbolicSearch):
                     del self.winning_states
                     return
             
-            print(f"**************************Layer: {layer}**************************")
+            if print_layers:
+                print(f"**************************Layer: {layer}**************************")
 
             _win_state_bucket: Dict[BDD] = defaultdict(lambda: self.manager.bddZero())
 

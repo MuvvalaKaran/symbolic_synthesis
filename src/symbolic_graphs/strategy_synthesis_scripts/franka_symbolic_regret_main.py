@@ -41,6 +41,7 @@ class FrankaSymbolicRegretSynthesis(FrankaRegretSynthesis):
                  plot_obs: bool = False,
                  plot_dfa: bool = False,
                  plot: bool = False,
+                 print_layer: bool = False,
                  create_lbls: bool = True,
                  weighting_factor: int = 1,
                  reg_factor: float = 1):
@@ -58,6 +59,7 @@ class FrankaSymbolicRegretSynthesis(FrankaRegretSynthesis):
                          plot_ts=plot_ts,
                          plot_obs=plot_obs,
                          plot_dfa=plot_dfa,
+                         print_layer=print_layer,
                          plot=plot,
                          create_lbls=create_lbls,
                          weighting_factor=weighting_factor,
@@ -115,7 +117,7 @@ class FrankaSymbolicRegretSynthesis(FrankaRegretSynthesis):
         self.graph_of_utls_handle = graph_of_utls_handle
     
 
-    def solve(self, verbose: bool = False, just_adv_game: bool = False, run_monitor: bool = False):
+    def solve(self, verbose: bool = False, just_adv_game: bool = False, run_monitor: bool = False, monolithic_tr: bool = False):
         """
          Overrides base method to first construct the required graph and then run Value Iteration. 
 
@@ -140,7 +142,8 @@ class FrankaSymbolicRegretSynthesis(FrankaRegretSynthesis):
                                                                env_act_vars=self.ts_human_vars,
                                                                ts_obs_vars=self.ts_obs_list,
                                                                ts_utls_vars=self.prod_utls_vars,
-                                                               cudd_manager=self.manager)
+                                                               cudd_manager=self.manager,
+                                                               monolithic_tr=monolithic_tr)
         
         # compute the cooperative value from each prod state in the graph of utility
         start: float = time.time()
@@ -206,7 +209,8 @@ class FrankaSymbolicRegretSynthesis(FrankaRegretSynthesis):
                                                prod_ba_vars=self.prod_ba_vars,
                                                sys_act_vars=self.ts_robot_vars,
                                                env_act_vars=self.ts_human_vars,
-                                               cudd_manager=self.manager)
+                                               cudd_manager=self.manager,
+                                               monolithic_tr=monolithic_tr)
         
         print("******************Computing Regret Minimizing strategies on Graph of Best Response******************")
         start: float = time.time()

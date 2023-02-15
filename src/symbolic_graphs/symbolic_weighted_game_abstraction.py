@@ -739,6 +739,7 @@ class DynWeightedPartitionedFrankaAbs():
                                         add_exist_constr: bool = True,
                                         verbose: bool = False,
                                         plot: bool = False,
+                                        print_layers: bool = False, 
                                         **kwargs):
         """
          This method overrides the parent method. For every robot action, we loop over all the human actions.
@@ -759,6 +760,10 @@ class DynWeightedPartitionedFrankaAbs():
         # no need to check if other boxes are placed at the destination loc during transfer and release as there is only one object
         if len(boxes) == 1:
             add_exist_constr = False
+        
+        # set layer flag to true if verbose flag is True
+        if verbose:
+            print_layers = True
         
         prod_curr_list = [lbl for sym_vars_list in self.sym_vars_lbl for lbl in sym_vars_list]
         prod_curr_list.extend([*self.sym_vars_curr])
@@ -788,8 +793,8 @@ class DynWeightedPartitionedFrankaAbs():
                 # Add states to be expanded next to already expanded states
                 closed |= open_list[layer]
 
-                # if verbose:
-                print(f"******************************* Layer: {layer}*******************************")
+                if print_layers:
+                    print(f"******************************* Layer: {layer}*******************************")
                 # get all the states
                 sym_state = self._convert_state_lbl_cube_to_func(dd_func=open_list[layer], prod_curr_list=prod_curr_list)
                 for state in sym_state:

@@ -187,7 +187,7 @@ class SymbolicGraphOfUtility(DynWeightedPartitionedFrankaAbs):
         """
         # for each utility value. . .
         for curr_utl, curr_utl_dd in self.predicate_sym_map_utls.items():
-            # we do evolve after reach the max utility value
+            # we do not evolve after reaching the max utility value
             if curr_utl == self.energy_budget:
                 continue
             
@@ -236,7 +236,7 @@ class SymbolicGraphOfUtility(DynWeightedPartitionedFrankaAbs):
         return curr_dfa_sym, self.dfa_handle.dfa_predicate_add_sym_map_curr.inv[curr_dfa_sym]
     
 
-    def compute_graph_of_utility_reachable_states(self, mod_act_dict: dict, boxes: List[str], verbose: bool = False):
+    def compute_graph_of_utility_reachable_states(self, mod_act_dict: dict, boxes: List[str], verbose: bool = False, print_layers: bool = False):
         """
         A function to construct the graph of utility given an Edge Weighted Arena (EWA).
             
@@ -260,6 +260,9 @@ class SymbolicGraphOfUtility(DynWeightedPartitionedFrankaAbs):
 
         layer = 0
 
+        if verbose:
+            print_layers = True
+
         self.open_list[layer].add((init_state_tuple, init_dfa_state))
 
         prod_curr_list: List[ADD] = [*self.dfa_handle.sym_add_vars_curr]
@@ -272,8 +275,9 @@ class SymbolicGraphOfUtility(DynWeightedPartitionedFrankaAbs):
         while True:
 
             if len(self.open_list[layer]) > 0:
-                # if verbose:
-                print(f"********************Layer: {layer}**************************")
+                
+                if print_layers:
+                    print(f"********************Layer: {layer}**************************")
                 
                 # reset the empty bucket counter 
                 empty_bucket_counter = 0

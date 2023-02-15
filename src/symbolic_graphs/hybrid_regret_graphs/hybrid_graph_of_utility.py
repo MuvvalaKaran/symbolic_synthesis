@@ -263,7 +263,7 @@ class HybridGraphOfUtility(DynWeightedPartitionedFrankaAbs):
         self.ecount += 1
 
 
-    def construct_graph_of_utility(self, mod_act_dict: dict, boxes: List[str], verbose: bool = False, debug: bool = True):
+    def construct_graph_of_utility(self, mod_act_dict: dict, boxes: List[str], verbose: bool = False, debug: bool = True, print_layers: bool = False):
         """
         A function to construct the graph of utility given an Edge Weighted Arena (EWA).
             
@@ -287,6 +287,9 @@ class HybridGraphOfUtility(DynWeightedPartitionedFrankaAbs):
 
         layer = 0
 
+        if verbose:
+            print_layers = True
+
         # creating monolithinc tr bdd to keep track all the transition we are creating to detect nondeterminism
         if debug:
             self.mono_tr_bdd = self.manager.addZero() 
@@ -303,8 +306,9 @@ class HybridGraphOfUtility(DynWeightedPartitionedFrankaAbs):
         while True:
 
             if len(self.open_list[layer]) > 0:
-                # if verbose:
-                print(f"********************Layer: {layer}**************************")
+                
+                if print_layers:
+                    print(f"********************Layer: {layer}**************************")
                 
                 # reset the empty bucket counter 
                 empty_bucket_counter = 0
@@ -466,7 +470,7 @@ class HybridGraphOfUtility(DynWeightedPartitionedFrankaAbs):
             layer += 1
         
 
-    def get_best_alternatives(self, cooperative_vals: ADD, mod_act_dict: dict, verbose: bool = False):
+    def get_best_alternatives(self, cooperative_vals: ADD, mod_act_dict: dict, verbose: bool = False, print_layers: bool = False):
         """
          A function that computes the best alternative from each valid edge in the Graph of Utility.  
 
@@ -475,6 +479,9 @@ class HybridGraphOfUtility(DynWeightedPartitionedFrankaAbs):
          
          The cooperate values are stored in the winning states ADD along with their optimal values.
         """
+        if verbose:
+            print_layers = True
+
         # gives the bdd version of all states as 0-1 ADD
         coop_bdd_vals: BDD = cooperative_vals.bddInterval(1, self.energy_budget)
 
@@ -484,8 +491,8 @@ class HybridGraphOfUtility(DynWeightedPartitionedFrankaAbs):
         layer = 0
         while True:
             if len(self.open_list[layer]) > 0:
-                # if verbose:
-                print(f"********************Layer: {layer}**************************")
+                if print_layers:
+                    print(f"********************Layer: {layer}**************************")
                 
                 # reset the empty bucket counter 
                 empty_bucket_counter = 0
