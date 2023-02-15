@@ -360,6 +360,7 @@ class SymbolicGraphOfUtility(DynWeightedPartitionedFrankaAbs):
                 # If Cmax consecutive layers are empty. . .
                 if empty_bucket_counter == self.max_ts_action_cost:
                     print(f"Done Computing the Graph of Utility! Accepting Leaf nodes {self.lcount}; Total states {self.scount}")
+                    print(f"Utility values at the leaf nodes are {self.leaf_vals}")
                     break
             
             layer += 1

@@ -198,24 +198,24 @@ if __name__ == "__main__":
                                                                 plot=False)
             else:
                 regret_synthesis_handle = FrankaSymbolicRegretSynthesis(domain_file=domain_file_path,
-                                                                problem_file=problem_file_path,
-                                                                formulas=formulas,
-                                                                manager=cudd_manager,
-                                                                sup_locs=SUP_LOC,
-                                                                top_locs=TOP_LOC,
-                                                                weight_dict=wgt_dict,
-                                                                ltlf_flag=USE_LTLF,
-                                                                dyn_var_ord=DYNAMIC_VAR_ORDERING,
-                                                                weighting_factor=4,
-                                                                reg_factor=1.25,
-                                                                algorithm=None,
-                                                                verbose=False,
-                                                                plot_ts=False,
-                                                                plot_obs=False,
-                                                                plot=False)
-                
+                                                                        problem_file=problem_file_path,
+                                                                        formulas=formulas,
+                                                                        manager=cudd_manager,
+                                                                        sup_locs=SUP_LOC,
+                                                                        top_locs=TOP_LOC,
+                                                                        weight_dict=wgt_dict,
+                                                                        ltlf_flag=USE_LTLF,
+                                                                        dyn_var_ord=DYNAMIC_VAR_ORDERING,
+                                                                        weighting_factor=3,
+                                                                        reg_factor=1.25,
+                                                                        algorithm=None,
+                                                                        verbose=False,
+                                                                        plot_ts=False,
+                                                                        plot_obs=False,
+                                                                        plot=False)
+                        
             regret_synthesis_handle.build_abstraction()
-            regret_synthesis_handle.solve(verbose=False, just_adv_game=False, run_monitor=True)
+            regret_synthesis_handle.solve(verbose=False, just_adv_game=False, run_monitor=False)
 
             print(f"****************** # Total Boolean Variables: { cudd_manager.size()} ******************")
 

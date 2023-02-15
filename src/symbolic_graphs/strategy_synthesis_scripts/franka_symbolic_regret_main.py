@@ -166,25 +166,24 @@ class FrankaSymbolicRegretSynthesis(FrankaRegretSynthesis):
         print("******************Constructing Graph of Best Response******************")
         # construct of Best response G^{br}
         graph_of_br_handle = HybridGraphOfBR(curr_vars=self.ts_x_list,
-                                               lbl_vars=self.ts_obs_list,
-                                               robot_action_vars=self.ts_robot_vars,
-                                               human_action_vars=self.ts_human_vars,
-                                               task=self.ts_handle.task,
-                                               domain=self.ts_handle.domain,
-                                               ts_state_map=self.ts_handle.pred_int_map,
-                                               ts_states=self.ts_handle.ts_states,
-                                               manager=self.manager,
-                                               weight_dict=self.ts_handle.weight_dict,
-                                               seg_actions=self.ts_handle.actions,
-                                               ts_state_lbls=self.ts_handle.state_lbls,
-                                               dfa_state_vars=self.dfa_x_list,
-                                               sup_locs=self.sup_locs,
-                                               top_locs=self.top_locs,
-                                               ts_handle=self.ts_handle,
-                                               dfa_handle=self.dfa_handle,
-                                               symbolic_gou_handle=self.graph_of_utls_handle,
-                                               prod_ba_vars=self.prod_ba_vars, 
-                                               prod_succ_ba_vars=None)
+                                             lbl_vars=self.ts_obs_list,
+                                             robot_action_vars=self.ts_robot_vars,
+                                             human_action_vars=self.ts_human_vars,
+                                             task=self.ts_handle.task,
+                                             domain=self.ts_handle.domain,
+                                             ts_state_map=self.ts_handle.pred_int_map,
+                                             ts_states=self.ts_handle.ts_states,
+                                             manager=self.manager,
+                                             weight_dict=self.ts_handle.weight_dict,
+                                             seg_actions=self.ts_handle.actions,
+                                             ts_state_lbls=self.ts_handle.state_lbls,
+                                             dfa_state_vars=self.dfa_x_list,
+                                             sup_locs=self.sup_locs,
+                                             top_locs=self.top_locs,
+                                             ts_handle=self.ts_handle,
+                                             dfa_handle=self.dfa_handle,
+                                             symbolic_gou_handle=self.graph_of_utls_handle,
+                                             prod_ba_vars=self.prod_ba_vars)
 
         start: float = time.time()
         graph_of_br_handle.construct_graph_of_best_response(mod_act_dict=self.mod_act_dict,
@@ -192,22 +191,22 @@ class FrankaSymbolicRegretSynthesis(FrankaRegretSynthesis):
                                                             verbose=False,
                                                             debug=True)
         stop: float = time.time()
-        print("Time took for costructing the Graph of best Response: ", stop - start)
+        print("Time took for costructing the Graph of Best Response: ", stop - start)
 
 
         # compute regret-minmizing strategies
         gbr_min_max_handle =  GraphofBRAdvGame(prod_gbr_handle=graph_of_br_handle,
-                                                prod_gou_handle=self.graph_of_utls_handle,
-                                                ts_handle=self.ts_handle,
-                                                dfa_handle=self.dfa_handle,
-                                                ts_curr_vars=self.ts_x_list,
-                                                dfa_curr_vars=self.dfa_x_list,
-                                                ts_obs_vars=self.ts_obs_list,
-                                                prod_utls_vars=self.prod_utls_vars,
-                                                prod_ba_vars=self.prod_ba_vars,
-                                                sys_act_vars=self.ts_robot_vars,
-                                                env_act_vars=self.ts_human_vars,
-                                                cudd_manager=self.manager)
+                                               prod_gou_handle=self.graph_of_utls_handle,
+                                               ts_handle=self.ts_handle,
+                                               dfa_handle=self.dfa_handle,
+                                               ts_curr_vars=self.ts_x_list,
+                                               dfa_curr_vars=self.dfa_x_list,
+                                               ts_obs_vars=self.ts_obs_list,
+                                               prod_utls_vars=self.prod_utls_vars,
+                                               prod_ba_vars=self.prod_ba_vars,
+                                               sys_act_vars=self.ts_robot_vars,
+                                               env_act_vars=self.ts_human_vars,
+                                               cudd_manager=self.manager)
         
         print("******************Computing Regret Minimizing strategies on Graph of Best Response******************")
         start: float = time.time()

@@ -441,16 +441,16 @@ class HybridGraphOfUtility(DynWeightedPartitionedFrankaAbs):
                             self.closed |= next_prod_sym_state & self.predicate_sym_map_utls[self.energy_budget]
 
                             self.add_edge_to_action_tr(curr_state_tuple=curr_prod_tuple,
-                                                        next_state_tuple=(next_state_tuple, curr_dfa_tuple),
-                                                        curr_state_sym=curr_prod_sym_state,
-                                                        nxt_state_sym=next_prod_sym_state,
-                                                        mod_act_dict=mod_act_dict,
-                                                        robot_action_name=robot_act,
-                                                        valid_hact_list=no_human_move_edge, 
-                                                        curr_state_val=layer,
-                                                        next_state_val=self.energy_budget,
-                                                        prod_curr_list=prod_curr_list,
-                                                        debug=debug)
+                                                       next_state_tuple=(next_state_tuple, curr_dfa_tuple),
+                                                       curr_state_sym=curr_prod_sym_state,
+                                                       nxt_state_sym=next_prod_sym_state,
+                                                       mod_act_dict=mod_act_dict,
+                                                       robot_action_name=robot_act,
+                                                       valid_hact_list=no_human_move_edge, 
+                                                       curr_state_val=layer,
+                                                       next_state_val=self.energy_budget,
+                                                       prod_curr_list=prod_curr_list,
+                                                       debug=debug)
                         
                             if verbose:
                                 print(f"Adding Trap edge: ({curr_ts_exp_states}, {curr_dfa_tuple})[{layer}] -------{robot_act}------> (vT)")
@@ -460,6 +460,7 @@ class HybridGraphOfUtility(DynWeightedPartitionedFrankaAbs):
                 # If Cmax consecutive layers are empty. . .
                 if empty_bucket_counter == self.max_ts_action_cost:
                     print(f"Done Computing the Graph of Utility! Accepting Leaf nodes {self.lcount}; Total states {self.scount}; Total edges {self.ecount}")
+                    print(f"Utility values at the leaf nodes are {self.leaf_vals}")
                     break
             
             layer += 1

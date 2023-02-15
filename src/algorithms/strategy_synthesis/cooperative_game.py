@@ -547,7 +547,7 @@ class SymbolicGraphOfUtlCooperativeGame(CooperativeGame):
         self.ts_utls_list = ts_utls_vars
 
         self.utls_trans_func_list: List[List[ADD]] = gou_handle.sym_tr_actions
-        self.ults_bdd_trans_func_list: List[List[BDD]] = []
+        self.utls_bdd_trans_func_list: List[List[BDD]] = []
 
         self.gou_handle = gou_handle
         
@@ -568,7 +568,7 @@ class SymbolicGraphOfUtlCooperativeGame(CooperativeGame):
             for avar in act:
                 act_ls.append(avar.bddPattern())
         
-            self.ults_bdd_trans_func_list.append(act_ls)
+            self.utls_bdd_trans_func_list.append(act_ls)
     
 
     def get_state_value_from_dd(self, dd_func: ADD, **kwargs) -> None:
@@ -714,7 +714,7 @@ class SymbolicGraphOfUtlCooperativeGame(CooperativeGame):
             for sval, succ_states in _win_state_bucket.items():
                 # first evolve over DFA and then evolve over the TS and utility values
                 mod_win_state: BDD = succ_states.vectorCompose(self.dfa_bdd_x_list, self.dfa_bdd_transition_fun_list)
-                for tr_action, utls_tr in zip(self.ts_bdd_transition_fun_list, self.ults_bdd_trans_func_list):
+                for tr_action, utls_tr in zip(self.ts_bdd_transition_fun_list, self.utls_bdd_trans_func_list):
                     pre_states: BDD = self.get_pre_states(ts_action=tr_action, From=mod_win_state, prod_curr_list=prod_bdd_curr_list, utls_tr=utls_tr)
 
                     pre_states = gou_reachable_states & pre_states
