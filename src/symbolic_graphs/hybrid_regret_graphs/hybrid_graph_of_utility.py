@@ -101,7 +101,7 @@ class HybridGraphOfUtility(DynWeightedPartitionedFrankaAbs):
         self.leaf_vals = set()
         self.lcount: int = 0
 
-        # beast alternative ADD and set
+        # best alternative ADD and set
         self.ba_strategy: ADD = self.manager.plusInfinity()
         self.ba_set = set()
     
@@ -221,7 +221,7 @@ class HybridGraphOfUtility(DynWeightedPartitionedFrankaAbs):
                 edge_exist: bool = (self.mono_tr_bdd & curr_state_sym & sym_curr_state_val & robot_move & no_human_move).isZero()
                 
                 if not edge_exist:
-                    print(f"Nondeterminism due to Human Action: {curr_str_state}[{curr_state_val}] ---{robot_action_name}---> {next_str_state}[{next_state_val}]")
+                    print(f"Nondeterminism due to Robot Action: {curr_str_state}[{curr_state_val}] ---{robot_action_name}---> {next_str_state}[{next_state_val}]")
 
                 self.mono_tr_bdd |= curr_state_sym & sym_curr_state_val & robot_move & no_human_move
 
@@ -333,7 +333,8 @@ class HybridGraphOfUtility(DynWeightedPartitionedFrankaAbs):
                         self.leaf_nodes = self.leaf_nodes.min(full_prod_state_val)
                         self.leaf_vals.add(layer)
                         # update counter
-                        self.lcount += 1
+                        if (self.closed & curr_prod_sym_state & self.predicate_sym_map_utls[layer]).isZero():
+                            self.lcount += 1
                         self.closed |= curr_prod_sym_state & self.predicate_sym_map_utls[layer]
                         continue
                         
@@ -440,16 +441,16 @@ class HybridGraphOfUtility(DynWeightedPartitionedFrankaAbs):
                             self.closed |= next_prod_sym_state & self.predicate_sym_map_utls[self.energy_budget]
 
                             self.add_edge_to_action_tr(curr_state_tuple=curr_prod_tuple,
-                                                        next_state_tuple=(next_state_tuple, curr_dfa_tuple),
-                                                        curr_state_sym=curr_prod_sym_state,
-                                                        nxt_state_sym=next_prod_sym_state,
-                                                        mod_act_dict=mod_act_dict,
-                                                        robot_action_name=robot_act,
-                                                        valid_hact_list=no_human_move_edge, 
-                                                        curr_state_val=layer,
-                                                        next_state_val=self.energy_budget,
-                                                        prod_curr_list=prod_curr_list,
-                                                        debug=debug)
+                                                       next_state_tuple=(next_state_tuple, curr_dfa_tuple),
+                                                       curr_state_sym=curr_prod_sym_state,
+                                                       nxt_state_sym=next_prod_sym_state,
+                                                       mod_act_dict=mod_act_dict,
+                                                       robot_action_name=robot_act,
+                                                       valid_hact_list=no_human_move_edge, 
+                                                       curr_state_val=layer,
+                                                       next_state_val=self.energy_budget,
+                                                       prod_curr_list=prod_curr_list,
+                                                       debug=debug)
                         
                             if verbose:
                                 print(f"Adding Trap edge: ({curr_ts_exp_states}, {curr_dfa_tuple})[{layer}] -------{robot_act}------> (vT)")
@@ -459,6 +460,7 @@ class HybridGraphOfUtility(DynWeightedPartitionedFrankaAbs):
                 # If Cmax consecutive layers are empty. . .
                 if empty_bucket_counter == self.max_ts_action_cost:
                     print(f"Done Computing the Graph of Utility! Accepting Leaf nodes {self.lcount}; Total states {self.scount}; Total edges {self.ecount}")
+                    print(f"Utility values at the leaf nodes are {self.leaf_vals}")
                     break
             
             layer += 1

@@ -25,7 +25,8 @@ from src.symbolic_graphs.strategy_synthesis_scripts import FrankaPartitionedWorl
 class FrankaRegretSynthesis(FrankaPartitionedWorld):
     """
       Main script that constructs the Main Graph in a partitioned fashion, then constructs the graph of utility (G^{u}) and
-       finally the Graph of best response (G^{br}). 
+       finally the Graph of best response (G^{br}). Both these graph are constrcuted in a Hybrid Fashion. We unroll the
+       graph explcitly and then construct the Symbplic TR for each graph for synthesis. 
     """
 
     def __init__(self,
@@ -325,14 +326,13 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
         return sym_tr, ts_curr_vars, ts_robot_vars, ts_human_vars, ts_lbl_vars
     
 
-    def build_add_graph_of_utility(self, verbose: bool = False, just_adv_game: bool = False):
+    def get_energy_budget(self, verbose: bool = False, just_adv_game: bool = False) -> AdversarialGame:
         """
-         Main method that first plays the min-max game over the original graph. 
-        
-            This is the minimum budget we need to provide to ensure regret minimizing strategies exists. This graph (G')
-            is of the form Target weighted arena (TWA).  The utility information is added to the nodes of G to construct
-            the nodes of G'. The utility information added to the nodes is uniquely determined by the path used to reach
-            the current  position.
+         A helper function that play min-max game over the original graph, calculates the energy budget as follows:
+
+            regret_budget := aVal * regret_factor ; here aVal is the minimum energy required to complete the task under adversarial human assumtion.
+
+        We then create boolean variables that correspons to the utility values in the set {0, 1, .., regret_budget} .
         """
         # compute the minmax value of the game
         min_max_handle = AdversarialGame(ts_handle=self.ts_handle,
@@ -351,10 +351,7 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
         if win_str:
             if True:
                 min_max_handle.roll_out_strategy(strategy=win_str, verbose=verbose)
-            
-            if just_adv_game:
-                sys.exit(-1)
-
+        
         # min max value
         self.min_energy_budget = min_max_handle.init_state_value
         assert min_max_handle != math.inf, "No winning strategy exists. Before running regret game, make sure there existd a winning strategy."
@@ -364,6 +361,9 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
 
         print(f"************************** Energy Budget: {self.reg_energy_budget} **************************")
 
+        if just_adv_game:
+            sys.exit(-1)
+
         # construct additional boolean variables used during the construction of the new graph
         self.prod_utls_vars = self._create_symbolic_lbl_vars(state_lbls=list(range(self.reg_energy_budget + 1)),
                                                              state_var_name='k',
@@ -371,33 +371,49 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
 
         print(f"# of States in the Original graph: {len(self.ts_handle.adj_map.keys())}")
 
-        print("******************Constructing Graph of utility******************")
+        return min_max_handle
+
+    
+
+    def build_add_graph_of_utility(self, verbose: bool = False, just_adv_game: bool = False):
+        """
+         Main method that first plays the min-max game over the original graph. 
+        
+            This is the minimum budget we need to provide to ensure regret minimizing strategies exists. This graph (G')
+            is of the form Target weighted arena (TWA).  The utility information is added to the nodes of G to construct
+            the nodes of G'. The utility information added to the nodes is uniquely determined by the path used to reach
+            the current  position.
+        """
+        print("******************Computing Min-Max (aVal) on the original graph******************")
+
+        min_max_handle = self.get_energy_budget(verbose=verbose, just_adv_game=just_adv_game)
 
         # get the max action cost
         max_action_cost: int = min_max_handle._get_max_tr_action_cost()
 
+        print("******************Constructing Graph of utility******************")
         # construct the graph of utilty
         graph_of_utls_handle = HybridGraphOfUtility(curr_vars=self.ts_x_list,
-                                                      lbl_vars=self.ts_obs_list,
-                                                      state_utls_vars=self.prod_utls_vars,
-                                                      robot_action_vars=self.ts_robot_vars,
-                                                      human_action_vars=self.ts_human_vars,
-                                                      task=self.ts_handle.task,
-                                                      domain=self.ts_handle.domain,
-                                                      ts_state_map=self.ts_handle.pred_int_map,
-                                                      ts_states=self.ts_handle.ts_states,
-                                                      manager=self.manager,
-                                                      weight_dict=self.ts_handle.weight_dict,
-                                                      seg_actions=self.ts_handle.actions,
-                                                      max_ts_action_cost=max_action_cost,
-                                                      ts_state_lbls=self.ts_handle.state_lbls,
-                                                      dfa_state_vars=self.dfa_x_list,
-                                                      sup_locs=self.sup_locs,
-                                                      top_locs=self.top_locs,
-                                                      dfa_handle=self.dfa_handle,
-                                                      ts_handle=self.ts_handle,
-                                                      int_weight_dict=self.int_weight_dict,
-                                                      budget=self.reg_energy_budget)
+                                                    lbl_vars=self.ts_obs_list,
+                                                    state_utls_vars=self.prod_utls_vars,
+                                                    robot_action_vars=self.ts_robot_vars,
+                                                    human_action_vars=self.ts_human_vars,
+                                                    task=self.ts_handle.task,
+                                                    domain=self.ts_handle.domain,
+                                                    ts_state_map=self.ts_handle.pred_int_map,
+                                                    ts_states=self.ts_handle.ts_states,
+                                                    manager=self.manager,
+                                                    weight_dict=self.ts_handle.weight_dict,
+                                                    seg_actions=self.ts_handle.actions,
+                                                    max_ts_action_cost=max_action_cost,
+                                                    ts_state_lbls=self.ts_handle.state_lbls,
+                                                    dfa_state_vars=self.dfa_x_list,
+                                                    sup_locs=self.sup_locs,
+                                                    top_locs=self.top_locs,
+                                                    dfa_handle=self.dfa_handle,
+                                                    ts_handle=self.ts_handle,
+                                                    int_weight_dict=self.int_weight_dict,
+                                                    budget=self.reg_energy_budget)
         
         start: float = time.time()
         graph_of_utls_handle.construct_graph_of_utility(mod_act_dict=self.mod_act_dict,
@@ -414,7 +430,7 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
         """
          Overides base method to first construct the required graph and then run Value Iteration. 
 
-         Set just_adv_game flag to True if you want to play an adversarial game.
+         Set just_adv_game flag to True if you just want to play an adversarial game.
 
          Set run_monitor to True if you want the human to choose strategy for both player.
           Note, for Robot player, we are restricted to regret minimizing strategies only. For Human player. we can select any strategy. 
@@ -422,6 +438,7 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
 
         # constuct graph of utility
         self.build_add_graph_of_utility(verbose=verbose, just_adv_game=just_adv_game)
+        # sys.exit(-1)
         
         print("******************Computing cVals on Graph of utility******************")
         # compute the min-min value from each state
@@ -451,7 +468,7 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
         stop: float = time.time()
         print("Time took for computing the set of best alternatives: ", stop - start)
 
-        # construct addiotnal boolean vars for set of best alternative values
+        # construct additional boolean vars for set of best alternative values
         self.prod_ba_vars: List[ADD] = self._create_symbolic_lbl_vars(state_lbls=self.graph_of_utls_handle.ba_set,
                                                                       state_var_name='r',
                                                                       add_flag=True)
@@ -459,25 +476,24 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
         print("******************Constructing Graph of Best Response******************")
         # construct of Best response G^{br}
         graph_of_br_handle = HybridGraphOfBR(curr_vars=self.ts_x_list,
-                                               lbl_vars=self.ts_obs_list,
-                                               robot_action_vars=self.ts_robot_vars,
-                                               human_action_vars=self.ts_human_vars,
-                                               task=self.ts_handle.task,
-                                               domain=self.ts_handle.domain,
-                                               ts_state_map=self.ts_handle.pred_int_map,
-                                               ts_states=self.ts_handle.ts_states,
-                                               manager=self.manager,
-                                               weight_dict=self.ts_handle.weight_dict,
-                                               seg_actions=self.ts_handle.actions,
-                                               ts_state_lbls=self.ts_handle.state_lbls,
-                                               dfa_state_vars=self.dfa_x_list,
-                                               sup_locs=self.sup_locs,
-                                               top_locs=self.top_locs,
-                                               ts_handle=self.ts_handle,
-                                               dfa_handle=self.dfa_handle,
-                                               symbolic_gou_handle=self.graph_of_utls_handle,
-                                               prod_ba_vars=self.prod_ba_vars, 
-                                               prod_succ_ba_vars=None)
+                                             lbl_vars=self.ts_obs_list,
+                                             robot_action_vars=self.ts_robot_vars,
+                                             human_action_vars=self.ts_human_vars,
+                                             task=self.ts_handle.task,
+                                             domain=self.ts_handle.domain,
+                                             ts_state_map=self.ts_handle.pred_int_map,
+                                             ts_states=self.ts_handle.ts_states,
+                                             manager=self.manager,
+                                             weight_dict=self.ts_handle.weight_dict,
+                                             seg_actions=self.ts_handle.actions,
+                                             ts_state_lbls=self.ts_handle.state_lbls,
+                                             dfa_state_vars=self.dfa_x_list,
+                                             sup_locs=self.sup_locs,
+                                             top_locs=self.top_locs,
+                                             ts_handle=self.ts_handle,
+                                             dfa_handle=self.dfa_handle,
+                                             symbolic_gou_handle=self.graph_of_utls_handle,
+                                             prod_ba_vars=self.prod_ba_vars)
 
         start: float = time.time()
         graph_of_br_handle.construct_graph_of_best_response(mod_act_dict=self.mod_act_dict,
@@ -485,22 +501,22 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
                                                             verbose=False,
                                                             debug=True)
         stop: float = time.time()
-        print("Time took for costructing the Graph of best Response: ", stop - start)
+        print("Time took for costructing the Graph of Best Response: ", stop - start)
 
 
         # compute regret-minmizing strategies
         gbr_min_max_handle =  GraphofBRAdvGame(prod_gbr_handle=graph_of_br_handle,
-                                                prod_gou_handle=self.graph_of_utls_handle,
-                                                ts_handle=self.ts_handle,
-                                                dfa_handle=self.dfa_handle,
-                                                ts_curr_vars=self.ts_x_list,
-                                                dfa_curr_vars=self.dfa_x_list,
-                                                ts_obs_vars=self.ts_obs_list,
-                                                prod_utls_vars=self.prod_utls_vars,
-                                                prod_ba_vars=self.prod_ba_vars,
-                                                sys_act_vars=self.ts_robot_vars,
-                                                env_act_vars=self.ts_human_vars,
-                                                cudd_manager=self.manager)
+                                               prod_gou_handle=self.graph_of_utls_handle,
+                                               ts_handle=self.ts_handle,
+                                               dfa_handle=self.dfa_handle,
+                                               ts_curr_vars=self.ts_x_list,
+                                               dfa_curr_vars=self.dfa_x_list,
+                                               ts_obs_vars=self.ts_obs_list,
+                                               prod_utls_vars=self.prod_utls_vars,
+                                               prod_ba_vars=self.prod_ba_vars,
+                                               sys_act_vars=self.ts_robot_vars,
+                                               env_act_vars=self.ts_human_vars,
+                                               cudd_manager=self.manager)
         
         print("******************Computing Regret Minimizing strategies on Graph of Best Response******************")
         start: float = time.time()

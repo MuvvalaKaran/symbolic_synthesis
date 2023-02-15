@@ -4,7 +4,7 @@ import warnings
 from cudd import Cudd
 
 from src.symbolic_graphs.graph_search_scripts import SimpleGridWorld, FrankaWorld
-from src.symbolic_graphs.strategy_synthesis_scripts import FrankaPartitionedWorld, FrankaRegretSynthesis
+from src.symbolic_graphs.strategy_synthesis_scripts import FrankaPartitionedWorld, FrankaRegretSynthesis, FrankaSymbolicRegretSynthesis
 
 from utls import *
 from config import *
@@ -162,11 +162,14 @@ if __name__ == "__main__":
             frankapartition_handle.solve(verbose=False)
 
         elif REGRET_SYNTHESIS:
-            domain_file_path = PROJECT_ROOT + "/pddl_files/franka_regret_world/two_blocks/domain.pddl"
-            problem_file_path = PROJECT_ROOT + "/pddl_files/franka_regret_world/two_blocks/problem.pddl"
+            # domain_file_path = PROJECT_ROOT + "/pddl_files/franka_regret_world/two_blocks/domain.pddl"
+            # problem_file_path = PROJECT_ROOT + "/pddl_files/franka_regret_world/two_blocks/problem.pddl"
 
             # domain_file_path = PROJECT_ROOT + "/pddl_files/franka_regret_world/arch/domain.pddl"
             # problem_file_path = PROJECT_ROOT + "/pddl_files/franka_regret_world/arch/problem.pddl"
+
+            domain_file_path = PROJECT_ROOT + "/pddl_files/franka_regret_world/test/domain.pddl"
+            problem_file_path = PROJECT_ROOT + "/pddl_files/franka_regret_world/test/problem.pddl"
 
             wgt_dict = {
                 "transit" : 1,
@@ -176,30 +179,48 @@ if __name__ == "__main__":
                 "human": 0
                 }
             
-            regret_synthesis_handle = FrankaRegretSynthesis(domain_file=domain_file_path,
-                                                            problem_file=problem_file_path,
-                                                            formulas=formulas,
-                                                            manager=cudd_manager,
-                                                            sup_locs=SUP_LOC,
-                                                            top_locs=TOP_LOC,
-                                                            weight_dict=wgt_dict,
-                                                            ltlf_flag=USE_LTLF,
-                                                            dyn_var_ord=DYNAMIC_VAR_ORDERING,
-                                                            weighting_factor=1,
-                                                            reg_factor=1.25,
-                                                            algorithm=None,
-                                                            verbose=False,
-                                                            plot_ts=False,
-                                                            plot_obs=False,
-                                                            plot=False)
-            
+            if REGRET_HYBRID:
+                regret_synthesis_handle = FrankaRegretSynthesis(domain_file=domain_file_path,
+                                                                problem_file=problem_file_path,
+                                                                formulas=formulas,
+                                                                manager=cudd_manager,
+                                                                sup_locs=SUP_LOC,
+                                                                top_locs=TOP_LOC,
+                                                                weight_dict=wgt_dict,
+                                                                ltlf_flag=USE_LTLF,
+                                                                dyn_var_ord=DYNAMIC_VAR_ORDERING,
+                                                                weighting_factor=3,
+                                                                reg_factor=1.25,
+                                                                algorithm=None,
+                                                                verbose=False,
+                                                                plot_ts=False,
+                                                                plot_obs=False,
+                                                                plot=False)
+            else:
+                regret_synthesis_handle = FrankaSymbolicRegretSynthesis(domain_file=domain_file_path,
+                                                                        problem_file=problem_file_path,
+                                                                        formulas=formulas,
+                                                                        manager=cudd_manager,
+                                                                        sup_locs=SUP_LOC,
+                                                                        top_locs=TOP_LOC,
+                                                                        weight_dict=wgt_dict,
+                                                                        ltlf_flag=USE_LTLF,
+                                                                        dyn_var_ord=DYNAMIC_VAR_ORDERING,
+                                                                        weighting_factor=3,
+                                                                        reg_factor=1.25,
+                                                                        algorithm=None,
+                                                                        verbose=False,
+                                                                        plot_ts=False,
+                                                                        plot_obs=False,
+                                                                        plot=False)
+                        
             regret_synthesis_handle.build_abstraction()
-            regret_synthesis_handle.solve(verbose=False, just_adv_game=False, run_monitor=True)
+            regret_synthesis_handle.solve(verbose=False, just_adv_game=False, run_monitor=False)
+
             print(f"****************** # Total Boolean Variables: { cudd_manager.size()} ******************")
-            # regret_synthesis_handle.solve(verbose=False)
 
         else:
-            warnings.warn("Please set atleast one flag to True - FRANKAWORLD or GRIDWORLD!")
+            warnings.warn("Please set atleast one flag to True - GRIDWORLD, FRANKAWORLD, STRATEGY_SYNTHESIS, or REGRET_SYNTHESIS!")
             sys.exit(-1)
         
         # convert bytes to MegaBytes and print the Memory usage

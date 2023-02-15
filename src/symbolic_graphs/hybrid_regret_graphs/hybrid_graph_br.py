@@ -43,7 +43,6 @@ class HybridGraphOfBR(DynWeightedPartitionedFrankaAbs):
                  dfa_handle: ADDPartitionedDFA,
                  symbolic_gou_handle: HybridGraphOfUtility,
                  prod_ba_vars: List[ADD],
-                 prod_succ_ba_vars: List[ADD],
                  **kwargs):
         super().__init__(curr_vars,
                          lbl_vars,
@@ -67,9 +66,6 @@ class HybridGraphOfBR(DynWeightedPartitionedFrankaAbs):
         self.ba_set: set = symbolic_gou_handle.ba_set
         # ba vars for current state
         self.sym_vars_ba: List[ADD] = prod_ba_vars
-        
-        # ba vars used to augment org robot action with successor ba vars
-        self.sym_vars_succ_ba: List[ADD] = prod_succ_ba_vars
 
         self.predicate_sym_map_ba: bidict = {}
 
@@ -191,9 +187,10 @@ class HybridGraphOfBR(DynWeightedPartitionedFrankaAbs):
         self.leaf_vals.add(accp_w)
 
         # update counter
-        self.lcount += 1
+        if (self.closed & next_prod_sym_state).isZero():
+            self.lcount += 1
+        
         self.closed |= next_prod_sym_state
-
 
 
     # add code to construt the edge TR
@@ -518,6 +515,7 @@ class HybridGraphOfBR(DynWeightedPartitionedFrankaAbs):
                 # If Cmax consecutive layers are empty. . .
                 if empty_bucket_counter == self.gou_handle.max_ts_action_cost:
                     print(f"Done Computing the Graph of Best Response! Accepting Leaf nodes {self.lcount}; Total states {self.scount}; Total edges {self.ecount}")
+                    print(f"Regret values at the leaf nodes are {self.leaf_vals}")
                     break
             
             layer += 1
