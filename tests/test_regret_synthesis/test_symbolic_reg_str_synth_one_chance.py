@@ -24,6 +24,8 @@ DYNAMIC_VAR_ORDERING: bool = False
 
 USE_LTLF: bool = True # Construct DFA from LTLf
 
+MONOLITHIC_TR: bool = False
+
 SUP_LOC = []
 TOP_LOC = []    
 
@@ -63,6 +65,7 @@ class TestSymbolicRegretStrSynth(TestRegretStrSynth):
                                                                     algorithm=None,
                                                                     verbose=False,
                                                                     plot_ts=False,
+                                                                    print_layer=False,
                                                                     plot_obs=False,
                                                                     plot=False)
         
@@ -93,17 +96,18 @@ class TestSymbolicRegretStrSynth(TestRegretStrSynth):
          Test Cooperative Value (cVal) computation. An important step in computing Best Alternative (BA) value associated with edge on Graph of Utility.
         """
         gou_min_min_handle = SymbolicGraphOfUtlCooperativeGame(gou_handle=self.regret_synthesis_handle.graph_of_utls_handle,
-                                                                ts_handle=self.regret_synthesis_handle.ts_handle,
-                                                                dfa_handle=self.regret_synthesis_handle.dfa_handle,
-                                                                ts_curr_vars=self.regret_synthesis_handle.ts_x_list,
-                                                                dfa_curr_vars=self.regret_synthesis_handle.dfa_x_list,
-                                                                sys_act_vars=self.regret_synthesis_handle.ts_robot_vars,
-                                                                env_act_vars=self.regret_synthesis_handle.ts_human_vars,
-                                                                ts_obs_vars=self.regret_synthesis_handle.ts_obs_list,
-                                                                ts_utls_vars=self.regret_synthesis_handle.prod_utls_vars,
-                                                                cudd_manager=self.cudd_manager)
+                                                               ts_handle=self.regret_synthesis_handle.ts_handle,
+                                                               dfa_handle=self.regret_synthesis_handle.dfa_handle,
+                                                               ts_curr_vars=self.regret_synthesis_handle.ts_x_list,
+                                                               dfa_curr_vars=self.regret_synthesis_handle.dfa_x_list,
+                                                               sys_act_vars=self.regret_synthesis_handle.ts_robot_vars,
+                                                               env_act_vars=self.regret_synthesis_handle.ts_human_vars,
+                                                               ts_obs_vars=self.regret_synthesis_handle.ts_obs_list,
+                                                               ts_utls_vars=self.regret_synthesis_handle.prod_utls_vars,
+                                                               cudd_manager=self.cudd_manager,
+                                                               monolithic_tr=MONOLITHIC_TR)
 
-        self.cvals: ADD = gou_min_min_handle.solve(verbose=False)
+        self.cvals: ADD = gou_min_min_handle.solve(verbose=False, print_layers=False)
 
         self.assertEqual(gou_min_min_handle.init_state_value, 1, "Error computing cVal on the Graph of Utility constrcuted by explicitly rolling out the original graph.")
 
@@ -119,21 +123,23 @@ class TestSymbolicRegretStrSynth(TestRegretStrSynth):
          Test Graph of Best Response Construction given the Graph of Utiltiy and BA for every edge
         """
         gou_min_min_handle = SymbolicGraphOfUtlCooperativeGame(gou_handle=self.regret_synthesis_handle.graph_of_utls_handle,
-                                                                ts_handle=self.regret_synthesis_handle.ts_handle,
-                                                                dfa_handle=self.regret_synthesis_handle.dfa_handle,
-                                                                ts_curr_vars=self.regret_synthesis_handle.ts_x_list,
-                                                                dfa_curr_vars=self.regret_synthesis_handle.dfa_x_list,
-                                                                sys_act_vars=self.regret_synthesis_handle.ts_robot_vars,
-                                                                env_act_vars=self.regret_synthesis_handle.ts_human_vars,
-                                                                ts_obs_vars=self.regret_synthesis_handle.ts_obs_list,
-                                                                ts_utls_vars=self.regret_synthesis_handle.prod_utls_vars,
-                                                                cudd_manager=self.cudd_manager)
+                                                               ts_handle=self.regret_synthesis_handle.ts_handle,
+                                                               dfa_handle=self.regret_synthesis_handle.dfa_handle,
+                                                               ts_curr_vars=self.regret_synthesis_handle.ts_x_list,
+                                                               dfa_curr_vars=self.regret_synthesis_handle.dfa_x_list,
+                                                               sys_act_vars=self.regret_synthesis_handle.ts_robot_vars,
+                                                               env_act_vars=self.regret_synthesis_handle.ts_human_vars,
+                                                               ts_obs_vars=self.regret_synthesis_handle.ts_obs_list,
+                                                               ts_utls_vars=self.regret_synthesis_handle.prod_utls_vars,
+                                                               cudd_manager=self.cudd_manager,
+                                                               monolithic_tr=MONOLITHIC_TR)
 
-        cvals: ADD = gou_min_min_handle.solve(verbose=False)
+        cvals: ADD = gou_min_min_handle.solve(verbose=False, print_layers=False)
 
         # compute the best alternative from each edge for cumulative payoff
         self.regret_synthesis_handle.graph_of_utls_handle.get_best_alternatives(cooperative_vals=cvals,
                                                                                 mod_act_dict=self.regret_synthesis_handle.mod_act_dict,
+                                                                                print_layers=False,
                                                                                 verbose=False)
 
         # construct additional boolean vars for set of best alternative values
@@ -162,6 +168,7 @@ class TestSymbolicRegretStrSynth(TestRegretStrSynth):
                                                   prod_ba_vars=self.regret_synthesis_handle.prod_ba_vars)
         
         self.graph_of_br_handle.construct_graph_of_best_response(mod_act_dict=self.regret_synthesis_handle.mod_act_dict,
+                                                                 print_layers=False,
                                                                  print_leaf_nodes=False,
                                                                  verbose=False,
                                                                  debug=True)

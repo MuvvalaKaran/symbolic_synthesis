@@ -1,16 +1,6 @@
-'''
- This files tests all steps executed during synthesis of regret-minimizing strategies.
-
-  1. We first test original graph construction 
-  2. We then test min-max value iteration on the original graph - the min-max value determines the minimum energy budget for the regret graphs
-  3. Then, we test Graph of Utiity construction
-  4. We test cVal computation on the graph of Utility, an intermediate computation need to compute Best Alternate value associated with edge on the Graph of Utility. 
-  5. Finally, we test Graph of Best Response construction and
-  4. We finally compute regret minimizing strategies by playing min-max game on the Graph of Best Response. 
-  5. We check if the strategies are correct, i.e., if the optimal strategy is give no, one, two ... chances to cooperate
-     by comparing the synthesized optimal strategy with a the correct strategy. 
-'''
-
+"""
+ This module tests Monolithic TR construction and strategy synthesis.
+"""
 
 import os
 import unittest
@@ -32,13 +22,13 @@ DYNAMIC_VAR_ORDERING: bool = False
 
 USE_LTLF: bool = True # Construct DFA from LTLf
 
-MONOLITHIC_TR: bool = False
+MONOLITHIC_TR: bool = True
 
 SUP_LOC = []
 TOP_LOC = []    
 
 
-class TestRegretStrSynth(unittest.TestCase):
+class TestMonoRegretStrSynth(unittest.TestCase):
     """
      We override the setUpClass method to construct the original Two-player graph only once. 
      This class method is initialized only once when the Test class is initialized. Thus, helping us same time.
@@ -186,13 +176,13 @@ class TestRegretStrSynth(unittest.TestCase):
                                                        cudd_manager=self.cudd_manager,
                                                        monolithic_tr=MONOLITHIC_TR)
 
-        cvals: ADD = gou_min_min_handle.solve(verbose=False, print_layers=False)
+        cvals: ADD = gou_min_min_handle.solve(verbose=False,  print_layers=False)
 
         # compute the best alternative from each edge for cumulative payoff
         self.regret_synthesis_handle.graph_of_utls_handle.get_best_alternatives(cooperative_vals=cvals,
                                                                                 mod_act_dict=self.regret_synthesis_handle.mod_act_dict,
-                                                                                print_layers=False,
-                                                                                verbose=False)
+                                                                                verbose=False,
+                                                                                print_layers=False)
 
         # construct additional boolean vars for set of best alternative values
         self.regret_synthesis_handle.prod_ba_vars: List[ADD] = self.regret_synthesis_handle._create_symbolic_lbl_vars(state_lbls=self.regret_synthesis_handle.graph_of_utls_handle.ba_set,

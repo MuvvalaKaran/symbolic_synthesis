@@ -13,10 +13,9 @@ from src.symbolic_graphs.strategy_synthesis_scripts import FrankaSymbolicRegretS
 
 from src.symbolic_graphs.hybrid_regret_graphs import HybridGraphOfBR
 
-from src.algorithms.strategy_synthesis import GraphofBRAdvGame
 from src.algorithms.strategy_synthesis import SymbolicGraphOfUtlCooperativeGame
 
-from .test_hybrid_reg_str_synth_two_chance import TestRegretStrSynth2
+from .test_hybrid_reg_str_synth_one_chance import TestRegretStrSynth
 
 # config flags 
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -31,7 +30,7 @@ SUP_LOC = []
 TOP_LOC = []    
 
 
-class TestSymbolicRegretStrSynth(TestRegretStrSynth2):
+class TestMonoSymbolicRegretStrSynth(TestRegretStrSynth):
     """
      We override the Graph of Utility functionality to construct it purely symbolically.
     """
@@ -61,7 +60,7 @@ class TestSymbolicRegretStrSynth(TestRegretStrSynth2):
                                                                     weight_dict=wgt_dict,
                                                                     ltlf_flag=USE_LTLF,
                                                                     dyn_var_ord=DYNAMIC_VAR_ORDERING,
-                                                                    weighting_factor=3,
+                                                                    weighting_factor=2,
                                                                     reg_factor=1.25,
                                                                     algorithm=None,
                                                                     verbose=False,
@@ -85,11 +84,11 @@ class TestSymbolicRegretStrSynth(TestRegretStrSynth2):
         leaf_values: int = self.regret_synthesis_handle.graph_of_utls_handle.leaf_vals
         fp_layer: int =  max(self.regret_synthesis_handle.graph_of_utls_handle.open_list.keys())
         
-        self.assertEqual(no_of_states, 483, "Error constructing Graph of Utility. Mismatch in # of states")
-        self.assertEqual(no_of_leaf_nodes, 167, "Error constructing Graph of Utility. Mismatch in # of Leaf nodes")
+        self.assertEqual(no_of_states, 284, "Error constructing Graph of Utility. Mismatch in # of states")
+        self.assertEqual(no_of_leaf_nodes, 105, "Error constructing Graph of Utility. Mismatch in # of Leaf nodes")
 
-        self.assertEqual(leaf_values, set([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]), "Error constructing Graph of Utility. Mismatch in # utility values associated with leaf nodes")
-        self.assertEqual(fp_layer, 18, "Error constructing Graph of Utility. Mismatch in # of layers required to construct the graph")
+        self.assertEqual(leaf_values, set([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]), "Error constructing Graph of Utility. Mismatch in # utility values associated with leaf nodes")
+        self.assertEqual(fp_layer, 12, "Error constructing Graph of Utility. Mismatch in # of layers required to construct the graph")
         
 
     def test_4_cVal_computation(self):
@@ -97,16 +96,16 @@ class TestSymbolicRegretStrSynth(TestRegretStrSynth2):
          Test Cooperative Value (cVal) computation. An important step in computing Best Alternative (BA) value associated with edge on Graph of Utility.
         """
         gou_min_min_handle = SymbolicGraphOfUtlCooperativeGame(gou_handle=self.regret_synthesis_handle.graph_of_utls_handle,
-                                                                ts_handle=self.regret_synthesis_handle.ts_handle,
-                                                                dfa_handle=self.regret_synthesis_handle.dfa_handle,
-                                                                ts_curr_vars=self.regret_synthesis_handle.ts_x_list,
-                                                                dfa_curr_vars=self.regret_synthesis_handle.dfa_x_list,
-                                                                sys_act_vars=self.regret_synthesis_handle.ts_robot_vars,
-                                                                env_act_vars=self.regret_synthesis_handle.ts_human_vars,
-                                                                ts_obs_vars=self.regret_synthesis_handle.ts_obs_list,
-                                                                ts_utls_vars=self.regret_synthesis_handle.prod_utls_vars,
-                                                                cudd_manager=self.cudd_manager,
-                                                                monolithic_tr=MONOLITHIC_TR)
+                                                               ts_handle=self.regret_synthesis_handle.ts_handle,
+                                                               dfa_handle=self.regret_synthesis_handle.dfa_handle,
+                                                               ts_curr_vars=self.regret_synthesis_handle.ts_x_list,
+                                                               dfa_curr_vars=self.regret_synthesis_handle.dfa_x_list,
+                                                               sys_act_vars=self.regret_synthesis_handle.ts_robot_vars,
+                                                               env_act_vars=self.regret_synthesis_handle.ts_human_vars,
+                                                               ts_obs_vars=self.regret_synthesis_handle.ts_obs_list,
+                                                               ts_utls_vars=self.regret_synthesis_handle.prod_utls_vars,
+                                                               cudd_manager=self.cudd_manager,
+                                                               monolithic_tr=MONOLITHIC_TR)
 
         self.cvals: ADD = gou_min_min_handle.solve(verbose=False, print_layers=False)
 
@@ -116,7 +115,7 @@ class TestSymbolicRegretStrSynth(TestRegretStrSynth2):
         self.assertNotEqual(self.cvals, self.cudd_manager.addZero(), "Could not synthesize a winning strategy for cooperative game!!!")
 
         # ensure that you reach the fixed point correctly
-        self.assertEqual(max(gou_min_min_handle.winning_states.keys()), 5, "Mismatch in # of iterations required to reach a fixed point for Min-Min game.")
+        self.assertEqual(max(gou_min_min_handle.winning_states.keys()), 4, "Mismatch in # of iterations required to reach a fixed point for Min-Min game.")
 
 
     def test_5_graph_of_best_response_construction(self):
@@ -124,16 +123,16 @@ class TestSymbolicRegretStrSynth(TestRegretStrSynth2):
          Test Graph of Best Response Construction given the Graph of Utiltiy and BA for every edge
         """
         gou_min_min_handle = SymbolicGraphOfUtlCooperativeGame(gou_handle=self.regret_synthesis_handle.graph_of_utls_handle,
-                                                                ts_handle=self.regret_synthesis_handle.ts_handle,
-                                                                dfa_handle=self.regret_synthesis_handle.dfa_handle,
-                                                                ts_curr_vars=self.regret_synthesis_handle.ts_x_list,
-                                                                dfa_curr_vars=self.regret_synthesis_handle.dfa_x_list,
-                                                                sys_act_vars=self.regret_synthesis_handle.ts_robot_vars,
-                                                                env_act_vars=self.regret_synthesis_handle.ts_human_vars,
-                                                                ts_obs_vars=self.regret_synthesis_handle.ts_obs_list,
-                                                                ts_utls_vars=self.regret_synthesis_handle.prod_utls_vars,
-                                                                cudd_manager=self.cudd_manager,
-                                                                monolithic_tr=MONOLITHIC_TR)
+                                                               ts_handle=self.regret_synthesis_handle.ts_handle,
+                                                               dfa_handle=self.regret_synthesis_handle.dfa_handle,
+                                                               ts_curr_vars=self.regret_synthesis_handle.ts_x_list,
+                                                               dfa_curr_vars=self.regret_synthesis_handle.dfa_x_list,
+                                                               sys_act_vars=self.regret_synthesis_handle.ts_robot_vars,
+                                                               env_act_vars=self.regret_synthesis_handle.ts_human_vars,
+                                                               ts_obs_vars=self.regret_synthesis_handle.ts_obs_list,
+                                                               ts_utls_vars=self.regret_synthesis_handle.prod_utls_vars,
+                                                               cudd_manager=self.cudd_manager,
+                                                               monolithic_tr=MONOLITHIC_TR)
 
         cvals: ADD = gou_min_min_handle.solve(verbose=False, print_layers=False)
 
@@ -182,12 +181,12 @@ class TestSymbolicRegretStrSynth(TestRegretStrSynth2):
         leaf_values: int = self.graph_of_br_handle.leaf_vals
         fp_layer: int =  max(self.graph_of_br_handle.open_list.keys())
         
-        self.assertEqual(no_of_edges, 5625, "Error constructing Graph of Best Response. Mismatch in # of Edges")
-        self.assertEqual(no_of_states, 1028, "Error constructing Graph of Best Response. Mismatch in # of states")
-        self.assertEqual(no_of_leaf_nodes, 368, "Error constructing Graph of Best Response. Mismatch in # of Leaf nodes")
+        self.assertEqual(no_of_edges, 2223, "Error constructing Graph of Best Response. Mismatch in # of Edges")
+        self.assertEqual(no_of_states, 438, "Error constructing Graph of Best Response. Mismatch in # of states")
+        self.assertEqual(no_of_leaf_nodes, 168, "Error constructing Graph of Best Response. Mismatch in # of Leaf nodes")
 
-        self.assertEqual(leaf_values, set([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]), "Error constructing Graph of Best Response. Mismatch in regret values associated with leaf nodes")
-        self.assertEqual(fp_layer, 18, "Error constructing Graph of Best Response. Mismatch in # of layers required to construct the graph")
+        self.assertEqual(leaf_values, set([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]), "Error constructing Graph of Best Response. Mismatch in regret values associated with leaf nodes")
+        self.assertEqual(fp_layer, 12, "Error constructing Graph of Best Response. Mismatch in # of layers required to construct the graph")
 
         self.reg_str_synthesis()
 

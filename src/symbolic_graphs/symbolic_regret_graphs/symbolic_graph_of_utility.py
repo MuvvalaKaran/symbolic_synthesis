@@ -370,7 +370,7 @@ class SymbolicGraphOfUtility(DynWeightedPartitionedFrankaAbs):
             layer += 1
     
 
-    def get_best_alternatives(self, cooperative_vals: ADD,  mod_act_dict: dict, verbose: bool = False):
+    def get_best_alternatives(self, cooperative_vals: ADD,  mod_act_dict: dict, verbose: bool = False, print_layers: bool = False):
         """
          A function that computes the best alternative from each valid edge in the Graph of Utility.  
 
@@ -379,13 +379,17 @@ class SymbolicGraphOfUtility(DynWeightedPartitionedFrankaAbs):
          
          The cooperate values are stored in the winning states ADD along with their optimal values.
         """
+        # if verbose flag is True then print leaf nodes too.
+        if verbose:
+            print_layers = True
 
         # loop through the open_list dict computed above
         layer = 0
         while True:
             if len(self.open_list[layer]) > 0:
-                # if verbose:
-                print(f"********************Layer: {layer}**************************")
+                
+                if print_layers:
+                    print(f"********************Layer: {layer}**************************")
                 
                 # reset the empty bucket counter 
                 empty_bucket_counter = 0

@@ -10,6 +10,7 @@ STRATEGY_SYNTHESIS: bool = False  # Set this flag to true when  when using manip
 REGRET_SYNTHESIS: bool = True  # Set this flag to true when you want compute regret minimizing strategies
 REGRET_HYBRID: bool = False  # Set this flag to true when you contruct graph of utility and best response explicitly
 
+MONOLITHIC_TR: bool = True  # Set this flag to true when using Monolithic TR during regret str synthesis
 
 TWO_PLAYER_GAME: bool = True # Set this flag to true when you want to contruct a two-player game env.
 TWO_PLAYER_GAME_BND: bool = False  # Set this flag to true when you want to construct som bounded no. off human interventions.

@@ -587,7 +587,6 @@ class SymbolicGraphOfUtlCooperativeGame(CooperativeGame):
 
         # energy budget
         self.energy_budget: int = gou_handle.energy_budget
-      
 
         # create ts and dfa combines cube
         self.prod_xlist: list =  self.dfa_x_list + [lbl for sym_vars_list in self.ts_obs_list for lbl in sym_vars_list] + self.ts_x_list + self.ts_utls_list
@@ -602,7 +601,59 @@ class SymbolicGraphOfUtlCooperativeGame(CooperativeGame):
             self.utls_bdd_trans_func_list.append(act_ls)
 
         if monolithic_tr:
-            raise NotImplementedError()
+            self.construct_monolithic_tr()
+    
+
+    def construct_monolithic_tr(self):
+        """
+          A helper function to constructs the monolithic TR for TS and for the utility. As the utility Tr captures evolution of utls var
+           under each ts action, actiosn with different edge weight should be stored in different bdd. For e.g., 
+
+           u ---a_s---> u' and u---a_s---> u'' are possible a_s is boolean formula assocated with modified robot action
+            which are unique for TS TR but not for utls TR
+        """
+        num_of_ts_bvars: int = len(self.ts_bdd_transition_fun_list[0])
+        num_of_utls_bvars: int = len(self.utls_bdd_trans_func_list[0])
+
+        # get set of edge weight. convert list and use the index of the weight as the map for the monolithic TR for utls vars
+        edge_weights: List[int] = list(set(self.gou_handle.int_weight_dict.values()))
+
+        self.mono_ts_bdd_transition_fun_list: List[BDD] = [[self.manager.bddZero() for _ in range(num_of_ts_bvars)] for _ in range(len(edge_weights))]
+        
+        # Monolithic TS TR 
+        for ts_id, tr_action in enumerate(self.ts_bdd_transition_fun_list):
+            # get the edge weight its corresponding BDD idx to be stored in
+            ts_act_name: str = self.ts_action_idx_map.inv[ts_id]
+            action_cost: ADD =  self.ts_handle.weight_dict[ts_act_name]
+            act_val: int = list(action_cost.generate_cubes())[0][1]
+
+            mono_tr_idx = edge_weights.index(act_val)
+            assert act_val != math.inf and act_val != 0, "Error constrcuting Monolithic TR for Utls Vars"
+            
+            for var_tr_id, var_tr_dd in enumerate(tr_action):
+                self.mono_ts_bdd_transition_fun_list[mono_tr_idx][var_tr_id] |= var_tr_dd
+
+
+        self.mono_utls_bdd_trans_func_list: List[BDD] = [[self.manager.bddZero() for _ in range(num_of_utls_bvars)] for _ in range(len(edge_weights))]
+
+        # Monolithic UTLS TR
+        for ts_id, utls_tr in enumerate(self.utls_bdd_trans_func_list):
+            # get the edge weight its corresponding BDD idx to be stored in
+            ts_act_name: str = self.ts_action_idx_map.inv[ts_id]
+            action_cost: ADD =  self.ts_handle.weight_dict[ts_act_name]
+            act_val: int = list(action_cost.generate_cubes())[0][1]
+
+            mono_tr_idx = edge_weights.index(act_val)
+            assert act_val != math.inf and act_val != 0, "Error constrcuting Monolithic TR for Utls Vars"
+            
+            for var_utls_id, var_utls_dd in enumerate(utls_tr):
+                self.mono_utls_bdd_trans_func_list[mono_tr_idx][var_utls_id] |= var_utls_dd
+
+        # override original bdd transition 
+        self.ts_bdd_transition_fun_list = self.mono_ts_bdd_transition_fun_list
+        self.utls_bdd_trans_func_list = self.mono_utls_bdd_trans_func_list
+
+
 
     def get_state_value_from_dd(self, dd_func: ADD, **kwargs) -> None:
         """
@@ -754,7 +805,10 @@ class SymbolicGraphOfUtlCooperativeGame(CooperativeGame):
                 # first evolve over DFA and then evolve over the TS and utility values
                 mod_win_state: BDD = succ_states.vectorCompose(self.dfa_bdd_x_list, self.dfa_bdd_transition_fun_list)
                 for tr_action, utls_tr in zip(self.ts_bdd_transition_fun_list, self.utls_bdd_trans_func_list):
-                    pre_states: BDD = self.get_pre_states(ts_action=tr_action, From=mod_win_state, prod_curr_list=prod_bdd_curr_list, utls_tr=utls_tr)
+                    pre_states: BDD = self.get_pre_states(utls_tr=utls_tr,
+                                                          ts_action=tr_action,
+                                                          From=mod_win_state,
+                                                          prod_curr_list=prod_bdd_curr_list)
 
                     pre_states = gou_reachable_states & pre_states
     

@@ -11,12 +11,8 @@ from typing import Union, List, Tuple, Dict
 
 from cudd import Cudd, BDD, ADD
 
-from src.explicit_graphs import CausalGraph, Ltlf2MonaDFA
-
 from src.algorithms.strategy_synthesis import SymbolicGraphOfUtlCooperativeGame, GraphofBRAdvGame
 
-from src.symbolic_graphs import ADDPartitionedDFA
-from src.symbolic_graphs import DynWeightedPartitionedFrankaAbs
 from src.symbolic_graphs.symbolic_regret_graphs import SymbolicGraphOfUtility
 from src.symbolic_graphs.hybrid_regret_graphs import HybridGraphOfBR
 
@@ -109,6 +105,7 @@ class FrankaSymbolicRegretSynthesis(FrankaRegretSynthesis):
         # compute reach states from the init state
         start: float = time.time()
         graph_of_utls_handle.compute_graph_of_utility_reachable_states(mod_act_dict=self.mod_act_dict, 
+                                                                       print_layers=self.print_layers,
                                                                        boxes=self.task_boxes,
                                                                        verbose=False)
         stop: float = time.time()
@@ -126,7 +123,9 @@ class FrankaSymbolicRegretSynthesis(FrankaRegretSynthesis):
          Set run_monitor to True if you want the human to choose strategy for both player.
           Note, for Robot player, we are restricted to regret minimizing strategies only. For Human player. we can select any strategy. 
         """
-
+        print("**********************************************************************************************************")
+        print("******************************************** TR: {approach} ***********************************************".format(approach='Monolithic' if monolithic_tr else 'Partitioned'))
+        print("**********************************************************************************************************")
         # constuct graph of utility
         self.build_add_graph_of_utility(verbose=verbose, just_adv_game=just_adv_game)
 
@@ -147,7 +146,7 @@ class FrankaSymbolicRegretSynthesis(FrankaRegretSynthesis):
         
         # compute the cooperative value from each prod state in the graph of utility
         start: float = time.time()
-        cvals: ADD = gou_min_min_handle.solve(verbose=False)
+        cvals: ADD = gou_min_min_handle.solve(verbose=False, print_layers=self.print_layers)
         stop: float = time.time()
         print("Time took for computing cVals is: ", stop - start)
 
@@ -157,6 +156,7 @@ class FrankaSymbolicRegretSynthesis(FrankaRegretSynthesis):
         # compute the best alternative from each edge for cumulative payoff
         self.graph_of_utls_handle.get_best_alternatives(mod_act_dict=self.mod_act_dict,
                                                         cooperative_vals=cvals,
+                                                        print_layers=self.print_layers,
                                                         verbose=False)
         stop: float = time.time()
         print("Time took for computing the set of best alternatives: ", stop - start)
@@ -190,6 +190,7 @@ class FrankaSymbolicRegretSynthesis(FrankaRegretSynthesis):
 
         start: float = time.time()
         graph_of_br_handle.construct_graph_of_best_response(mod_act_dict=self.mod_act_dict,
+                                                            print_layers=self.print_layers,
                                                             print_leaf_nodes=False,
                                                             verbose=False,
                                                             debug=True)
@@ -214,7 +215,7 @@ class FrankaSymbolicRegretSynthesis(FrankaRegretSynthesis):
         
         print("******************Computing Regret Minimizing strategies on Graph of Best Response******************")
         start: float = time.time()
-        reg_str: ADD = gbr_min_max_handle.solve(verbose=False)
+        reg_str: ADD = gbr_min_max_handle.solve(verbose=False,  print_layers=self.print_layers)
         stop: float = time.time()
         print("Time took for computing min-max strs on the Graph of best Response: ", stop - start)
 

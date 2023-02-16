@@ -441,10 +441,13 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
          Set run_monitor to True if you want the human to choose strategy for both player.
           Note, for Robot player, we are restricted to regret minimizing strategies only. For Human player. we can select any strategy. 
         """
+        print("**********************************************************************************************************")
+        print("******************************************** TR: {approach} ***********************************************".format(approach='Monolithic' if monolithic_tr else 'Partitioned'))
+        print("**********************************************************************************************************")
 
         # constuct graph of utility
         self.build_add_graph_of_utility(verbose=verbose, just_adv_game=just_adv_game)
-        # sys.exit(-1)
+        
         
         print("******************Computing cVals on Graph of utility******************")
         # compute the min-min value from each state
@@ -462,7 +465,7 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
         
         # compute the cooperative value from each prod state in the graph of utility
         start: float = time.time()
-        cvals: ADD = gou_min_min_handle.solve(verbose=False, print_layers=self.print_layers,)
+        cvals: ADD = gou_min_min_handle.solve(verbose=False, print_layers=self.print_layers)
         stop: float = time.time()
         print("Time took for computing cVals is: ", stop - start)
         # sys.exit(-1)
@@ -525,7 +528,8 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
                                                prod_ba_vars=self.prod_ba_vars,
                                                sys_act_vars=self.ts_robot_vars,
                                                env_act_vars=self.ts_human_vars,
-                                               cudd_manager=self.manager)
+                                               cudd_manager=self.manager,
+                                               monolithic_tr=monolithic_tr)
         
         print("******************Computing Regret Minimizing strategies on Graph of Best Response******************")
         start: float = time.time()

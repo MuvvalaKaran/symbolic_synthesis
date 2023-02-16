@@ -32,6 +32,8 @@ DYNAMIC_VAR_ORDERING: bool = False
 
 USE_LTLF: bool = True # Construct DFA from LTLf
 
+MONOLITHIC_TR: bool = False
+
 SUP_LOC = []
 TOP_LOC = []    
 
@@ -75,6 +77,7 @@ class TestRegretStrSynth2(unittest.TestCase):
                                                             reg_factor=1.25,
                                                             algorithm=None,
                                                             verbose=False,
+                                                            print_layer=False,
                                                             plot_ts=False,
                                                             plot_obs=False,
                                                             plot=False)
@@ -104,7 +107,7 @@ class TestRegretStrSynth2(unittest.TestCase):
         """
         # stop after computing the Min-max value.
         with self.assertRaises(SystemExit) as cm:
-            self.regret_synthesis_handle.solve(verbose=False, just_adv_game=True, run_monitor=True)
+            self.regret_synthesis_handle.solve(verbose=False, just_adv_game=True, run_monitor=False)
 
             # verify min max value
             self.assertEqual(self.regret_synthesis_handle.min_energy_budget, 12, "Error computing aVal on the original Two-player game") 
@@ -150,9 +153,10 @@ class TestRegretStrSynth2(unittest.TestCase):
                                                        env_act_vars=self.regret_synthesis_handle.ts_human_vars,
                                                        ts_obs_vars=self.regret_synthesis_handle.ts_obs_list,
                                                        ts_utls_vars=self.regret_synthesis_handle.prod_utls_vars,
-                                                       cudd_manager=self.cudd_manager)
+                                                       cudd_manager=self.cudd_manager,
+                                                       monolithic_tr=MONOLITHIC_TR)
 
-        self.cvals: ADD = gou_min_min_handle.solve(verbose=False)
+        self.cvals: ADD = gou_min_min_handle.solve(verbose=False, print_layers=False)
 
         self.assertEqual(gou_min_min_handle.init_state_value, 1, "Error computing cVal on the Graph of Utility constrcuted by explicitly rolling out the original graph.")
 
@@ -176,19 +180,21 @@ class TestRegretStrSynth2(unittest.TestCase):
                                                        env_act_vars=self.regret_synthesis_handle.ts_human_vars,
                                                        ts_obs_vars=self.regret_synthesis_handle.ts_obs_list,
                                                        ts_utls_vars=self.regret_synthesis_handle.prod_utls_vars,
-                                                       cudd_manager=self.cudd_manager)
+                                                       cudd_manager=self.cudd_manager,
+                                                       monolithic_tr=MONOLITHIC_TR)
 
-        cvals: ADD = gou_min_min_handle.solve(verbose=False)
+        cvals: ADD = gou_min_min_handle.solve(verbose=False, print_layers=False)
 
         # compute the best alternative from each edge for cumulative payoff
         self.regret_synthesis_handle.graph_of_utls_handle.get_best_alternatives(cooperative_vals=cvals,
                                                                                 mod_act_dict=self.regret_synthesis_handle.mod_act_dict,
+                                                                                print_layers=False,
                                                                                 verbose=False)
 
         # construct additional boolean vars for set of best alternative values
         self.regret_synthesis_handle.prod_ba_vars: List[ADD] = self.regret_synthesis_handle._create_symbolic_lbl_vars(state_lbls=self.regret_synthesis_handle.graph_of_utls_handle.ba_set,
-                                                                                                state_var_name='r',
-                                                                                                add_flag=True)
+                                                                                                                      state_var_name='r',
+                                                                                                                      add_flag=True)
         # construct of Best response G^{br}
         self.graph_of_br_handle = HybridGraphOfBR(curr_vars=self.regret_synthesis_handle.ts_x_list,
                                                   lbl_vars=self.regret_synthesis_handle.ts_obs_list,
@@ -213,6 +219,7 @@ class TestRegretStrSynth2(unittest.TestCase):
         self.graph_of_br_handle.construct_graph_of_best_response(mod_act_dict=self.regret_synthesis_handle.mod_act_dict,
                                                                  print_leaf_nodes=False,
                                                                  verbose=False,
+                                                                 print_layers=False,
                                                                  debug=True)
         
         # verify # of edges; # of states; # of leaf nodes required to constuct the graph.
@@ -251,10 +258,11 @@ class TestRegretStrSynth2(unittest.TestCase):
                                                     prod_ba_vars=self.regret_synthesis_handle.prod_ba_vars,
                                                     sys_act_vars=self.regret_synthesis_handle.ts_robot_vars,
                                                     env_act_vars=self.regret_synthesis_handle.ts_human_vars,
-                                                    cudd_manager=self.cudd_manager)
+                                                    cudd_manager=self.cudd_manager,
+                                                    monolithic_tr=MONOLITHIC_TR)
 
         # calling the solve() method
-        self.reg_str: ADD = self.gbr_min_max_handle.solve(verbose=False)
+        self.reg_str: ADD = self.gbr_min_max_handle.solve(verbose=False, print_layers=False)
 
         self.assertEqual(self.gbr_min_max_handle.init_state_value, 11, "Error computing optimal regret value on the Graph of Best Response.")
 
