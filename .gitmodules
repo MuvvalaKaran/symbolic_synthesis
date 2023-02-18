@@ -10,3 +10,6 @@
 [submodule "src/LTLf2DFA"]
 	path = src/LTLf2DFA
 	url = https://github.com/whitemech/LTLf2DFA.git
+[submodule "cudd_and_wrapper"]
+	path = cudd_and_wrapper
+	url = git@github.com:MuvvalaKaran/cudd_and_wrapper.git

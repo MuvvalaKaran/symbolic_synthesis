@@ -5,7 +5,7 @@ ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get -y update && apt -y install \
     gcc git \
     wget vim curl \
-    python3-pip cmake \
+    python3-pip cmake automake \
     build-essential \
     apt-utils flex bison mona 
 
@@ -25,8 +25,8 @@ RUN apt-get -y update && apt -y install spot \
 RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # installing system packages
-ADD cudd /cudd
-ADD PyDD /PyDD
+ADD cudd_and_wrapper/cudd /cudd
+ADD cudd_and_wrapper/PyDD /PyDD
 
 ADD ./ /root/symbolic_planning/src
 
