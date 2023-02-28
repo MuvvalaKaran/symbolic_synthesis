@@ -301,6 +301,7 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
                                                  robot_action_vars=ts_robot_vars,
                                                  human_action_vars=ts_human_vars,
                                                  weight_dict=weight_dict,
+                                                 int_weight_dict=self.int_weight_dict,
                                                  task=task,
                                                  domain=domain,
                                                  seg_actions=modified_actions,
@@ -331,7 +332,7 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
         return sym_tr, ts_curr_vars, ts_robot_vars, ts_human_vars, ts_lbl_vars
     
 
-    def get_energy_budget(self, verbose: bool = False, just_adv_game: bool = False) -> AdversarialGame:
+    def get_energy_budget(self, verbose: bool = False, just_adv_game: bool = False, monolithic_tr: bool = False) -> AdversarialGame:
         """
          A helper function that play min-max game over the original graph, calculates the energy budget as follows:
 
@@ -347,7 +348,8 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
                                          ts_obs_vars=self.ts_obs_list,
                                          sys_act_vars=self.ts_robot_vars,
                                          env_act_vars=self.ts_human_vars,
-                                         cudd_manager=self.manager)
+                                         cudd_manager=self.manager,
+                                         monolithic_tr=monolithic_tr)
         start = time.time()
         win_str: ADD = min_max_handle.solve(verbose=verbose)
         stop = time.time()
@@ -355,7 +357,7 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
 
         if win_str:
             if True:
-                min_max_handle.roll_out_strategy(strategy=win_str, verbose=verbose)
+                min_max_handle.roll_out_strategy(strategy=win_str, verbose=True)
         
         # min max value
         self.min_energy_budget = min_max_handle.init_state_value
@@ -367,6 +369,8 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
         print(f"************************** Energy Budget: {self.reg_energy_budget} **************************")
 
         if just_adv_game:
+            # convert bytes to MegaBytes and print the Memory usage
+            print(f"Memory in use (MB): {self.manager.readMemoryInUse()/(10**6)}")
             sys.exit(-1)
 
         # construct additional boolean variables used during the construction of the new graph
@@ -375,12 +379,12 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
                                                              add_flag=True)
 
         print(f"# of States in the Original graph: {len(self.ts_handle.adj_map.keys())}")
-
+        # sys.exit(-1)
         return min_max_handle
 
     
 
-    def build_add_graph_of_utility(self, verbose: bool = False, just_adv_game: bool = False):
+    def build_add_graph_of_utility(self, verbose: bool = False, just_adv_game: bool = False, monolithic_tr: bool = False):
         """
          Main method that first plays the min-max game over the original graph. 
         
@@ -391,7 +395,7 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
         """
         print("******************Computing Min-Max (aVal) on the original graph******************")
 
-        min_max_handle = self.get_energy_budget(verbose=verbose, just_adv_game=just_adv_game)
+        min_max_handle = self.get_energy_budget(verbose=verbose, just_adv_game=just_adv_game, monolithic_tr=monolithic_tr)
 
         # get the max action cost
         max_action_cost: int = min_max_handle._get_max_tr_action_cost()

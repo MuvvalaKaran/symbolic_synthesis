@@ -827,7 +827,7 @@ class SymbolicGraphOfUtlCooperativeGame(CooperativeGame):
 
             # go over all the human actions and preserve the minimum one
             for human_tr_dd in self.ts_sym_to_human_act_map.keys():
-                new_tmp_strategy = new_tmp_strategy.min(tmp_strategy.restrict(human_tr_dd)) 
+                new_tmp_strategy = new_tmp_strategy.min(tmp_strategy.restrict(human_tr_dd))
 
             # compute the minimum of state action pairs
             strategy = strategy.min(new_tmp_strategy)
@@ -845,5 +845,6 @@ class SymbolicGraphOfUtlCooperativeGame(CooperativeGame):
             # update counter 
             layer += 1
     
+
     def roll_out_strategy(self, strategy: ADD, verbose: bool = False):
         raise NotImplementedError()

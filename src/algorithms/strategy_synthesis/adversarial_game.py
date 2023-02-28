@@ -34,7 +34,8 @@ class AdversarialGame(BaseSymbolicSearch):
                  ts_obs_vars: List[ADD],
                  sys_act_vars: List[ADD],
                  env_act_vars: List[ADD],
-                 cudd_manager: Cudd):
+                 cudd_manager: Cudd,
+                 monolithic_tr: bool = False):
         super().__init__(ts_obs_vars, cudd_manager)
 
         self.init_TS = ts_handle.sym_init_states
@@ -98,6 +99,45 @@ class AdversarialGame(BaseSymbolicSearch):
         
         # mimimum energy required from the init states
         self.init_state_value: Union[int, float] = math.inf
+        
+        # flag to construct monolithic TR and use differen pre-image computation code - only extracting weight changes.
+        self.monolithic_tr: bool = monolithic_tr
+        
+        if monolithic_tr:
+            self.construct_monolithic_tr()
+    
+    
+    def construct_monolithic_tr(self):
+        """
+          A helper function to constructs the monolithic TR for TS and for the utility. As the utility Tr captures evolution of utls var
+           under each ts action, actiosn with different edge weight should be stored in different bdd. For e.g., 
+
+           u ---a_s---> u' and u---a_s---> u'' are possible a_s is boolean formula assocated with modified robot action
+            which are unique for TS TR but not for utls TR
+        """
+        num_of_ts_bvars: int = len(self.ts_bdd_transition_fun_list[0])
+
+        # get set of edge weight. convert list and use the index of the weight as the map for the monolithic TR for utls vars
+        edge_weights: List[int] = list(set(self.ts_handle.int_weight_dict.values()))
+
+        self.mono_ts_bdd_transition_fun_list: List[BDD] = [[self.manager.bddZero() for _ in range(num_of_ts_bvars)] for _ in range(len(edge_weights))]
+        
+        # Monolithic TS TR 
+        for ts_id, tr_action in enumerate(self.ts_bdd_transition_fun_list):
+            # get the edge weight its corresponding BDD idx to be stored in
+            ts_act_name: str = self.ts_action_idx_map.inv[ts_id]
+            action_cost: ADD =  self.ts_handle.weight_dict[ts_act_name]
+            act_val: int = list(action_cost.generate_cubes())[0][1]
+
+            mono_tr_idx = edge_weights.index(act_val)
+            assert act_val != math.inf and act_val != 0, "Error constrcuting Monolithic TR for Utls Vars"
+            
+            for var_tr_id, var_tr_dd in enumerate(tr_action):
+                self.mono_ts_bdd_transition_fun_list[mono_tr_idx][var_tr_id] |= var_tr_dd
+        
+        # override original bdd transition and update edge weighy 
+        self.ts_bdd_transition_fun_list = self.mono_ts_bdd_transition_fun_list
+        self.mono_ts_action_idx_wgt_map = {idx: wgt for idx, wgt in enumerate(edge_weights)}
     
 
     def _create_lbl_cubes(self) -> List[ADD]:
@@ -372,15 +412,26 @@ class AdversarialGame(BaseSymbolicSearch):
             _pre_buckets: Dict[ADD] = defaultdict(lambda: self.manager.addZero())
 
             # compute the predecessor and store them by action cost + successor cost
-            for tr_idx, tr_action in enumerate(self.ts_bdd_transition_fun_list):
-                curr_act_name: str = self.ts_action_idx_map.inv[tr_idx]
-                action_cost: ADD =  self.ts_handle.weight_dict[curr_act_name]
-                act_val: int = list(action_cost.generate_cubes())[0][1]
-                for sval, succ_states in _win_state_bucket.items():
-                    pre_states: BDD = self.get_pre_states(ts_action=tr_action, From=succ_states, prod_curr_list=prod_bdd_curr_list)
+            if self.monolithic_tr:
+                for tr_idx, tr_action in enumerate(self.ts_bdd_transition_fun_list):
+                    # we get from the new weightr dictionary
+                    act_val = self.mono_ts_action_idx_wgt_map[tr_idx]
+                    for sval, succ_states in _win_state_bucket.items():
+                        pre_states: BDD = self.get_pre_states(ts_action=tr_action, From=succ_states, prod_curr_list=prod_bdd_curr_list)
 
-                    if not pre_states.isZero():
-                        _pre_buckets[act_val + sval] |= pre_states.toADD()
+                        if not pre_states.isZero():
+                            _pre_buckets[act_val + sval] |= pre_states.toADD()
+
+            else:
+                for tr_idx, tr_action in enumerate(self.ts_bdd_transition_fun_list):
+                    curr_act_name: str = self.ts_action_idx_map.inv[tr_idx]
+                    action_cost: ADD =  self.ts_handle.weight_dict[curr_act_name]
+                    act_val: int = list(action_cost.generate_cubes())[0][1]
+                    for sval, succ_states in _win_state_bucket.items():
+                        pre_states: BDD = self.get_pre_states(ts_action=tr_action, From=succ_states, prod_curr_list=prod_bdd_curr_list)
+
+                        if not pre_states.isZero():
+                            _pre_buckets[act_val + sval] |= pre_states.toADD()
             
             # unions of all predecessors
             pre_states: ADD = reduce(lambda x, y: x | y, _pre_buckets.values())

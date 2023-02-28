@@ -62,12 +62,12 @@ class FrankaSymbolicRegretSynthesis(FrankaRegretSynthesis):
                          reg_factor=reg_factor)
     
 
-    def build_add_graph_of_utility(self, verbose: bool = False, just_adv_game: bool = False):
+    def build_add_graph_of_utility(self, verbose: bool = False, just_adv_game: bool = False, monolithic_tr: bool = False):
         """
          Override parent method to constrcut Graph of Utility in symbolic fashion.
         """
         print("******************Computing Min-Max (aVal) on the original graph******************")
-        min_max_handle = self.get_energy_budget(verbose=verbose, just_adv_game=just_adv_game)
+        min_max_handle = self.get_energy_budget(verbose=verbose, just_adv_game=just_adv_game, monolithic_tr=monolithic_tr)
 
         # get the max action cost
         max_action_cost: int = min_max_handle._get_max_tr_action_cost()
@@ -127,7 +127,7 @@ class FrankaSymbolicRegretSynthesis(FrankaRegretSynthesis):
         print("******************************************** TR: {approach} ***********************************************".format(approach='Monolithic' if monolithic_tr else 'Partitioned'))
         print("**********************************************************************************************************")
         # constuct graph of utility
-        self.build_add_graph_of_utility(verbose=verbose, just_adv_game=just_adv_game)
+        self.build_add_graph_of_utility(verbose=verbose, just_adv_game=just_adv_game, monolithic_tr=monolithic_tr)
 
         print("******************Computing cVals on Graph of utility******************")
 

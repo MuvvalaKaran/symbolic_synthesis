@@ -75,7 +75,7 @@ class TestMonoSymbolicRegretStrSynth(TestRegretStrSynth):
         """
          Test Symbolic Graph of Utility (unrolling original graph) Construction
         """
-        self.regret_synthesis_handle.build_add_graph_of_utility(verbose=False, just_adv_game=False)
+        self.regret_synthesis_handle.build_add_graph_of_utility(verbose=False, just_adv_game=False, monolithic_tr=True)
 
         # verify # of states; # of leaf nodes required to constuct the graph.
         no_of_states: int = self.regret_synthesis_handle.graph_of_utls_handle.scount

@@ -36,6 +36,7 @@ class DynWeightedPartitionedFrankaAbs():
                  dfa_state_vars: List[ADD],
                  sup_locs: List[str],
                  top_locs: List[str],
+                 int_weight_dict: dict = {},
                  **kwargs):
         self.sym_vars_curr: List[ADD] = curr_vars
         self.sym_vars_lbl: List[ADD] = lbl_vars
@@ -46,6 +47,7 @@ class DynWeightedPartitionedFrankaAbs():
         self.ts_states: dict = ts_states
         self.state_lbls = ts_state_lbls
         self.weight_dict: Dict[str, List[ADD]] = weight_dict
+        self.int_weight_dict = int_weight_dict
 
         self.pred_int_map: dict = ts_state_map
 

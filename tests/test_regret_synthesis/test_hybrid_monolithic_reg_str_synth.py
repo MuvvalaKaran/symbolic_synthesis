@@ -99,7 +99,7 @@ class TestMonoRegretStrSynth(unittest.TestCase):
         """
         # stop after computing the Min-max value.
         with self.assertRaises(SystemExit) as cm:
-            self.regret_synthesis_handle.solve(verbose=False, just_adv_game=True, run_monitor=False)
+            self.regret_synthesis_handle.solve(verbose=False, just_adv_game=True, run_monitor=False, monolithic_tr=True)
 
             # verify min max value
             self.assertEqual(self.regret_synthesis_handle.min_energy_budget, 8, "Error computing aVal on the original Two-player game") 
@@ -115,7 +115,7 @@ class TestMonoRegretStrSynth(unittest.TestCase):
         """
          Test Graph of Utility (unrolling original graph) Construction
         """
-        self.regret_synthesis_handle.build_add_graph_of_utility(verbose=False, just_adv_game=False)
+        self.regret_synthesis_handle.build_add_graph_of_utility(verbose=False, just_adv_game=False, monolithic_tr=True)
 
         # verify # of edges; # of states; # of leaf nodes required to constuct the graph.
         no_of_edges: int = self.regret_synthesis_handle.graph_of_utls_handle.ecount
