@@ -1080,6 +1080,11 @@ class GraphofBRAdvGame(BaseSymbolicSearch):
             
                 if ask_usr_input:
                     nxt_act_idx = int(input("Enter Next action id: "))
+                    
+                    while nxt_state_idx > len(ract_list):
+                        print("Please enter a valid index")
+                        nxt_state_idx = int(input("Enter Next action id: "))
+
                     ract_name: str = ract_list[nxt_act_idx]
                 else:
                     ract_name: str = random.choice(ract_list)

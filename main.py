@@ -208,7 +208,7 @@ if __name__ == "__main__":
                                                                         ltlf_flag=USE_LTLF,
                                                                         dyn_var_ord=DYNAMIC_VAR_ORDERING,
                                                                         weighting_factor=3,
-                                                                        reg_factor=5,
+                                                                        reg_factor=1.5,
                                                                         algorithm=None,
                                                                         verbose=False,
                                                                         print_layer=False,

@@ -211,6 +211,7 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
         task = kwargs['task']
 
         factor = self.scale_weights
+        else_to_robot_factor = 10
 
         assert factor >= 1 and isinstance(factor, int), "Please an integer scaling factor!" 
 
@@ -229,7 +230,8 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
                     elif locs[0] in causal_instance.task_intervening_locations:
                         weight: int = self.weight_dict['transit']
                     else:
-                        weight: int = factor * self.weight_dict['transit']
+                        # weight: int = factor * self.weight_dict['transit']
+                        weight: int = else_to_robot_factor * self.weight_dict['transit']
                 else:
                     if locs[1] in causal_instance.task_intervening_locations:
                         weight: int = self.weight_dict['transit']     
@@ -243,7 +245,8 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
                     if locs[0] in causal_instance.task_intervening_locations:
                         weight: int = self.weight_dict['transfer']
                     else:
-                        weight: int = factor * self.weight_dict['transfer']
+                        # weight: int = factor * self.weight_dict['transfer']
+                        weight: int = else_to_robot_factor * self.weight_dict['transfer']
                 else:
                     if locs[1] in causal_instance.task_intervening_locations:
                         weight: int = self.weight_dict['transfer']
