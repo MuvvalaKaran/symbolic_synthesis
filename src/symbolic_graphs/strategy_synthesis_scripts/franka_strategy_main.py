@@ -120,9 +120,20 @@ class FrankaPartitionedWorld(FrankaWorld):
         """
         _seg_action = defaultdict(lambda: [])
 
+        # org code
+        # for b in causal_graph_instance.task_objects:
+            # for l in causal_graph_instance.task_intervening_locations:
+            #     _seg_action['human'].append(f'human-move {b} {l}')
+        
+
+        # modifying to full parameterized human actions
         for b in causal_graph_instance.task_objects:
-            for l in causal_graph_instance.task_intervening_locations:
-                _seg_action['human'].append(f'human-move {b} {l}')
+            for hfrom in causal_graph_instance.task_intervening_locations:
+                for hto in causal_graph_instance.task_intervening_locations:
+                    if hfrom != hto:
+                        if hfrom > hto:
+                            _seg_action['human'].append(f'human-move {b} {hfrom} {hto}')
+
 
         # for release and grasp, we only create one action
         # for transit we only create transit b# and for transfer l2#
@@ -191,7 +202,8 @@ class FrankaPartitionedWorld(FrankaWorld):
                 locs: List[str] = re.findall(_loc_pattern, op.name)
                 _box_state: str = re.search(_box_pattern, op.name).group()
 
-                _org_to_mod_act[op.name] = f'human-move {_box_state} {locs[1]}'
+                # _org_to_mod_act[op.name] = f'human-move {_box_state} {locs[1]}'
+                _org_to_mod_act[op.name] = op.name[1:-1]
             
             else:
                 warnings.warn("Could not look up the corresponding modified robot action name")

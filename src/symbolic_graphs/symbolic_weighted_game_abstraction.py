@@ -637,15 +637,18 @@ class DynWeightedPartitionedFrankaAbs():
 
         if human_action_name != '':
             # get the modified human action name
-            mod_haction_name: str = mod_act_dict[human_action_name]
+            # mod_haction_name: str = mod_act_dict[human_action_name]
+            mod_haction_name = human_action_name
             
             if 'debug' in kwargs:
-                edge_exist: bool = (self.mono_tr_bdd & curr_state_sym & robot_move & self.predicate_sym_map_human[mod_haction_name]).isZero()
-                
+                # edge_exist: bool = (self.mono_tr_bdd & curr_state_sym & robot_move & self.predicate_sym_map_human[mod_haction_name]).isZero()
+                edge_exist: bool = (self.mono_tr_bdd & curr_state_sym & robot_move & self.predicate_sym_map_human[mod_haction_name[1: -1]]).isZero()
+
                 if not edge_exist:
                     print(f"Nondeterminism due to Human Action: {curr_str_state} --- {robot_action_name} & {human_action_name}---> {next_str_state}")
                 
-                self.mono_tr_bdd |= curr_state_sym & robot_move & self.predicate_sym_map_human[mod_haction_name]
+                # self.mono_tr_bdd |= curr_state_sym & robot_move & self.predicate_sym_map_human[mod_haction_name]
+                self.mono_tr_bdd |= curr_state_sym & robot_move & self.predicate_sym_map_human[mod_haction_name[1: -1]]
         else:
             if 'debug' in kwargs:
                 edge_exist: bool = (self.mono_tr_bdd & curr_state_sym & robot_move & no_human_move).isZero()
@@ -667,7 +670,8 @@ class DynWeightedPartitionedFrankaAbs():
                 assert _state_idx >= 0, "Error constructing the Partitioned Transition Relation."
                 # if human intervenes then the edge looks like (true) & (human move b# l# l#)
                 if human_action_name != '':
-                    self.sym_tr_actions[_tr_idx][_state_idx] |= curr_state_sym & robot_move & self.predicate_sym_map_human[mod_haction_name]
+                    # self.sym_tr_actions[_tr_idx][_state_idx] |= curr_state_sym & robot_move & self.predicate_sym_map_human[mod_haction_name]
+                    self.sym_tr_actions[_tr_idx][_state_idx] |= curr_state_sym & robot_move & self.predicate_sym_map_human[mod_haction_name[1: -1]]
                     
                 # if human does not intervene then the edge looks like (robot-action) & not(valid human moves)
                 else:
@@ -781,7 +785,9 @@ class DynWeightedPartitionedFrankaAbs():
         _seg_actions = {'human': [], 'robot': []}
         for act in self.task.operators:
             if 'human' in act.name:
-                _seg_actions['human'].append(act)
+                # add condition that human can only move left 
+                if act.name[1: -1] in self.actions['human']:
+                    _seg_actions['human'].append(act)
             else:
                 _seg_actions['robot'].append(act)
 

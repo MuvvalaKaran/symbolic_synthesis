@@ -211,7 +211,8 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
         task = kwargs['task']
 
         factor = self.scale_weights
-        else_to_robot_factor = 10
+        # else_to_robot_factor = 10
+        else_to_robot_factor = factor
 
         assert factor >= 1 and isinstance(factor, int), "Please an integer scaling factor!" 
 

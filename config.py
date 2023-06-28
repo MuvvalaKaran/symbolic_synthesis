@@ -81,7 +81,16 @@ TOP_LOC = []
 # formulas = ['F(p11 & p06 & F(p07 & F(p06)))']   # neat complicated formula
 # formulas = ['F(p01)']
 # formulas = ['F(p01 | p11)'] 
-formulas = ['F((p01 | p11 | p41) | (p17 & p28 & p36 & p49))'] 
+# formulas = ['F((p01 & p41) | (p17 & p28 & p36 & p49))'] 
+# formulas = ['F((p10) | (p17 & p06))']
+# formulas = ['F(p10 | (p17 & p06))']
+### ARIA LAB for restricted human moves
+# formulas = ['F((p00 & p21 & p12) | (p06 & p19 & p37 & p28))']
+
+
+#### ARIA LAB - 3A in robot region is fixed
+formulas = ['F((p02 & p21 & p10) | (p03 & p18 & p27 & p36))']
+
 
 
 # formulas = [
