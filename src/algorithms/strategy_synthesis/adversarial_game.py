@@ -565,8 +565,8 @@ class AdversarialGame(BaseSymbolicSearch):
 
             counter += 1
         
-        # need to delete this dict that holds cudd object to avoid segfaults after exiting python code
-        del self.winning_states
+        # # need to delete this dict that holds cudd object to avoid segfaults after exiting python code
+        # del self.winning_states
 
 
 class GraphofBRAdvGame(BaseSymbolicSearch):
@@ -1125,5 +1125,5 @@ class GraphofBRAdvGame(BaseSymbolicSearch):
             
             counter += 1
 
-        # need to delete this dict that holds cudd object to avoid segfaults after exiting python code
-        del self.winning_states
+        # # need to delete this dict that holds cudd object to avoid segfaults after exiting python code
+        # del self.winning_states

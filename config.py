@@ -89,7 +89,8 @@ TOP_LOC = []
 
 
 #### ARIA LAB - 3A in robot region is fixed
-formulas = ['F((p02 & p21 & p10) | (p03 & p18 & p27 & p36))']
+# formulas = ['F((p02 & p21 & p10) | (p03 & p18 & p27 & p36))']   ## orgininal 4 block IROS formula - verified and works
+formulas = ['F((p42 & p21 & p10) | (p03 & p18 & p27 & p36 & p42))']   ## actual 5 block one - used for IROS video demo
 
 
 

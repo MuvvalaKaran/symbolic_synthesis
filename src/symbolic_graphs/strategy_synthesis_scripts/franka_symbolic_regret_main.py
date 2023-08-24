@@ -220,6 +220,9 @@ class FrankaSymbolicRegretSynthesis(FrankaRegretSynthesis):
         print("Time took for computing min-max strs on the Graph of best Response: ", stop - start)
 
         if reg_str:
-            gbr_min_max_handle.roll_out_strategy(strategy=reg_str, verbose=True, ask_usr_input=run_monitor)
-            print("Done Rolling out.")
+            retry_flag = 'y'
+            while retry_flag == 'y':
+                gbr_min_max_handle.roll_out_strategy(strategy=reg_str, verbose=True, ask_usr_input=run_monitor)
+                print("Done Rolling out.")
+                retry_flag = input("Want to retry? [y/n]: ")
 

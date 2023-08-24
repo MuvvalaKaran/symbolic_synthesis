@@ -31,13 +31,13 @@
 
 
 ;;;;;; FOr restrcited human interventions
-;;;;;; b0 - A, b1 - A, b2 - I, b3 - R 
+;;;;;; b0 - A, b1 - A, b2 - I, b3 - R, b4 - A 
 
     b0 - box
     b1 - box
     b2 - box
     b3 - box
-    ;b4 - box
+    b4 - box
     ;b5 - box
     ;b6 - box
 )
@@ -52,7 +52,7 @@
     (on b1 else)
     (on b2 else)
     (on b3 l8)
-    ;(on b4 else)
+    (on b4 else)
     ;(on b5 l5)
     ;(on b6 l6)
 )

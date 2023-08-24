@@ -1,0 +1,85 @@
+A Winning Strategy Exists!!. The Min Energy is 18.0
+Time for solving the Adv. game on Original Graph:  951.6343500614166
+Init State: ['(on b2 else)', '(on b0 l3)', '(on b4 else)', '(on b3 l8)', '(on b1 else)']
+Step 0: Conf: ['(ready else)', '(on b2 else)', '(on b0 l3)', '(on b4 else)', '(on b3 l8)', '(on b1 else)'] Act: transit b4
+Human Moved: New Conf. ['(to-obj b4)', '(on b2 else)', '(on b0 l3)', '(on b4 else)', '(on b3 l6)', '(on b1 else)']
+Step 1: Conf: ['(to-obj b4)', '(on b2 else)', '(on b0 l3)', '(on b4 else)', '(on b3 l6)', '(on b1 else)'] Act: grasp
+Step 2: Conf: ['(holding else)', '(on b4 ee)', '(on b2 else)', '(on b0 l3)', '(on b3 l6)', '(on b1 else)'] Act: transfer l2
+Step 3: Conf: ['(holding l2)', '(on b4 ee)', '(on b2 else)', '(on b0 l3)', '(on b3 l6)', '(on b1 else)'] Act: release
+Step 4: Conf: ['(ready l2)', '(on b4 l2)', '(on b2 else)', '(on b0 l3)', '(on b3 l6)', '(on b1 else)'] Act: transit b2
+Step 5: Conf: ['(to-obj b2)', '(on b4 l2)', '(on b2 else)', '(on b0 l3)', '(on b3 l6)', '(on b1 else)'] Act: grasp
+Step 6: Conf: ['(holding else)', '(on b2 ee)', '(on b4 l2)', '(on b0 l3)', '(on b3 l6)', '(on b1 else)'] Act: transfer l7
+Step 7: Conf: ['(holding l7)', '(on b2 ee)', '(on b4 l2)', '(on b0 l3)', '(on b3 l6)', '(on b1 else)'] Act: release
+Step 8: Conf: ['(ready l7)', '(on b2 l7)', '(on b4 l2)', '(on b0 l3)', '(on b3 l6)', '(on b1 else)'] Act: transit b1
+Step 9: Conf: ['(to-obj b1)', '(on b2 l7)', '(on b4 l2)', '(on b0 l3)', '(on b3 l6)', '(on b1 else)'] Act: grasp
+Step 10: Conf: ['(holding else)', '(on b2 l7)', '(on b4 l2)', '(on b0 l3)', '(on b1 ee)', '(on b3 l6)'] Act: transfer l8
+Step 11: Conf: ['(holding l8)', '(on b2 l7)', '(on b4 l2)', '(on b0 l3)', '(on b1 ee)', '(on b3 l6)'] Act: release
+Done Rolling out MinMax strategy.
+
+Want to retry? [y/n]: y
+Init State: ['(on b2 else)', '(on b0 l3)', '(on b4 else)', '(on b3 l8)', '(on b1 else)']
+Step 0: Conf: ['(ready else)', '(on b2 else)', '(on b0 l3)', '(on b4 else)', '(on b3 l8)', '(on b1 else)'] Act: transit b1
+Human Moved: New Conf. ['(to-obj b1)', '(on b2 else)', '(on b0 l3)', '(on b4 else)', '(on b3 l6)', '(on b1 else)']
+Step 1: Conf: ['(to-obj b1)', '(on b2 else)', '(on b0 l3)', '(on b4 else)', '(on b3 l6)', '(on b1 else)'] Act: grasp
+Step 2: Conf: ['(holding else)', '(on b2 else)', '(on b0 l3)', '(on b4 else)', '(on b1 ee)', '(on b3 l6)'] Act: transfer l0
+Step 3: Conf: ['(holding l0)', '(on b2 else)', '(on b0 l3)', '(on b4 else)', '(on b1 ee)', '(on b3 l6)'] Act: release
+Step 4: Conf: ['(ready l0)', '(on b1 l0)', '(on b2 else)', '(on b0 l3)', '(on b4 else)', '(on b3 l6)'] Act: transit b2
+Step 5: Conf: ['(to-obj b2)', '(on b1 l0)', '(on b2 else)', '(on b0 l3)', '(on b4 else)', '(on b3 l6)'] Act: grasp
+Step 6: Conf: ['(holding else)', '(on b1 l0)', '(on b2 ee)', '(on b0 l3)', '(on b4 else)', '(on b3 l6)'] Act: transfer l1
+Step 7: Conf: ['(holding l1)', '(on b1 l0)', '(on b2 ee)', '(on b0 l3)', '(on b4 else)', '(on b3 l6)'] Act: release
+Step 8: Conf: ['(ready l1)', '(on b1 l0)', '(on b2 l1)', '(on b0 l3)', '(on b4 else)', '(on b3 l6)'] Act: transit b4
+Step 9: Conf: ['(to-obj b4)', '(on b1 l0)', '(on b2 l1)', '(on b0 l3)', '(on b4 else)', '(on b3 l6)'] Act: grasp
+Step 10: Conf: ['(holding else)', '(on b1 l0)', '(on b4 ee)', '(on b2 l1)', '(on b0 l3)', '(on b3 l6)'] Act: transfer l2
+Step 11: Conf: ['(holding l2)', '(on b1 l0)', '(on b4 ee)', '(on b2 l1)', '(on b0 l3)', '(on b3 l6)'] Act: release
+Done Rolling out MinMax strategy.
+
+Want to retry? [y/n]: y
+Init State: ['(on b2 else)', '(on b0 l3)', '(on b4 else)', '(on b3 l8)', '(on b1 else)']
+Step 0: Conf: ['(ready else)', '(on b2 else)', '(on b0 l3)', '(on b4 else)', '(on b3 l8)', '(on b1 else)'] Act: transit b2
+Human Moved: New Conf. ['(to-obj b2)', '(on b2 else)', '(on b0 l3)', '(on b4 else)', '(on b3 l6)', '(on b1 else)']
+Step 1: Conf: ['(to-obj b2)', '(on b2 else)', '(on b0 l3)', '(on b4 else)', '(on b3 l6)', '(on b1 else)'] Act: grasp
+Step 2: Conf: ['(holding else)', '(on b2 ee)', '(on b0 l3)', '(on b4 else)', '(on b3 l6)', '(on b1 else)'] Act: transfer l7
+Step 3: Conf: ['(holding l7)', '(on b2 ee)', '(on b0 l3)', '(on b4 else)', '(on b3 l6)', '(on b1 else)'] Act: release
+Step 4: Conf: ['(ready l7)', '(on b2 l7)', '(on b0 l3)', '(on b4 else)', '(on b3 l6)', '(on b1 else)'] Act: transit b1
+Step 5: Conf: ['(to-obj b1)', '(on b2 l7)', '(on b0 l3)', '(on b4 else)', '(on b3 l6)', '(on b1 else)'] Act: grasp
+Step 6: Conf: ['(holding else)', '(on b2 l7)', '(on b0 l3)', '(on b4 else)', '(on b1 ee)', '(on b3 l6)'] Act: transfer l8
+Step 7: Conf: ['(holding l8)', '(on b2 l7)', '(on b0 l3)', '(on b4 else)', '(on b1 ee)', '(on b3 l6)'] Act: release
+Step 8: Conf: ['(ready l8)', '(on b1 l8)', '(on b2 l7)', '(on b0 l3)', '(on b4 else)', '(on b3 l6)'] Act: transit b4
+Step 9: Conf: ['(to-obj b4)', '(on b1 l8)', '(on b2 l7)', '(on b0 l3)', '(on b4 else)', '(on b3 l6)'] Act: grasp
+Step 10: Conf: ['(holding else)', '(on b1 l8)', '(on b4 ee)', '(on b2 l7)', '(on b0 l3)', '(on b3 l6)'] Act: transfer l2
+Step 11: Conf: ['(holding l2)', '(on b1 l8)', '(on b4 ee)', '(on b2 l7)', '(on b0 l3)', '(on b3 l6)'] Act: release
+Done Rolling out MinMax strategy.
+
+Want to retry? [y/n]: y
+Init State: ['(on b2 else)', '(on b0 l3)', '(on b4 else)', '(on b3 l8)', '(on b1 else)']
+Step 0: Conf: ['(ready else)', '(on b2 else)', '(on b0 l3)', '(on b4 else)', '(on b3 l8)', '(on b1 else)'] Act: transit b1
+Human Moved: New Conf. ['(to-obj b1)', '(on b2 else)', '(on b0 l3)', '(on b4 else)', '(on b3 l6)', '(on b1 else)']
+Step 1: Conf: ['(to-obj b1)', '(on b2 else)', '(on b0 l3)', '(on b4 else)', '(on b3 l6)', '(on b1 else)'] Act: grasp
+Step 2: Conf: ['(holding else)', '(on b2 else)', '(on b0 l3)', '(on b4 else)', '(on b1 ee)', '(on b3 l6)'] Act: transfer l0
+Step 3: Conf: ['(holding l0)', '(on b2 else)', '(on b0 l3)', '(on b4 else)', '(on b1 ee)', '(on b3 l6)'] Act: release
+Step 4: Conf: ['(ready l0)', '(on b1 l0)', '(on b2 else)', '(on b0 l3)', '(on b4 else)', '(on b3 l6)'] Act: transit b4
+Step 5: Conf: ['(to-obj b4)', '(on b1 l0)', '(on b2 else)', '(on b0 l3)', '(on b4 else)', '(on b3 l6)'] Act: grasp
+Step 6: Conf: ['(holding else)', '(on b1 l0)', '(on b4 ee)', '(on b2 else)', '(on b0 l3)', '(on b3 l6)'] Act: transfer l2
+Step 7: Conf: ['(holding l2)', '(on b1 l0)', '(on b4 ee)', '(on b2 else)', '(on b0 l3)', '(on b3 l6)'] Act: release
+Step 8: Conf: ['(ready l2)', '(on b1 l0)', '(on b4 l2)', '(on b2 else)', '(on b0 l3)', '(on b3 l6)'] Act: transit b2
+Step 9: Conf: ['(to-obj b2)', '(on b1 l0)', '(on b4 l2)', '(on b2 else)', '(on b0 l3)', '(on b3 l6)'] Act: grasp
+Step 10: Conf: ['(holding else)', '(on b1 l0)', '(on b2 ee)', '(on b4 l2)', '(on b0 l3)', '(on b3 l6)'] Act: transfer l1
+Step 11: Conf: ['(holding l1)', '(on b1 l0)', '(on b2 ee)', '(on b4 l2)', '(on b0 l3)', '(on b3 l6)'] Act: release
+Done Rolling out MinMax strategy.
+
+Want to retry? [y/n]: y
+Init State: ['(on b2 else)', '(on b0 l3)', '(on b4 else)', '(on b3 l8)', '(on b1 else)']
+Step 0: Conf: ['(ready else)', '(on b2 else)', '(on b0 l3)', '(on b4 else)', '(on b3 l8)', '(on b1 else)'] Act: transit b2
+Human Moved: New Conf. ['(to-obj b2)', '(on b2 else)', '(on b0 l3)', '(on b4 else)', '(on b3 l6)', '(on b1 else)']
+Step 1: Conf: ['(to-obj b2)', '(on b2 else)', '(on b0 l3)', '(on b4 else)', '(on b3 l6)', '(on b1 else)'] Act: grasp
+Step 2: Conf: ['(holding else)', '(on b2 ee)', '(on b0 l3)', '(on b4 else)', '(on b3 l6)', '(on b1 else)'] Act: transfer l7
+Step 3: Conf: ['(holding l7)', '(on b2 ee)', '(on b0 l3)', '(on b4 else)', '(on b3 l6)', '(on b1 else)'] Act: release
+Step 4: Conf: ['(ready l7)', '(on b2 l7)', '(on b0 l3)', '(on b4 else)', '(on b3 l6)', '(on b1 else)'] Act: transit b4
+Step 5: Conf: ['(to-obj b4)', '(on b2 l7)', '(on b0 l3)', '(on b4 else)', '(on b3 l6)', '(on b1 else)'] Act: grasp
+Step 6: Conf: ['(holding else)', '(on b4 ee)', '(on b2 l7)', '(on b0 l3)', '(on b3 l6)', '(on b1 else)'] Act: transfer l2
+Step 7: Conf: ['(holding l2)', '(on b4 ee)', '(on b2 l7)', '(on b0 l3)', '(on b3 l6)', '(on b1 else)'] Act: release
+Step 8: Conf: ['(ready l2)', '(on b2 l7)', '(on b4 l2)', '(on b0 l3)', '(on b3 l6)', '(on b1 else)'] Act: transit b1
+Step 9: Conf: ['(to-obj b1)', '(on b2 l7)', '(on b4 l2)', '(on b0 l3)', '(on b3 l6)', '(on b1 else)'] Act: grasp
+Step 10: Conf: ['(holding else)', '(on b2 l7)', '(on b4 l2)', '(on b0 l3)', '(on b1 ee)', '(on b3 l6)'] Act: transfer l8
+Step 11: Conf: ['(holding l8)', '(on b2 l7)', '(on b4 l2)', '(on b0 l3)', '(on b1 ee)', '(on b3 l6)'] Act: release
+Done Rolling out MinMax strategy.

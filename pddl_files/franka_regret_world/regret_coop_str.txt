@@ -1,0 +1,104 @@
+Init State: ['(on b2 else)', '(on b0 l3)', '(on b4 else)', '(on b3 l8)', '(on b1 else)']
+[0] transit b3: reg val: 5.0
+[1] transit b0: reg val: inf
+[2] transit b4: reg val: 4.0
+[3] transit b2: reg val: 4.0
+[4] transit b1: reg val: 4.0
+Enter Next action id: 2
+Step 0
+[(['(ready else)', '(on b2 else)', '(on b0 l3)', '(on b4 else)', '(on b3 l8)', '(on b1 else)'], 1), 0, inf]: 4.0
+Act: transit b4
+===================================================================================
+[0] human-move b3 l8 l7
+[1] human-move b3 l8 l6
+[2] r
+===================================================================================
+Enter Next state id: 2
+[0] grasp: reg val: 4.0
+Enter Next action id: 0
+Step 1
+[(['(to-obj b4)', '(on b2 else)', '(on b0 l3)', '(on b4 else)', '(on b3 l8)', '(on b1 else)'], 1), 1, 14.0]: 4.0
+Act: grasp
+===================================================================================
+[0] human-move b3 l8 l7
+[1] human-move b3 l8 l6
+[2] r
+===================================================================================
+Enter Next state id: 1
+[0] transfer l1: reg val: 3.0
+[1] transfer l7: reg val: 3.0
+[2] transfer l8: reg val: 3.0
+[3] transfer l0: reg val: 3.0
+[4] transfer l2: reg val: 0
+Enter Next action id: 4
+Step 2
+[(['(holding else)', '(on b4 ee)', '(on b2 else)', '(on b0 l3)', '(on b3 l6)', '(on b1 else)'], 1), 2, 14.0]: 0
+Act: transfer l2
+[0] release: reg val: 0
+[1] transfer l1: reg val: 6.0
+[2] transfer l7: reg val: 4.0
+[3] transfer l8: reg val: 4.0
+[4] transfer l0: reg val: 6.0
+Enter Next action id: 0
+Step 3
+[(['(holding l2)', '(on b4 ee)', '(on b2 else)', '(on b0 l3)', '(on b3 l6)', '(on b1 else)'], 1), 3, 14.0]: 0
+Act: release
+[0] transit b3: reg val: 3.0
+[1] transit b0: reg val: 9.0
+[2] transit b4: reg val: 9.0
+[3] transit b2: reg val: 0
+[4] transit b1: reg val: 4.0
+Enter Next action id: 3
+Step 4
+[(['(ready l2)', '(on b4 l2)', '(on b2 else)', '(on b0 l3)', '(on b3 l6)', '(on b1 else)'], 1), 6, 14.0]: 0
+Act: transit b2
+[0] grasp: reg val: 0
+Enter Next action id: 0
+Step 5
+[(['(to-obj b2)', '(on b4 l2)', '(on b2 else)', '(on b0 l3)', '(on b3 l6)', '(on b1 else)'], 1), 7, 14.0]: 0
+Act: grasp
+[0] transfer l1: reg val: 1.0
+[1] transfer l7: reg val: 0
+[2] transfer l8: reg val: 1.0
+[3] transfer l0: reg val: 1.0
+Enter Next action id: 1
+Step 6
+[(['(holding else)', '(on b2 ee)', '(on b4 l2)', '(on b0 l3)', '(on b3 l6)', '(on b1 else)'], 1), 8, 14.0]: 0
+Act: transfer l7
+[0] transfer l1: reg val: 4.0
+[1] release: reg val: 0
+[2] transfer l8: reg val: 2.0
+[3] transfer l0: reg val: 4.0
+Enter Next action id: 1
+Step 7
+[(['(holding l7)', '(on b2 ee)', '(on b4 l2)', '(on b0 l3)', '(on b3 l6)', '(on b1 else)'], 1), 9, 14.0]: 0
+Act: release
+[0] transit b3: reg val: 3.0
+[1] transit b0: reg val: 9.0
+[2] transit b4: reg val: 9.0
+[3] transit b2: reg val: 3.0
+[4] transit b1: reg val: 0
+Enter Next action id: 4
+Step 8
+[(['(ready l7)', '(on b2 l7)', '(on b4 l2)', '(on b0 l3)', '(on b3 l6)', '(on b1 else)'], 1), 10, 14.0]: 0
+Act: transit b1
+[0] grasp: reg val: 0
+Enter Next action id: 0
+Step 9
+[(['(to-obj b1)', '(on b2 l7)', '(on b4 l2)', '(on b0 l3)', '(on b3 l6)', '(on b1 else)'], 1), 11, 14.0]: 0
+Act: grasp
+[0] transfer l1: reg val: 1.0
+[1] transfer l8: reg val: 0
+[2] transfer l0: reg val: 1.0
+Enter Next action id: 1
+Step 10
+[(['(holding else)', '(on b2 l7)', '(on b4 l2)', '(on b0 l3)', '(on b1 ee)', '(on b3 l6)'], 1), 12, 14.0]: 0
+Act: transfer l8
+[0] transfer l1: reg val: 4.0
+[1] release: reg val: 0
+[2] transfer l0: reg val: 4.0
+Enter Next action id: 1
+Step 11
+[(['(holding l8)', '(on b2 l7)', '(on b4 l2)', '(on b0 l3)', '(on b1 ee)', '(on b3 l6)'], 1), 13, 14.0]: 0
+Act: release
+Done Rolling out.

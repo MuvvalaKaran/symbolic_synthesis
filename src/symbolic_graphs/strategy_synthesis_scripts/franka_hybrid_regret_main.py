@@ -211,8 +211,8 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
         task = kwargs['task']
 
         factor = self.scale_weights
-        # else_to_robot_factor = 10
-        else_to_robot_factor = factor
+        else_to_robot_factor = 1
+        # else_to_robot_factor = factor
 
         assert factor >= 1 and isinstance(factor, int), "Please an integer scaling factor!" 
 
@@ -360,8 +360,12 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
         print("Time for solving the Adv. game on Original Graph: ", stop - start)
 
         if win_str:
-            if True:
+            retry_flag = 'y'
+            while retry_flag == 'y': 
+            # if True:
                 min_max_handle.roll_out_strategy(strategy=win_str, verbose=True)
+                print("Done Rolling out MinMax strategy.")
+                retry_flag = input("Want to retry? [y/n]: ")
         
         # min max value
         self.min_energy_budget = min_max_handle.init_state_value
@@ -546,5 +550,9 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
         print("Time took for computing min-max strs on the Graph of best Response: ", stop - start)
 
         if reg_str:
-            gbr_min_max_handle.roll_out_strategy(strategy=reg_str, verbose=True, ask_usr_input=run_monitor)
-            print("Done Rolling out.")
+            retry_flag = 'y'
+            while retry_flag == 'y':
+                gbr_min_max_handle.roll_out_strategy(strategy=reg_str, verbose=True, ask_usr_input=run_monitor)
+                print("Done Rolling out.")
+                retry_flag = input("Want to retry? [y/n]: ")
+            
