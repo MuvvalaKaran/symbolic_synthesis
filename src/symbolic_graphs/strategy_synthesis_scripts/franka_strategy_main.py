@@ -400,6 +400,7 @@ class FrankaPartitionedWorld(FrankaWorld):
         
         if print_facts:
             print(f"******************# of Edges in Franka Abstraction: {sym_tr.ecount}******************")
+            print(f"******************# of States in the Original graph: {len(sym_tr.adj_map.keys())}******************")
 
         return sym_tr, ts_curr_vars, ts_robot_vars, ts_human_vars, ts_lbl_vars
     
@@ -455,6 +456,7 @@ class FrankaPartitionedWorld(FrankaWorld):
         
         if print_facts:
             print(f"******************# of Edges in Franka Abstraction: {sym_tr.ecount}******************")
+            print(f"******************# of States in the Original graph: {len(sym_tr.adj_map.keys())}******************")
 
         return sym_tr, ts_curr_vars, ts_robot_vars, ts_human_vars, ts_lbl_vars
     
@@ -507,6 +509,7 @@ class FrankaPartitionedWorld(FrankaWorld):
         # sys.exit(-1)
         if print_facts:
             print(f"******************# of Edges in Franka Abstraction: {sym_tr.ecount}******************")
+            print(f"******************# of States in the Original graph: {len(sym_tr.adj_map.keys())}******************")
 
         return sym_tr, ts_curr_vars, ts_robot_vars, ts_human_vars, ts_lbl_vars
     
