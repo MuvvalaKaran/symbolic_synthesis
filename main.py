@@ -174,7 +174,7 @@ if __name__ == "__main__":
             # problem_file_path = PROJECT_ROOT + "/pddl_files/franka_regret_world/test/problem.pddl"
 
             domain_file_path = PROJECT_ROOT + "/iros23_pddl_files/domain.pddl"
-            problem_file_path = PROJECT_ROOT + "/iros23_pddl_files/varying_locs/p04.pddl"
+            problem_file_path = PROJECT_ROOT + "/iros23_pddl_files/simple_problem.pddl"
 
             wgt_dict = {
                 "transit" : 1,
@@ -222,7 +222,7 @@ if __name__ == "__main__":
                                                                         plot=False)
                         
             regret_synthesis_handle.build_abstraction()
-            regret_synthesis_handle.solve(verbose=False, just_adv_game=True, run_monitor=False, monolithic_tr=MONOLITHIC_TR)
+            regret_synthesis_handle.solve(verbose=False, just_adv_game=False, run_monitor=False, monolithic_tr=MONOLITHIC_TR)
 
             print(f"****************** # Total Boolean Variables: { cudd_manager.size()} ******************")
 
