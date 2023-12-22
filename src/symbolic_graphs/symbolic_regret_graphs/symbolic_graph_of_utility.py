@@ -433,15 +433,15 @@ class SymbolicGraphOfUtility(DynWeightedPartitionedFrankaAbs):
                             min_val: ADD = (alt_edges_state & cooperative_vals).findMin()
 
                             assert min_val != self.manager.addZero(), "Error computing best alternative value. This should never be zero. Fix this!!!"
-
-                            # if min_val == self.manager.plusInfinity():
-                            #     min_val = self.manager.addConst(self.energy_budget)
                             
                             self.ba_strategy = self.ba_strategy.min( (curr_state_act).ite(min_val, self.manager.plusInfinity()))
 
                             ## add the ba value to set
                             int_min_val: int =  list(min_val.generate_cubes())[0][1]
-                            self.ba_set.add(int_min_val)
+                            
+                            # we manually update BA set with inf after assertion statement.
+                            if int_min_val != inf:
+                                self.ba_set.add(int_min_val)
 
                             if verbose:
                                 curr_ts_exp_states = self.get_state_from_tuple(curr_state_tuple)
@@ -457,7 +457,7 @@ class SymbolicGraphOfUtility(DynWeightedPartitionedFrankaAbs):
         
 
         # sanity check. The set of best alternative values should be subset of utility values
-        # assert self.ba_set.issubset(self.leaf_vals), f"Error computing set of beat alternatives. The BA set: [{self.ba_set}] should be a subset of utility values [{self.leaf_vals}]"
+        assert self.ba_set.issubset(self.leaf_vals), f"Error computing set of beat alternatives. The BA set: [{self.ba_set}] should be a subset of utility values [{self.leaf_vals}]"
 
         # add infinity to the set of best responses
         self.ba_set.add(inf)
