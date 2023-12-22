@@ -755,8 +755,8 @@ class SymbolicGraphOfUtlCooperativeGame(CooperativeGame):
         # reachable states
         gou_reachable_states: BDD = self.gou_handle.closed.bddPattern()
 
-        if verbose:
-            print_layers = True
+        # if verbose:
+        print_layers = True
         
         layer: int = 0
 
@@ -848,3 +848,184 @@ class SymbolicGraphOfUtlCooperativeGame(CooperativeGame):
 
     def roll_out_strategy(self, strategy: ADD, verbose: bool = False):
         raise NotImplementedError()
+
+
+class TopologicalSymbolicGraphOfUtlCooperativeGame(SymbolicGraphOfUtlCooperativeGame):
+    """
+    Optimal Backup Order (Bertsekas, 2001): If an MDP is acyclic, then there exists an optimal backup order.
+      By applying the optimal order, the optimal value function can be found with each state needing only
+      one backup
+    """
+
+    def solve(self, verbose: bool = False, print_layers: bool = False) -> ADD:
+        """
+         Compute cVals on the Symbolic Graph of utility. In this class we proceed an optimal backup order to compute the cVals. 
+
+         print_layer: set this flag to True to see Value Iteration progress
+         verbose: set this flag to True to print values of states at each iteration.
+        """
+
+        ts_states: ADD = self.obs_add
+        accp_states: ADD = ts_states & self.target_DFA
+
+        # strategy - optimal (state & robot-action) pair stored in the ADD
+        strategy: ADD  = self.manager.plusInfinity()
+
+        # initializes accepting states
+        for sval in range(self.energy_budget + 1):
+            # augment the accepting states with utility vars by computing the fully defined 0-1 ADD
+            tmp_accp_states = accp_states & self.gou_handle.predicate_sym_map_utls[sval]
+            
+            # if a leaf node with this utility value is reachable from the init prod state.
+            if sval in self.gou_handle.leaf_node_list.keys():
+                # only keep the reachable states
+                tmp_accp_states = tmp_accp_states & self.gou_handle.leaf_node_list[sval]
+
+                tmp_accp_states = tmp_accp_states.ite(self.manager.addConst(int(sval)), self.manager.plusInfinity())
+                self.winning_states[0] |= self.winning_states[0].min(tmp_accp_states)
+            
+                strategy |= strategy.min(tmp_accp_states)
+
+        # reachable states
+        gou_reachable_states: BDD = self.gou_handle.closed.bddPattern()
+
+        if verbose:
+            print_layers = True
+        
+        layer: int = 0
+
+        sym_lbl_cubes = self._create_lbl_cubes()
+
+        prod_curr_list = []
+        prod_curr_list.extend([lbl for sym_vars_list in self.ts_obs_list for lbl in sym_vars_list])
+        prod_curr_list.extend(self.ts_x_list)
+        prod_curr_list.extend(self.ts_utls_list)
+        
+        prod_bdd_curr_list = [_avar.bddPattern() for _avar in prod_curr_list]
+
+        # 
+        pos_set_weights = set(self.gou_handle.int_weight_dict.values()) - set({0})
+        min_edge_weight: int = min(pos_set_weights)
+        curr_val_order: int = max(self.gou_handle.leaf_node_list.keys())
+
+        bookkeeping_dict: Dict[int, bool] = {}
+        for i in range(self.energy_budget + 1):
+            bookkeeping_dict[i] =  self.gou_handle.closed & self.gou_handle.predicate_sym_map_utls[i]
+        # tmp_gou_states = self.gou_handle.closed & self.gou_handle.predicate_sym_map_utls[curr_val_order]
+
+        done: bool = False
+
+        while not done:
+            # chcek if states in GoU with utls value == curr_val_order have converged
+            
+            tmp_winning_states = self.winning_states[layer] & bookkeeping_dict[curr_val_order]
+            last_tmp_winning_states = self.winning_states[layer - 1] & bookkeeping_dict[curr_val_order]
+            if tmp_winning_states.compare(last_tmp_winning_states, 2):
+                print(f"States with utls values {curr_val_order} have Converged!!")
+                curr_val_order -= min_edge_weight
+                if curr_val_order < 0:
+                    done = True
+
+            if done:
+                break
+            
+            if print_layers:
+                print(f"**************************Layer: {layer}**************************")
+
+            _win_state_bucket: Dict[BDD] = defaultdict(lambda: self.manager.bddZero())
+
+            # convert the winning states into buckets of BDD
+            # for sval in range(self.gou_handle.energy_budget + 1):
+            for sval in range(curr_val_order + 1):
+                # get the states with state value equal to sval and store them in their respective bukcets
+                win_sval = self.winning_states[layer].bddInterval(sval, sval)
+
+                if not win_sval.isZero():
+                    _win_state_bucket[sval] |= win_sval
+            
+            
+            # convert the winning states into buckets of BDD
+            # for sval in range(self.gou_handle.energy_budget + 1):
+                # get the states with state value equal to sval and store them in their respective buckets
+            # accp_states = self.winning_states[layer].bddInterval(curr_val_order, curr_val_order)
+            # win_sval = self.winning_states[layer].bddInterval(curr_val_order, curr_val_order)
+
+            # while win_sval.isZero():
+            #     curr_val_order -= min_edge_weight
+            #     if curr_val_order < 0:
+            #         break
+                
+            #     win_sval = self.winning_states[layer].bddInterval(curr_val_order, curr_val_order)
+            
+            # if curr_val_order < 0:
+            #     break
+
+            # _win_state_bucket[sval] |= win_sval
+            
+            _pre_buckets: Dict[ADD] = defaultdict(lambda: self.manager.addZero())
+
+            # compute the predecessor and store them by successor cost
+            for sval, succ_states in _win_state_bucket.items():
+                # if sval <= curr_val_order:
+                # first evolve over DFA and then evolve over the TS and utility values
+                mod_win_state: BDD = succ_states.vectorCompose(self.dfa_bdd_x_list, self.dfa_bdd_transition_fun_list)
+                for tr_action, utls_tr in zip(self.ts_bdd_transition_fun_list, self.utls_bdd_trans_func_list):
+                    pre_states: BDD = self.get_pre_states(utls_tr=utls_tr,
+                                                        ts_action=tr_action,
+                                                        From=mod_win_state,
+                                                        prod_curr_list=prod_bdd_curr_list)
+
+                    pre_states = gou_reachable_states & pre_states
+    
+                    if not pre_states.isZero():
+                        _pre_buckets[sval] |= pre_states.toADD()
+            
+            # unions of all predecessors
+            if bool(_pre_buckets) is False:
+                done = True
+                break
+            pre_states: ADD = reduce(lambda x, y: x | y, _pre_buckets.values())
+
+            tmp_strategy: ADD = pre_states.ite(self.manager.addOne(), self.manager.plusInfinity())
+
+            for sval, apre_s in _pre_buckets.items():
+                tmp_strategy = tmp_strategy.max(apre_s.ite(self.manager.addConst(int(sval)), self.manager.addZero()))
+
+            new_tmp_strategy: ADD = tmp_strategy
+
+            # go over all the human actions and preserve the minimum one
+            for human_tr_dd in self.ts_sym_to_human_act_map.keys():
+                new_tmp_strategy = new_tmp_strategy.min(tmp_strategy.restrict(human_tr_dd))
+
+            # compute the minimum of state action pairs
+            strategy = strategy.min(new_tmp_strategy)
+
+            self.winning_states[layer + 1] |= self.winning_states[layer]
+
+            for tr_dd in self.ts_sym_to_robot_act_map.keys():
+                # remove the dependency for that action and preserve the minimum value for every state
+                self.winning_states[layer + 1] = self.winning_states[layer  + 1].min(strategy.restrict(tr_dd))
+            
+            if verbose:
+                print(f"Minimum State value at Iteration {layer +1}")
+                self.get_state_value_from_dd(dd_func=self.winning_states[layer + 1], sym_lbl_cubes=sym_lbl_cubes)
+
+            # update counter 
+            layer += 1
+        
+
+        print(f"**************************Reached a Fixed Point in {layer} layers**************************")
+        init_state_cube = list((self.init_prod & self.winning_states[layer]).generate_cubes())[0]
+        init_val: int = init_state_cube[1]
+        self.init_state_value = init_val
+        if init_val != math.inf:
+            print(f"A Winning Strategy Exists!!. The Min Energy is {init_val}")
+            return strategy
+        else:
+            print("No Winning Strategy Exists!!!")
+            # need to delete this dict that holds cudd object to avoid segfaults after exiting python code
+            del self.winning_states
+            return
+    
+
+    

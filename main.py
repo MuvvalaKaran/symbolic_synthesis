@@ -169,7 +169,7 @@ if __name__ == "__main__":
             # problem_file_path = PROJECT_ROOT + "/pddl_files/franka_regret_world/arch/problem.pddl"
 
             domain_file_path = PROJECT_ROOT + "/pddl_files/franka_regret_world/test/domain.pddl"
-            problem_file_path = PROJECT_ROOT + "/pddl_files/franka_regret_world/test/problem.pddl"
+            problem_file_path = PROJECT_ROOT + "/pddl_files/franka_regret_world/test/problem_1.pddl"
 
             wgt_dict = {
                 "transit" : 1,
@@ -207,8 +207,8 @@ if __name__ == "__main__":
                                                                         weight_dict=wgt_dict,
                                                                         ltlf_flag=USE_LTLF,
                                                                         dyn_var_ord=DYNAMIC_VAR_ORDERING,
-                                                                        weighting_factor=3,
-                                                                        reg_factor=1.25,
+                                                                        weighting_factor=1,
+                                                                        reg_factor=20,
                                                                         algorithm=None,
                                                                         verbose=False,
                                                                         print_layer=False,

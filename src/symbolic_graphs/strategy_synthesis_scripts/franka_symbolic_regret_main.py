@@ -11,7 +11,7 @@ from typing import Union, List, Tuple, Dict
 
 from cudd import Cudd, BDD, ADD
 
-from src.algorithms.strategy_synthesis import SymbolicGraphOfUtlCooperativeGame, GraphofBRAdvGame
+from src.algorithms.strategy_synthesis import SymbolicGraphOfUtlCooperativeGame, GraphofBRAdvGame, TopologicalSymbolicGraphOfUtlCooperativeGame
 
 from src.symbolic_graphs.symbolic_regret_graphs import SymbolicGraphOfUtility
 from src.symbolic_graphs.hybrid_regret_graphs import HybridGraphOfBR
@@ -114,7 +114,7 @@ class FrankaSymbolicRegretSynthesis(FrankaRegretSynthesis):
         self.graph_of_utls_handle = graph_of_utls_handle
     
 
-    def solve(self, verbose: bool = False, just_adv_game: bool = False, run_monitor: bool = False, monolithic_tr: bool = False):
+    def solve(self, verbose: bool = False, just_adv_game: bool = False, run_monitor: bool = False, monolithic_tr: bool = False, topological: bool = True):
         """
          Overrides base method to first construct the required graph and then run Value Iteration. 
 
@@ -131,24 +131,46 @@ class FrankaSymbolicRegretSynthesis(FrankaRegretSynthesis):
 
         print("******************Computing cVals on Graph of utility******************")
 
+        if topological:
+            # compute the min-min value from each state
+            gou_min_min_handle = TopologicalSymbolicGraphOfUtlCooperativeGame(gou_handle=self.graph_of_utls_handle,
+                                                                              ts_handle=self.ts_handle,
+                                                                              dfa_handle=self.dfa_handle,
+                                                                              ts_curr_vars=self.ts_x_list,
+                                                                              dfa_curr_vars=self.dfa_x_list,
+                                                                              sys_act_vars=self.ts_robot_vars,
+                                                                              env_act_vars=self.ts_human_vars,
+                                                                              ts_obs_vars=self.ts_obs_list,
+                                                                              ts_utls_vars=self.prod_utls_vars,
+                                                                              cudd_manager=self.manager,
+                                                                              monolithic_tr=monolithic_tr)
+            start: float = time.time()
+            tmp_cvals: ADD = gou_min_min_handle.solve(verbose=False, print_layers=self.print_layers)
+            stop: float = time.time()
+            print("Time took for computing Topological cVals is: ", stop - start)
+        # else:
         # compute the min-min value from each state
         gou_min_min_handle = SymbolicGraphOfUtlCooperativeGame(gou_handle=self.graph_of_utls_handle,
-                                                               ts_handle=self.ts_handle,
-                                                               dfa_handle=self.dfa_handle,
-                                                               ts_curr_vars=self.ts_x_list,
-                                                               dfa_curr_vars=self.dfa_x_list,
-                                                               sys_act_vars=self.ts_robot_vars,
-                                                               env_act_vars=self.ts_human_vars,
-                                                               ts_obs_vars=self.ts_obs_list,
-                                                               ts_utls_vars=self.prod_utls_vars,
-                                                               cudd_manager=self.manager,
-                                                               monolithic_tr=monolithic_tr)
+                                                            ts_handle=self.ts_handle,
+                                                            dfa_handle=self.dfa_handle,
+                                                            ts_curr_vars=self.ts_x_list,
+                                                            dfa_curr_vars=self.dfa_x_list,
+                                                            sys_act_vars=self.ts_robot_vars,
+                                                            env_act_vars=self.ts_human_vars,
+                                                            ts_obs_vars=self.ts_obs_list,
+                                                            ts_utls_vars=self.prod_utls_vars,
+                                                            cudd_manager=self.manager,
+                                                            monolithic_tr=monolithic_tr)
         
         # compute the cooperative value from each prod state in the graph of utility
         start: float = time.time()
         cvals: ADD = gou_min_min_handle.solve(verbose=False, print_layers=self.print_layers)
         stop: float = time.time()
         print("Time took for computing cVals is: ", stop - start)
+        if tmp_cvals != cvals:
+            print("Not equal")
+            # cvals = tmp_cvals
+        sys.exit(-1)
 
         # sanity checking
         print("******************Computing BA Vals on Graph of utility******************")
