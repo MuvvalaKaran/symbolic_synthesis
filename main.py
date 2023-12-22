@@ -105,8 +105,10 @@ if __name__ == "__main__":
         elif STRATEGY_SYNTHESIS:
             # Franka World files 
             if TWO_PLAYER_GAME:
-                domain_file_path = PROJECT_ROOT + "/pddl_files/dynamic_franka_world/domain.pddl"
-                problem_file_path = PROJECT_ROOT + "/pddl_files/dynamic_franka_world/problem.pddl"
+                # domain_file_path = PROJECT_ROOT + "/pddl_files/dynamic_franka_world/domain.pddl"
+                # problem_file_path = PROJECT_ROOT + "/pddl_files/dynamic_franka_world/problem.pddl"
+                domain_file_path = PROJECT_ROOT + "/iros23_pddl_files/dynamic_franka_world/domain.pddl"
+                problem_file_path = PROJECT_ROOT + "/iros23_pddl_files/dynamic_franka_world/p00.pddl"
             
             elif TWO_PLAYER_GAME_BND:
                 domain_file_path = PROJECT_ROOT + "/pddl_files/bounded_dynamic_franka_world/domain.pddl"
@@ -168,8 +170,11 @@ if __name__ == "__main__":
             # domain_file_path = PROJECT_ROOT + "/pddl_files/franka_regret_world/arch/domain.pddl"
             # problem_file_path = PROJECT_ROOT + "/pddl_files/franka_regret_world/arch/problem.pddl"
 
-            domain_file_path = PROJECT_ROOT + "/pddl_files/franka_regret_world/test/domain.pddl"
-            problem_file_path = PROJECT_ROOT + "/pddl_files/franka_regret_world/test/problem.pddl"
+            # domain_file_path = PROJECT_ROOT + "/pddl_files/franka_regret_world/test/domain.pddl"
+            # problem_file_path = PROJECT_ROOT + "/pddl_files/franka_regret_world/test/problem.pddl"
+
+            domain_file_path = PROJECT_ROOT + "/iros23_pddl_files/domain.pddl"
+            problem_file_path = PROJECT_ROOT + "/iros23_pddl_files/simple_problem.pddl"
 
             wgt_dict = {
                 "transit" : 1,
@@ -208,7 +213,7 @@ if __name__ == "__main__":
                                                                         ltlf_flag=USE_LTLF,
                                                                         dyn_var_ord=DYNAMIC_VAR_ORDERING,
                                                                         weighting_factor=3,
-                                                                        reg_factor=5,
+                                                                        reg_factor=1.25,
                                                                         algorithm=None,
                                                                         verbose=False,
                                                                         print_layer=False,
@@ -217,7 +222,7 @@ if __name__ == "__main__":
                                                                         plot=False)
                         
             regret_synthesis_handle.build_abstraction()
-            regret_synthesis_handle.solve(verbose=False, just_adv_game=False, run_monitor=True, monolithic_tr=MONOLITHIC_TR)
+            regret_synthesis_handle.solve(verbose=False, just_adv_game=False, run_monitor=False, monolithic_tr=MONOLITHIC_TR)
 
             print(f"****************** # Total Boolean Variables: { cudd_manager.size()} ******************")
 

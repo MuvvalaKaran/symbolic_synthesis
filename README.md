@@ -2,6 +2,9 @@
 
 This repository contains code for the paper "Efficient Symbolic Approaches for Quantitative Reactive Synthesis with Finite Tasks." In this work we introduce symbolic algorithms for quantitative reactive synthesis. We consider resource constrained robotic manipulators that need to interact with a human to achieve a complex task expressed in linear temporal logic. This code implement Symbolic Value Iteration for Min-max Reachbility games with quantative constraints as well Hybrid Regret-Minimizing strategy synthesis algorithm. See the [paper](https://arxiv.org/abs/2303.03686) for more details. 
 
+# Authors
+
+* [Karan Muvvala](https://muvvalakaran.github.io/) <[karan.muvvala@colorado.edu](mailto:karan.muvvala@colorado.edu)>
 
 ## Instructions to clone the code
 
@@ -51,6 +54,29 @@ Additionally, if you are more used to GUI and would like to edit or attach a con
 	* Now click on the `Remote Explore` tab on the left and attach VScode to a container.
 2. This will launch a new vs code attached to the container and prompt you to a location to attach to. The default is root, and you can just press enter. Congrats, you have attached your container to VSCode.
 
+## Tests
+
+All the tests related scripts are available in the `tests/` directory. I use python [unittest](https://docs.python.org/3.8/library/unittest.html) for testing individual components of my source code. Here are some commands to run the tests:
+
+To run a specific test package:
+
+```bash
+python3 -m unittest discover -s tests.<directory-name> -bv
+```
+
+To run a specific test script:
+
+```bash
+python3 -m tests.<directory-name>.<module-nane> -b
+```
+
+To run all tests:
+
+```bash
+python3 -m unittest -bv
+```
+
+For more details see the `tests/README.md`. Note, all commands must be run from `<root/of/project>`. Additionally, I have included to shell scripts to run regret and non-regret unit tests. You can call these <test_script>.sh file with `-v` (default is False) for verbose test results.
 
 ## Directories
 
@@ -82,3 +108,7 @@ If the code is useful in your research, and you would like to acknowledge it, pl
   year={2023}
 }
 ```
+
+# Contact
+
+Please contact me if you have questions at :karan.muvvala@colorado.edu

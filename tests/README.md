@@ -42,3 +42,17 @@ python3 -m unittest -bv
 	1. SymboliDFA() - A class used to create the DFA for the 2d gridworld exmaples using BDD Variables. The formulas can be LTL or LTLf!
     2. SymbolicDFAFranka() - A class used to create DFA for the Manipulation examples in MONOLITHIC Fashion. The formulas can only be LTLf!
     3. PartitionedDFA() - A class used to create DFA for the Manipulation example in COMPOSITIONAL Fashion. The formulas can only be LTLf!
+
+
+### Known Issues
+
+Try running the regret tests scripts (from `test_regret_synthesis` directory) individually if you encounter the following issue. The issue occurs when creating multiple CUDD managers when calling CUDD package. 
+
+```
+dead count != deleted
+This problem is often due to a missing call to Cudd_Ref
+or to an extra call to Cudd_RecursiveDeref.
+See the CUDD Programmer's Guide for additional details../tests/regret_scripts.sh: ... Aborted                 (core dumped) python3 -m tests.test_regret_synthesis.test_symbolic_monolithic_reg_str_synth -bv
+```
+
+Please contact me if you have questions at :karan.muvvala@colorado.edu
