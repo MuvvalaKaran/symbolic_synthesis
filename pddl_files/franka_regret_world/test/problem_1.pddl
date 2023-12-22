@@ -10,11 +10,11 @@
 
     l6 - hbox_loc
     l7 - hbox_loc
-    l8 - hbox_loc
+    ;l8 - hbox_loc
 
     b0 - box
     b1 - box
-    b2 - box
+    ;b2 - box
 
 )
 
@@ -24,7 +24,7 @@
     
     (on b0 l0)
     (on b1 l6)
-    (on b2 l8)
+    ;(on b2 l8)
 )
 
 (:goal 

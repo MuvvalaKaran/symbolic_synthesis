@@ -855,7 +855,17 @@ class TopologicalSymbolicGraphOfUtlCooperativeGame(SymbolicGraphOfUtlCooperative
     Optimal Backup Order (Bertsekas, 2001): If an MDP is acyclic, then there exists an optimal backup order.
       By applying the optimal order, the optimal value function can be found with each state needing only
       one backup
+    
+      TODO: Add functionality to do backwards reachability to compute the set of states that have a path to the goal states. 
+       States in this set will be the only ones that need to be considered for computing the optimal value function because they will
+       have non-infinity optimal value.
     """
+
+    def backwards_reachability(self, verbose: bool = False, print_layers: bool = False) -> BDD:
+        """
+         A function that compute the set of states that belong to the set of Backwards Reacahable.
+        """
+        raise NotImplementedError()
 
     def solve(self, verbose: bool = False, print_layers: bool = False) -> ADD:
         """
@@ -864,6 +874,8 @@ class TopologicalSymbolicGraphOfUtlCooperativeGame(SymbolicGraphOfUtlCooperative
          print_layer: set this flag to True to see Value Iteration progress
          verbose: set this flag to True to print values of states at each iteration.
         """
+        # call backwards reachability solver
+        Breach_states: ADD = self.backwards_reachability(verbose=False, print_layers=False)
 
         ts_states: ADD = self.obs_add
         accp_states: ADD = ts_states & self.target_DFA
@@ -886,7 +898,7 @@ class TopologicalSymbolicGraphOfUtlCooperativeGame(SymbolicGraphOfUtlCooperative
             
                 strategy |= strategy.min(tmp_accp_states)
 
-        # reachable states
+        # forward reachable states
         gou_reachable_states: BDD = self.gou_handle.closed.bddPattern()
 
         if verbose:
@@ -903,21 +915,18 @@ class TopologicalSymbolicGraphOfUtlCooperativeGame(SymbolicGraphOfUtlCooperative
         
         prod_bdd_curr_list = [_avar.bddPattern() for _avar in prod_curr_list]
 
-        # 
         pos_set_weights = set(self.gou_handle.int_weight_dict.values()) - set({0})
         min_edge_weight: int = min(pos_set_weights)
         curr_val_order: int = max(self.gou_handle.leaf_node_list.keys())
 
         bookkeeping_dict: Dict[int, bool] = {}
         for i in range(self.energy_budget + 1):
-            bookkeeping_dict[i] =  self.gou_handle.closed & self.gou_handle.predicate_sym_map_utls[i]
-        # tmp_gou_states = self.gou_handle.closed & self.gou_handle.predicate_sym_map_utls[curr_val_order]
+            bookkeeping_dict[i] =  Breach_states & self.gou_handle.predicate_sym_map_utls[i]
 
         done: bool = False
 
         while not done:
-            # chcek if states in GoU with utls value == curr_val_order have converged
-            
+            # check if states in GoU with utls value == curr_val_order have converged
             tmp_winning_states = self.winning_states[layer] & bookkeeping_dict[curr_val_order]
             last_tmp_winning_states = self.winning_states[layer - 1] & bookkeeping_dict[curr_val_order]
             if tmp_winning_states.compare(last_tmp_winning_states, 2):
@@ -935,8 +944,8 @@ class TopologicalSymbolicGraphOfUtlCooperativeGame(SymbolicGraphOfUtlCooperative
             _win_state_bucket: Dict[BDD] = defaultdict(lambda: self.manager.bddZero())
 
             # convert the winning states into buckets of BDD
-            # for sval in range(self.gou_handle.energy_budget + 1):
             for sval in range(curr_val_order + 1):
+            # for sval in range(curr_val_order, curr_val_order + 1):
                 # get the states with state value equal to sval and store them in their respective bukcets
                 win_sval = self.winning_states[layer].bddInterval(sval, sval)
 
@@ -945,28 +954,10 @@ class TopologicalSymbolicGraphOfUtlCooperativeGame(SymbolicGraphOfUtlCooperative
             
             
             # convert the winning states into buckets of BDD
-            # for sval in range(self.gou_handle.energy_budget + 1):
-                # get the states with state value equal to sval and store them in their respective buckets
-            # accp_states = self.winning_states[layer].bddInterval(curr_val_order, curr_val_order)
-            # win_sval = self.winning_states[layer].bddInterval(curr_val_order, curr_val_order)
-
-            # while win_sval.isZero():
-            #     curr_val_order -= min_edge_weight
-            #     if curr_val_order < 0:
-            #         break
-                
-            #     win_sval = self.winning_states[layer].bddInterval(curr_val_order, curr_val_order)
-            
-            # if curr_val_order < 0:
-            #     break
-
-            # _win_state_bucket[sval] |= win_sval
-            
             _pre_buckets: Dict[ADD] = defaultdict(lambda: self.manager.addZero())
 
             # compute the predecessor and store them by successor cost
             for sval, succ_states in _win_state_bucket.items():
-                # if sval <= curr_val_order:
                 # first evolve over DFA and then evolve over the TS and utility values
                 mod_win_state: BDD = succ_states.vectorCompose(self.dfa_bdd_x_list, self.dfa_bdd_transition_fun_list)
                 for tr_action, utls_tr in zip(self.ts_bdd_transition_fun_list, self.utls_bdd_trans_func_list):
@@ -982,8 +973,8 @@ class TopologicalSymbolicGraphOfUtlCooperativeGame(SymbolicGraphOfUtlCooperative
             
             # unions of all predecessors
             if bool(_pre_buckets) is False:
-                done = True
                 break
+
             pre_states: ADD = reduce(lambda x, y: x | y, _pre_buckets.values())
 
             tmp_strategy: ADD = pre_states.ite(self.manager.addOne(), self.manager.plusInfinity())
