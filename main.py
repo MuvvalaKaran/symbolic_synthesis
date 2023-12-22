@@ -105,10 +105,8 @@ if __name__ == "__main__":
         elif STRATEGY_SYNTHESIS:
             # Franka World files 
             if TWO_PLAYER_GAME:
-                # domain_file_path = PROJECT_ROOT + "/pddl_files/dynamic_franka_world/domain.pddl"
-                # problem_file_path = PROJECT_ROOT + "/pddl_files/dynamic_franka_world/problem.pddl"
-                domain_file_path = PROJECT_ROOT + "/iros23_pddl_files/dynamic_franka_world/domain.pddl"
-                problem_file_path = PROJECT_ROOT + "/iros23_pddl_files/dynamic_franka_world/p00.pddl"
+                domain_file_path = PROJECT_ROOT + "/pddl_files/dynamic_franka_world/domain.pddl"
+                problem_file_path = PROJECT_ROOT + "/pddl_files/dynamic_franka_world/problem.pddl"
             
             elif TWO_PLAYER_GAME_BND:
                 domain_file_path = PROJECT_ROOT + "/pddl_files/bounded_dynamic_franka_world/domain.pddl"
@@ -170,11 +168,8 @@ if __name__ == "__main__":
             # domain_file_path = PROJECT_ROOT + "/pddl_files/franka_regret_world/arch/domain.pddl"
             # problem_file_path = PROJECT_ROOT + "/pddl_files/franka_regret_world/arch/problem.pddl"
 
-            # domain_file_path = PROJECT_ROOT + "/pddl_files/franka_regret_world/test/domain.pddl"
-            # problem_file_path = PROJECT_ROOT + "/pddl_files/franka_regret_world/test/problem.pddl"
-
-            domain_file_path = PROJECT_ROOT + "/iros23_pddl_files/domain.pddl"
-            problem_file_path = PROJECT_ROOT + "/iros23_pddl_files/simple_problem.pddl"
+            domain_file_path = PROJECT_ROOT + "/pddl_files/franka_regret_world/test/domain.pddl"
+            problem_file_path = PROJECT_ROOT + "/pddl_files/franka_regret_world/test/problem.pddl"
 
             wgt_dict = {
                 "transit" : 1,

@@ -5,6 +5,9 @@ PyDD/
 # ignore pdf files generated
 *.pdf
 
+# ignore benchmark scripts
+iros23_pddl_files/
+
 # ignore cache files generated
 *__pycache__
 .idea/

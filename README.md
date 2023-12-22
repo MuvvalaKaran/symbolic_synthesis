@@ -93,6 +93,10 @@ For more details see the `tests/README.md`. Note, all commands must be run from 
 * Regret_synthesis_toolbox - Source code for the explicit implementatiob of Min-max reachability algorithm and Regret-minimizing strategy synthesis. See this [paper](https://arxiv.org/pdf/2203.06861.pdf) for more information.
 
 
+## Benchmarking Dataset
+
+The PDDL files used for benchmarking the symbolic synthesis code (Fig. 5 from Experiments section) can be found [here](https://github.com/MuvvalaKaran/conference-datasets).
+
 ## Contributing
 All contributions welcome! All content in this repository is licensed under the MIT license.
 
@@ -104,8 +108,10 @@ If the code is useful in your research, and you would like to acknowledge it, pl
 @article{muvvala2023efficient,
   title={Efficient Symbolic Approaches for Quantitative Reactive Synthesis with Finite Tasks},
   author={Muvvala, Karan and Lahijanian, Morteza},
-  journal={arXiv preprint arXiv:2303.03686},
-  year={2023}
+  booktitle={2023 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS)}, 
+  year={2023},
+  pages={8666-8672},
+  doi={10.1109/IROS55552.2023.10342496}}
 }
 ```
 
