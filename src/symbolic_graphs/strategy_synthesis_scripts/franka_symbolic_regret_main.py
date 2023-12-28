@@ -110,6 +110,7 @@ class FrankaSymbolicRegretSynthesis(FrankaRegretSynthesis):
                                                                        verbose=False)
         stop: float = time.time()
         print("Time took for constructing Reachable states on Graph of Utility: ", stop - start)
+        # sys.exit(-1)
 
         self.graph_of_utls_handle = graph_of_utls_handle
     
@@ -145,7 +146,7 @@ class FrankaSymbolicRegretSynthesis(FrankaRegretSynthesis):
                                                                               cudd_manager=self.manager,
                                                                               monolithic_tr=monolithic_tr)
             start: float = time.time()
-            tmp_cvals: ADD = gou_min_min_handle.solve(verbose=False, print_layers=self.print_layers)
+            tmp_cvals: ADD = gou_min_min_handle.solve(verbose=True, print_layers=self.print_layers)
             stop: float = time.time()
             print("Time took for computing Topological cVals is: ", stop - start)
         # else:
@@ -167,9 +168,13 @@ class FrankaSymbolicRegretSynthesis(FrankaRegretSynthesis):
         cvals: ADD = gou_min_min_handle.solve(verbose=False, print_layers=self.print_layers)
         stop: float = time.time()
         print("Time took for computing cVals is: ", stop - start)
-        if tmp_cvals != cvals:
-            print("Not equal")
+        
+        # 3 means != and 2 means ==
+        if tmp_cvals.compare(cvals, 3):
+            print("Not equal!!!!")
+            # print(cvals.generate_cubes() & tmp_cvals)
             # cvals = tmp_cvals
+            sys.exit(-1)
         sys.exit(-1)
 
         # sanity checking
