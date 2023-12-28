@@ -4,21 +4,22 @@
     
     l0 - box_loc
     l1 - box_loc
-    ;l2 - box_loc
-    ;l3 - box_loc
+    l2 - box_loc
+    l3 - box_loc
 
     ;;;;; Locs where the robot & human can operate ;;;;;
     ; NOTE: The way pyperplan parses the PDDL file, you need atleast two human locs to construct `human-move` action
 
     l6 - hbox_loc
     l7 - hbox_loc
-    ;l8 - hbox_loc
-    ;l9 - hbox_loc
+    l8 - hbox_loc
+    l9 - hbox_loc
 
     b0 - box
     b1 - box
-    ;b2 - box
-    ;b3 - box
+    b2 - box
+    b3 - box
+    b4 - box
 
 )
 
@@ -28,8 +29,9 @@
     
     (on b0 l0)
     (on b1 l6)
-    ;(on b2 l6)
-    ;(on b3 l8)
+    (on b2 l1)
+    (on b3 l8)
+    (on b4 l2)
 )
 
 (:goal 

@@ -777,7 +777,7 @@ class SymbolicGraphOfUtlCooperativeGame(CooperativeGame):
                 self.init_state_value = init_val
                 if init_val != math.inf:
                     print(f"A Winning Strategy Exists!!. The Min Energy is {init_val}")
-                    return strategy
+                    return strategy, self.winning_states[layer]
                 else:
                     print("No Winning Strategy Exists!!!")
                     # need to delete this dict that holds cudd object to avoid segfaults after exiting python code
@@ -908,42 +908,35 @@ class TopologicalSymbolicGraphOfUtlCooperativeGame(SymbolicGraphOfUtlCooperative
         min_edge_weight: int = min(pos_set_weights)
         curr_val_order: int = max(self.gou_handle.leaf_node_list.keys())
 
+        # get states with corresponding utls value
         bookkeeping_dict: Dict[int, bool] = {}
         for i in range(self.energy_budget + 1):
             bookkeeping_dict[i] =  self.gou_handle.closed & self.gou_handle.predicate_sym_map_utls[i]
+            bookkeeping_dict[i] = bookkeeping_dict[i].ite(self.manager.addConst(1), self.manager.plusInfinity())
 
-        done: bool = False
         back_prop_val = curr_val_order
 
-        while not done:
-            # check if states in GoU with utls value == curr_val_order have converged
-            if layer >= 2:
-                tmp_winning_states = self.winning_states[layer] & bookkeeping_dict[curr_val_order]
-                last_tmp_winning_states = self.winning_states[layer - 1] & bookkeeping_dict[curr_val_order]
-                if tmp_winning_states.compare(last_tmp_winning_states, 2):
-                    print(f"States with utls values {curr_val_order} have Converged!!")
-                    back_prop_val = curr_val_order
-                    curr_val_order -= min_edge_weight
-                    if curr_val_order < 0:
-                        done = True
-
-            if done:
-                break
-            
+        # while not done:
+        while back_prop_val > 0:
             if print_layers:
                 print(f"**************************Layer: {layer}**************************")
 
+            # for the the initial layer we reason over the leaf nodes (accp + terminal)
+            if layer == 0:
+                win_sval_topo = self.winning_states[layer]
+            else:   
+                # win_sval_topo = self.winning_states[layer].bddInterval(back_prop_val, back_prop_val)
+                win_sval_topo = bookkeeping_dict[back_prop_val] & self.winning_states[layer]
+            
             _win_state_bucket: Dict[BDD] = defaultdict(lambda: self.manager.bddZero())
 
             # convert the winning states into buckets of BDD
-            # for sval in range(curr_val_order + 1):
-            # for sval in range(curr_val_order, curr_val_order + 1):
+            for sval in range(self.gou_handle.energy_budget + 1):
                 # get the states with state value equal to sval and store them in their respective bukcets
-            win_sval = self.winning_states[layer].bddInterval(back_prop_val, back_prop_val)
+                win_sval = win_sval_topo.bddInterval(sval, sval)
 
-            if not win_sval.isZero():
-                _win_state_bucket[back_prop_val] |= win_sval
-            
+                if not win_sval.isZero():
+                    _win_state_bucket[sval] |= win_sval
             
             # convert the winning states into buckets of BDD
             _pre_buckets: Dict[ADD] = defaultdict(lambda: self.manager.addZero())
@@ -954,9 +947,9 @@ class TopologicalSymbolicGraphOfUtlCooperativeGame(SymbolicGraphOfUtlCooperative
                 mod_win_state: BDD = succ_states.vectorCompose(self.dfa_bdd_x_list, self.dfa_bdd_transition_fun_list)
                 for tr_action, utls_tr in zip(self.ts_bdd_transition_fun_list, self.utls_bdd_trans_func_list):
                     pre_states: BDD = self.get_pre_states(utls_tr=utls_tr,
-                                                        ts_action=tr_action,
-                                                        From=mod_win_state,
-                                                        prod_curr_list=prod_bdd_curr_list)
+                                                          ts_action=tr_action,
+                                                          From=mod_win_state,
+                                                          prod_curr_list=prod_bdd_curr_list)
 
                     pre_states = gou_reachable_states & pre_states
     
@@ -997,8 +990,12 @@ class TopologicalSymbolicGraphOfUtlCooperativeGame(SymbolicGraphOfUtlCooperative
                     sys.exit(-1)
                 self.get_state_value_from_dd(dd_func=self.winning_states[layer + 1], sym_lbl_cubes=sym_lbl_cubes)
 
-            # update counter 
+            if layer > 0:
+                back_prop_val -= min_edge_weight
+            
+            # update counter
             layer += 1
+            
         
 
         print(f"**************************Reached a Fixed Point in {layer} layers**************************")
@@ -1007,7 +1004,7 @@ class TopologicalSymbolicGraphOfUtlCooperativeGame(SymbolicGraphOfUtlCooperative
         self.init_state_value = init_val
         if init_val != math.inf:
             print(f"A Winning Strategy Exists!!. The Min Energy is {init_val}")
-            return strategy
+            return strategy, self.winning_states[layer]
         else:
             print("No Winning Strategy Exists!!!")
             # need to delete this dict that holds cudd object to avoid segfaults after exiting python code

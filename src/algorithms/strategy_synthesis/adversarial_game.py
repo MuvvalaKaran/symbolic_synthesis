@@ -1122,3 +1122,17 @@ class GraphofBRAdvGame(BaseSymbolicSearch):
 
         # need to delete this dict that holds cudd object to avoid segfaults after exiting python code
         del self.winning_states
+
+
+class TopologicalGraphofBRAdvGame(GraphofBRAdvGame):
+    """
+     This class implements the Topological Value Iteration. For a acyclic graph, there exists an Optimal Backup Order (Bertsekas, 2001).
+     By applying the optimal order, the optimal value function can be found with each state needing only
+      one backup
+    """
+    
+    def solve(self, verbose: bool = False, print_layers: bool = False) -> ADD:
+        """
+         Overide the parent method to incorporate the topological value iteration.
+        """
+        raise NotImplementedError()

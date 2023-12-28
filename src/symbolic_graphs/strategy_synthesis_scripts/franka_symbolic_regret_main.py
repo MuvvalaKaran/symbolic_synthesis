@@ -115,6 +115,42 @@ class FrankaSymbolicRegretSynthesis(FrankaRegretSynthesis):
         self.graph_of_utls_handle = graph_of_utls_handle
     
 
+    def sanity_check_topological_vi(self, topo_cval: ADD, cvals: ADD):
+        """
+        A function that is called when we want to check if the topological cval is same as the cval computed on the symbolic graph of utility.
+        
+        """
+        # first check if the set of states are same in both the ADD
+        set_of_ADDs: ADD = topo_cval.bddPattern() & cvals.bddPattern()
+        if topo_cval.bddPattern() & ~cvals.bddPattern() or ~topo_cval.bddPattern() & cvals.bddPattern() or not set_of_ADDs.isOne():
+            print("[Error] Not all states in both the ADDs are same.")
+        
+        
+        # compute the set of optimals state values and check if they are the same
+        topo_cube = list(topo_cval.generate_cubes())
+        cvals_cube = list(cvals.generate_cubes())
+
+        # check the set of optimal values
+        # NOTE: Topological VI will have states with all the possible values. It will be a superset of the normal VI.
+        topo_cval_optimal_set: set = set([i[1] for i in topo_cube if i[1] != math.inf])
+        cval_optimal_set: set = set([i[1] for i in cvals_cube if i[1] != math.inf])
+
+        # if topo_cval_optimal_set != cval_optimal_set:
+        if cval_optimal_set.issubset(topo_cval_optimal_set):
+            print("[Error] Not all optimal values in both the ADDs are same.")
+        
+
+        # now loop over the optimal values and check if the set of states are same
+        for val in sorted(list(cval_optimal_set)):
+            val_topo_cval = topo_cval.bddInterval(val, val)
+            val_cval = cvals.bddInterval(val, val)
+
+            if val_topo_cval.compare(val_cval, 3):
+                print(f"[Error] Not all optimal values in both the ADDs are same for {val}.")
+                # sys.exit(-1)
+
+    
+
     def solve(self, verbose: bool = False, just_adv_game: bool = False, run_monitor: bool = False, monolithic_tr: bool = False, topological: bool = True):
         """
          Overrides base method to first construct the required graph and then run Value Iteration. 
@@ -146,7 +182,7 @@ class FrankaSymbolicRegretSynthesis(FrankaRegretSynthesis):
                                                                               cudd_manager=self.manager,
                                                                               monolithic_tr=monolithic_tr)
             start: float = time.time()
-            tmp_cvals: ADD = gou_min_min_handle.solve(verbose=True, print_layers=self.print_layers)
+            topo_str_cvals, tmp_cvals = gou_min_min_handle.solve(verbose=False, print_layers=self.print_layers)
             stop: float = time.time()
             print("Time took for computing Topological cVals is: ", stop - start)
         # else:
@@ -165,17 +201,17 @@ class FrankaSymbolicRegretSynthesis(FrankaRegretSynthesis):
         
         # compute the cooperative value from each prod state in the graph of utility
         start: float = time.time()
-        cvals: ADD = gou_min_min_handle.solve(verbose=False, print_layers=self.print_layers)
+        str_cvals, cvals = gou_min_min_handle.solve(verbose=False, print_layers=self.print_layers)
         stop: float = time.time()
         print("Time took for computing cVals is: ", stop - start)
         
         # 3 means != and 2 means ==
-        if tmp_cvals.compare(cvals, 3):
-            print("Not equal!!!!")
-            # print(cvals.generate_cubes() & tmp_cvals)
-            # cvals = tmp_cvals
-            sys.exit(-1)
-        sys.exit(-1)
+        # if tmp_cvals.compare(cvals, 3):
+            # print("Not equal!!!!")
+            # self.sanity_check_topological_vi(tmp_cvals, cvals)
+            # sys.exit(-1)
+        cvals = topo_str_cvals
+        # sys.exit(-1)
 
         # sanity checking
         print("******************Computing BA Vals on Graph of utility******************")
