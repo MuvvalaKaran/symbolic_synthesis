@@ -74,7 +74,7 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
         self.mod_act_dict = None
 
         # maps each action to int weight
-        self.int_weight_dict = None
+        self.int_weight_dict: Dict[str, int]  = None
         self.task_boxes: List[str] = [] 
 
         self.min_energy_budget: Union[int, float] = math.inf

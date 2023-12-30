@@ -135,13 +135,92 @@ class TestCoopGameArch(unittest.TestCase):
                                                     max_human_int=HUMAN_INT_BND)
             
             min_min_handle = CooperativeGame(ts_handle=frankapartition_handle.ts_handle,
-                                                dfa_handle=frankapartition_handle.dfa_handle,
-                                                ts_curr_vars=frankapartition_handle.ts_x_list,
-                                                dfa_curr_vars=frankapartition_handle.dfa_x_list,
-                                                ts_obs_vars=frankapartition_handle.ts_obs_list,
-                                                sys_act_vars=frankapartition_handle.ts_robot_vars,
-                                                env_act_vars=frankapartition_handle.ts_human_vars,
-                                                cudd_manager=frankapartition_handle.manager)
+                                             dfa_handle=frankapartition_handle.dfa_handle,
+                                             ts_curr_vars=frankapartition_handle.ts_x_list,
+                                             dfa_curr_vars=frankapartition_handle.dfa_x_list,
+                                             ts_obs_vars=frankapartition_handle.ts_obs_list,
+                                             sys_act_vars=frankapartition_handle.ts_robot_vars,
+                                             env_act_vars=frankapartition_handle.ts_human_vars,
+                                             cudd_manager=frankapartition_handle.manager)
+
+            win_str: ADD = min_min_handle.solve(verbose=False)
+
+            # ensure winning strategy exisits
+            self.assertNotEqual(win_str, cudd_manager.addZero(), "Could not synthesize a winning strategy for adversarial game")
+
+            if win_str:
+                # ensure that you reach the fixed point correctly
+                self.assertEqual(max(min_min_handle.winning_states.keys()), cor_fp[arch_id], "Error computing the fixed point.")
+
+                init_state_cube = list(((min_min_handle.init_TS & min_min_handle.init_DFA) & min_min_handle.winning_states[cor_fp[arch_id]]).generate_cubes())[0]
+                init_val: int = init_state_cube[1]
+
+                # ensure that the energy required is correct
+                self.assertEqual(init_val, corr_eng[arch_id], "Error in the minimum energy required the task under adv. env. assumption.")
+
+                # this has to be done to ensure that
+                # 1) the strategy synthesized does indeed reach the accepting state, and
+                # 2) to ensure that the code does not seg fault.
+                min_min_handle.roll_out_strategy(strategy=win_str, verbose=False)
+    
+
+    def test_monolithic_synthesis(self):
+        """
+         Check all the tests related Quantitative strategy synthesis under quantitative constraints with Monolithic TR.
+           This method is same as the above with only the Monolithic TR flag set to true.
+        """
+        formulas = ['F(p00 & p12 & p21) & G(~(p00 & p21) -> ~(p12))']
+
+
+        domain_file_path = PROJECT_ROOT + "/pddl_files/domain.pddl"
+        problem_file_paths = [
+            PROJECT_ROOT + "/pddl_files/problem_arch1.pddl",   # all boxed are withing robot's reach
+            PROJECT_ROOT + "/pddl_files/problem_arch2.pddl"]    # robot cannot force human to build the arch
+
+        wgt_dict = {
+            "transit" : 1,
+            "grasp"   : 1,
+            "transfer": 1,
+            "release" : 1,
+            "human": 0
+            }
+
+        # No. of iteration req. to reach the fixed point
+        cor_fp: List[int] = [20, 16]
+
+        # Min. energy required
+        corr_eng: List[int] = [12, 12]
+
+        for arch_id, arch_problem in enumerate(problem_file_paths):
+            cudd_manager = Cudd()
+            frankapartition_handle = FrankaPartitionedWorld(domain_file=domain_file_path,
+                                                            problem_file=arch_problem,
+                                                            formulas=formulas,
+                                                            sup_locs=SUP_LOC,
+                                                            top_locs=TOP_LOC,
+                                                            manager=cudd_manager,
+                                                            weight_dict=wgt_dict,
+                                                            ltlf_flag=USE_LTLF,
+                                                            dyn_var_ord=DYNAMIC_VAR_ORDERING,
+                                                            algorithm=GAME_ALGORITHM,
+                                                            verbose=False,
+                                                            plot_ts=False,
+                                                            plot_obs=False,
+                                                            plot=False)
+            # build the abstraction
+            frankapartition_handle.build_abstraction(dynamic_env=TWO_PLAYER_GAME,
+                                                    bnd_dynamic_env=TWO_PLAYER_GAME_BND,
+                                                    max_human_int=HUMAN_INT_BND)
+            
+            min_min_handle = CooperativeGame(ts_handle=frankapartition_handle.ts_handle,
+                                             dfa_handle=frankapartition_handle.dfa_handle,
+                                             ts_curr_vars=frankapartition_handle.ts_x_list,
+                                             dfa_curr_vars=frankapartition_handle.dfa_x_list,
+                                             ts_obs_vars=frankapartition_handle.ts_obs_list,
+                                             sys_act_vars=frankapartition_handle.ts_robot_vars,
+                                             env_act_vars=frankapartition_handle.ts_human_vars,
+                                             cudd_manager=frankapartition_handle.manager,
+                                             monolithic_tr=True)
 
             win_str: ADD = min_min_handle.solve(verbose=False)
 
