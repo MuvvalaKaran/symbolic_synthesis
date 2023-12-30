@@ -588,6 +588,9 @@ class FrankaPartitionedWorld(FrankaWorld):
         """
          A function that call the winning strategy synthesis code and compute the set of winnign states and winning strategy for robot. 
         """
+        print("**********************************************************************************************************")
+        print("******************************************** TR: {approach} ***********************************************".format(approach='Monolithic' if monolithic_tr else 'Partitioned'))
+        print("**********************************************************************************************************")
         start = time.time()
         if self.algorithm == 'qual':
             
@@ -650,7 +653,8 @@ class FrankaPartitionedWorld(FrankaWorld):
                                              ts_obs_vars=self.ts_obs_list,
                                              sys_act_vars=self.ts_robot_vars,
                                              env_act_vars=self.ts_human_vars,
-                                             cudd_manager=self.manager)
+                                             cudd_manager=self.manager,
+                                             monolithic_tr=monolithic_tr)
             
             win_str: ADD = min_min_handle.solve(verbose=verbose)
             # sys.exit(-1)
