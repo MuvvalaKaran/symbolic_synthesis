@@ -103,6 +103,10 @@ if __name__ == "__main__":
             frankaworld_handle.simulate(action_dict=policy, print_strategy=True)
         
         elif STRATEGY_SYNTHESIS:
+            
+            # Assert that only one variable is True
+            assert sum([TWO_PLAYER_GAME, TWO_PLAYER_GAME_BND, TWO_PLAYER_GAME_UNREALIZABLE]) <= 1, "Only One variable should be True out of [TWO_PLAYER_GAME, TWO_PLAYER_GAME_BND, TWO_PLAYER_GAME_UNREALIZABLE]."
+
             # Franka World files 
             if TWO_PLAYER_GAME:
                 domain_file_path = PROJECT_ROOT + "/pddl_files/dynamic_franka_world/domain.pddl"
@@ -113,6 +117,10 @@ if __name__ == "__main__":
                 problem_file_path = PROJECT_ROOT + "/pddl_files/bounded_dynamic_franka_world/problem.pddl"
 
                 assert HUMAN_INT_BND >= 0, "Please make sure you enter a non-negative number of human interventions."
+            
+            elif TWO_PLAYER_GAME_UNREALIZABLE:
+                domain_file_path = PROJECT_ROOT + "/pddl_files/franka_unrealizable_world/domain.pddl"
+                problem_file_path = PROJECT_ROOT + "/pddl_files/franka_unrealizable_world/problem.pddl"
 
             else:
                 domain_file_path = PROJECT_ROOT + "/pddl_files/simple_franka_world/domain.pddl"
@@ -154,7 +162,7 @@ if __name__ == "__main__":
                 sys.exit(-1)
 
             # build the abstraction
-            frankapartition_handle.build_abstraction(dynamic_env=TWO_PLAYER_GAME,
+            frankapartition_handle.build_abstraction(dynamic_env=TWO_PLAYER_GAME or TWO_PLAYER_GAME_UNREALIZABLE,
                                                      bnd_dynamic_env=TWO_PLAYER_GAME_BND,
                                                      max_human_int=HUMAN_INT_BND)
             # sys.exit(-1)                                      
@@ -168,8 +176,8 @@ if __name__ == "__main__":
             # domain_file_path = PROJECT_ROOT + "/pddl_files/franka_regret_world/arch/domain.pddl"
             # problem_file_path = PROJECT_ROOT + "/pddl_files/franka_regret_world/arch/problem.pddl"
 
-            domain_file_path = PROJECT_ROOT + "/pddl_files/franka_regret_world/test/domain.pddl"
-            problem_file_path = PROJECT_ROOT + "/pddl_files/franka_regret_world/test/problem.pddl"
+            domain_file_path = PROJECT_ROOT + "/pddl_files/franka_unrealizable_world/domain.pddl"
+            problem_file_path = PROJECT_ROOT + "/pddl_files/franka_unrealizable_world/problem.pddl"
 
             wgt_dict = {
                 "transit" : 1,
