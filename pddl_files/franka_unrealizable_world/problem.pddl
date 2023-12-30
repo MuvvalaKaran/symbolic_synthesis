@@ -7,16 +7,16 @@
 
 
     
-    l0 - hbox_loc
+    l0 - box_loc
     l1 - hbox_loc
     l2 - hbox_loc
     l3 - hbox_loc
-    l4 - hbox_loc
-    l5 - hbox_loc
-    l6 - hbox_loc
-    l7 - hbox_loc
-    l8 - hbox_loc
-    l9 - hbox_loc
+    ;l4 - hbox_loc
+    ;l5 - hbox_loc
+    ;l6 - hbox_loc
+    ;l7 - hbox_loc
+    ;l8 - hbox_loc
+    ;l9 - hbox_loc
     ;l10 - hbox_loc
     ;l11 - hbox_loc
 
@@ -36,7 +36,7 @@
     (ready else)
     
     (on b0 l0)
-    (on b1 l6)
+    (on b1 l2)
     ;(on b2 l7)
     ;(on b3 l1)
     ;(on b4 l3)

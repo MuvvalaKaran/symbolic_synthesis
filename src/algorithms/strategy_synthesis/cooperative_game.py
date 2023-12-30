@@ -162,14 +162,14 @@ class CooperativeGame(AdversarialGame):
             layer += 1
     
 
-    def roll_out_strategy(self, strategy: ADD, verbose: bool = False):
+    def roll_out_strategy(self, strategy: ADD, verbose: bool = False, no_intervention: bool = False):
         """
          A function to roll out the synthesized Min-Min strategy
         """
         curr_dfa_state = self.init_DFA
         curr_prod_state = self.init_TS & curr_dfa_state
         counter = 0
-        max_layer: input = max(self.winning_states.keys())
+        max_layer: int = max(self.winning_states.keys())
         ract_name: str = ''
 
         sym_lbl_cubes = self._create_lbl_cubes()
@@ -216,39 +216,40 @@ class CooperativeGame(AdversarialGame):
             next_exp_states = self.ts_handle.adj_map[curr_ts_tuple][ract_name]['r']
             next_tuple = self.ts_handle.get_tuple_from_state(next_exp_states)
 
-            # for a given (s, a_s) there should be exaclty one human action (a_e). 
-            # If you encounter multiple then that corresponds to no-human intervention
-            curr_state_human_act_cubes: ADD = strategy.restrict(curr_prod_state & sys_act_cube)
-            print(f"{counter}: State value: {curr_prod_state_sval}")
-            human_act_cube: ADD = curr_state_human_act_cubes.bddInterval(curr_prod_state_sval, curr_prod_state_sval).toADD()
-            # print(human_act_cube.display())
-            human_list_act_cube = self.convert_add_cube_to_func(human_act_cube, curr_state_list=self.env_act_vars)
+            if not no_intervention:
+                # for a given (s, a_s) there should be exaclty one human action (a_e). 
+                # If you encounter multiple then that corresponds to no-human intervention
+                curr_state_human_act_cubes: ADD = strategy.restrict(curr_prod_state & sys_act_cube)
+                print(f"{counter}: State value: {curr_prod_state_sval}")
+                human_act_cube: ADD = curr_state_human_act_cubes.bddInterval(curr_prod_state_sval, curr_prod_state_sval).toADD()
+                # print(human_act_cube.display())
+                human_list_act_cube = self.convert_add_cube_to_func(human_act_cube, curr_state_list=self.env_act_vars)
 
-            # This logic does not work for Cooperative games - just check the state value during roll out
-            if len(human_list_act_cube) > 1:
-                for env_act_cube in human_list_act_cube:
-                    full_state_act_cube = strategy.restrict(curr_prod_state & sys_act_cube & env_act_cube)
-                    
-                    if full_state_act_cube.findMin() == self.manager.addConst(opt_sval_cube[1]):
-                        hact_name = self.ts_sym_to_human_act_map.get(env_act_cube, ' ')
-                        # check is this robot action exisits from (s, a_s) in the adj dictionary
-                        if self.ts_handle.adj_map.get(curr_ts_tuple, {}).get(ract_name, {}).get(hact_name):
-                            next_exp_states = self.ts_handle.adj_map[curr_ts_tuple][ract_name][hact_name]
-                            next_tuple = self.ts_handle.get_tuple_from_state(next_exp_states)
-                            
-                            if verbose:
-                                print(f"Human Moved: New Conf.: {self.ts_handle.get_state_from_tuple(next_tuple)} Act: {hact_name}")
-                            
-                            break
-            else:
-                hact_name = self.ts_sym_to_human_act_map[human_act_cube]
-                # look up the next tuple - could fail if the no-intervention edge is an unambiguous one.  
-                if self.ts_handle.adj_map.get(curr_ts_tuple, {}).get(ract_name, {}).get(hact_name):
-                    next_exp_states = self.ts_handle.adj_map[curr_ts_tuple][ract_name][hact_name]
-                    next_tuple = self.ts_handle.get_tuple_from_state(next_exp_states)
+                # This logic does not work for Cooperative games - just check the state value during roll out
+                if len(human_list_act_cube) > 1:
+                    for env_act_cube in human_list_act_cube:
+                        full_state_act_cube = strategy.restrict(curr_prod_state & sys_act_cube & env_act_cube)
+                        
+                        if full_state_act_cube.findMin() == self.manager.addConst(opt_sval_cube[1]):
+                            hact_name = self.ts_sym_to_human_act_map.get(env_act_cube, ' ')
+                            # check is this robot action exisits from (s, a_s) in the adj dictionary
+                            if self.ts_handle.adj_map.get(curr_ts_tuple, {}).get(ract_name, {}).get(hact_name):
+                                next_exp_states = self.ts_handle.adj_map[curr_ts_tuple][ract_name][hact_name]
+                                next_tuple = self.ts_handle.get_tuple_from_state(next_exp_states)
+                                
+                                if verbose:
+                                    print(f"Human Moved: New Conf.: {self.ts_handle.get_state_from_tuple(next_tuple)} Act: {hact_name}")
+                                
+                                break
+                else:
+                    hact_name = self.ts_sym_to_human_act_map[human_act_cube]
+                    # look up the next tuple - could fail if the no-intervention edge is an unambiguous one.  
+                    if self.ts_handle.adj_map.get(curr_ts_tuple, {}).get(ract_name, {}).get(hact_name):
+                        next_exp_states = self.ts_handle.adj_map[curr_ts_tuple][ract_name][hact_name]
+                        next_tuple = self.ts_handle.get_tuple_from_state(next_exp_states)
 
-                    if verbose:
-                        print(f"Human Moved: New Conf.: {self.ts_handle.get_state_from_tuple(next_tuple)} Act: {hact_name}")
+                        if verbose:
+                            print(f"Human Moved: New Conf.: {self.ts_handle.get_state_from_tuple(next_tuple)} Act: {hact_name}")
 
             # look up its corresponding formula
             curr_ts_state: ADD = self.ts_handle.get_sym_state_from_tuple(next_tuple)

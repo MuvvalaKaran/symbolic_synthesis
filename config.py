@@ -15,8 +15,13 @@ MONOLITHIC_TR: bool = False  # Set this flag to true when using Monolithic TR du
 TWO_PLAYER_GAME_UNREALIZABLE: bool = True # Set this flag to true when you want to contruct a two-player game env for unrealizable world.
 TWO_PLAYER_GAME: bool = False # Set this flag to true when you want to contruct a two-player game env.
 TWO_PLAYER_GAME_BND: bool = False  # Set this flag to true when you want to construct som bounded no. off human interventions.
-GAME_ALGORITHM = 'quant-coop' # choose qual for qualitative game, quant-adv for quantitative adversarial game, and quant-coop for cooperative game
 
+# choose
+# qual for qualitative game, or
+# quant-adv for quantitative adversarial game, or
+# quant-coop for cooperative game, or
+# quant-be-reach for Best-Effort reachability game
+GAME_ALGORITHM = 'quant-be-reach' 
 HUMAN_INT_BND: int = 3
 
 DIJKSTRAS: bool = False  # set this flag to true when you want to use Dijkstras

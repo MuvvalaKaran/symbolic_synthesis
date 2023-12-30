@@ -391,8 +391,8 @@ class AdversarialGame(BaseSymbolicSearch):
                 else:
                     print("No Winning Strategy Exists!!!")
                     # need to delete this dict that holds cudd object to avoid segfaults after exiting python code
-                    del self.winning_states
-                    return
+                    # del self.winning_states
+                    return strategy
             
             if print_layers:
                 print(f"**************************Layer: {layer}**************************")

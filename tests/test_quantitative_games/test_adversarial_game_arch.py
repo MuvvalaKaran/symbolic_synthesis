@@ -166,7 +166,7 @@ class TestAdversarialGameArch(unittest.TestCase):
 
     def test_monolithic_synthesis(self):
         """
-         Check all the tests related to Arch Quantitative strategy synthesis under quantitative constraints with Mnolithic TR.
+         Check all the tests related to Arch Quantitative strategy synthesis under quantitative constraints with Monolithic TR.
            This method is same as the above with only the Monolithic TR flag set to true.
         """
         formulas = ['F(p00 & p12 & p21) & G(~(p00 & p21) -> ~(p12))']

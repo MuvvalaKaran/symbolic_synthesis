@@ -584,6 +584,25 @@ class FrankaPartitionedWorld(FrankaWorld):
             self.manager.enableReorderingReporting()
     
 
+    def construct_best_effort_reach_strategies(self, adv_win_str: ADD, coop_win_str: ADD, adv_win_states: ADD, coop_win_states: ADD) -> ADD:
+        """
+         A function that constructs the best effort reachability strategies for the robot.
+
+         For states (Winning Region) from where these exists a winning strategy, we retain them. For states (Pending Region), from where there is no winning strategy,
+          we choose cooperative winning strategy. For the rest of the states (losing region), we choose all valid strategies.  
+        """
+        # TODO: Update the upper bound in the future to 2*max(edge_weight)*(|V| - 1). Need to check this bound.
+        pending_states: BDD = ~adv_win_states.bddInterval(1, 10000) & coop_win_states.bddInterval(1, 10000)
+
+        # retain the coop winning strategies for these states
+        pending_states_str: ADD = pending_states.toADD() & coop_win_str
+
+        # merge the straegies to construct BE strategies
+        be_str: ADD = adv_win_str | pending_states_str
+
+        return be_str
+    
+
     def solve(self, verbose: bool = False, monolithic_tr: bool = False) -> BDD:
         """
          A function that call the winning strategy synthesis code and compute the set of winnign states and winning strategy for robot. 
@@ -663,6 +682,50 @@ class FrankaPartitionedWorld(FrankaWorld):
             
             if win_str:
                 min_min_handle.roll_out_strategy(strategy=win_str, verbose=True)
+        
+        elif self.algorithm == 'quant-be-reach':
+            # first we play adversarial game and then we play cooperative game
+            min_max_handle = AdversarialGame(ts_handle=self.ts_handle,
+                                             dfa_handle=self.dfa_handle,
+                                             ts_curr_vars=self.ts_x_list,
+                                             dfa_curr_vars=self.dfa_x_list,
+                                             ts_obs_vars=self.ts_obs_list,
+                                             sys_act_vars=self.ts_robot_vars,
+                                             env_act_vars=self.ts_human_vars,
+                                             cudd_manager=self.manager, 
+                                             monolithic_tr=monolithic_tr)
+
+            adv_win_str: ADD = min_max_handle.solve(verbose=verbose)
+            adv_win_states: ADD = min_max_handle.winning_states[max(min_max_handle.winning_states.keys())]
+            stop = time.time()
+            print("Time for solving the Adversarial game: ", stop - start)
+
+            start = time.time()
+            min_min_handle = CooperativeGame(ts_handle=self.ts_handle,
+                                             dfa_handle=self.dfa_handle,
+                                             ts_curr_vars=self.ts_x_list,
+                                             dfa_curr_vars=self.dfa_x_list,
+                                             ts_obs_vars=self.ts_obs_list,
+                                             sys_act_vars=self.ts_robot_vars,
+                                             env_act_vars=self.ts_human_vars,
+                                             cudd_manager=self.manager,
+                                             monolithic_tr=monolithic_tr)
+            
+            coop_win_str: ADD = min_min_handle.solve(verbose=verbose)
+            coop_win_states: ADD = min_min_handle.winning_states[max(min_min_handle.winning_states.keys())]
+            # sys.exit(-1)
+            stop = time.time()
+            print("Time for solving the Cooperative game: ", stop - start)
+
+            # finally merge the strategies
+            be_str: ADD = self.construct_best_effort_reach_strategies(adv_win_str=adv_win_str,
+                                                                      coop_win_str=coop_win_str,
+                                                                      adv_win_states=adv_win_states,
+                                                                      coop_win_states=coop_win_states)
+
+            # BE always exists so we can always roll them out
+            min_min_handle.roll_out_strategy(strategy=be_str, verbose=True, no_intervention=True)
+
 
         else:
             warnings.warn("Please enter either 'qual', 'quant-adv', or 'quant-coop' for Two player game strategy synthesis.")
