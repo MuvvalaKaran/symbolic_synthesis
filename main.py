@@ -159,7 +159,7 @@ if __name__ == "__main__":
                                                      max_human_int=HUMAN_INT_BND)
             # sys.exit(-1)                                      
             print(f"****************** # Total Boolean Variables: { cudd_manager.size()} ******************")
-            frankapartition_handle.solve(verbose=False)
+            frankapartition_handle.solve(verbose=False, monolithic_tr=MONOLITHIC_TR)
 
         elif REGRET_SYNTHESIS:
             # domain_file_path = PROJECT_ROOT + "/pddl_files/franka_regret_world/two_blocks/domain.pddl"
