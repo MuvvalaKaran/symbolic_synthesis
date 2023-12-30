@@ -88,13 +88,13 @@ class CooperativeGame(AdversarialGame):
                 init_val = init_state_cube[1]
                 self.init_state_value = init_val
                 if init_val != math.inf:
-                    print(f"A Winning Strategy Exists!!. The Min Energy is {init_val}")
+                    print(f"A Coop Winning Strategy Exists!!. The Min Energy is {init_val}")
                     return tmp_strategy
                 else:
-                    print("No Winning Strategy Exists!!!")
+                    print("No Coop Winning Strategy Exists!!!")
                     # need to delete this dict that holds cudd object to avoid segfaults after exiting python code
-                    del self.winning_states
-                    return
+                    # del self.winning_states
+                    return tmp_strategy
             
             if print_layers:
                 print(f"**************************Layer: {layer}**************************")

@@ -13,6 +13,7 @@ from src.explicit_graphs import CausalGraph, Ltlf2MonaDFA
 
 from src.algorithms.strategy_synthesis import ReachabilityGame, BndReachabilityGame
 from src.algorithms.strategy_synthesis import AdversarialGame, CooperativeGame
+from src.algorithms.strategy_synthesis import QuantitativeBestEffortReachSyn
 
 from src.symbolic_graphs import PartitionedDFA, ADDPartitionedDFA
 from src.symbolic_graphs import PartitionedFrankaTransitionSystem, DynamicFrankaTransitionSystem, BndDynamicFrankaTransitionSystem
@@ -603,7 +604,7 @@ class FrankaPartitionedWorld(FrankaWorld):
         return be_str
     
 
-    def solve(self, verbose: bool = False, monolithic_tr: bool = False) -> BDD:
+    def solve(self, verbose: bool = False, print_layers: bool = False, monolithic_tr: bool = False):
         """
          A function that call the winning strategy synthesis code and compute the set of winnign states and winning strategy for robot. 
         """
@@ -656,7 +657,7 @@ class FrankaPartitionedWorld(FrankaWorld):
                                              cudd_manager=self.manager, 
                                              monolithic_tr=monolithic_tr)
 
-            win_str: ADD = min_max_handle.solve(verbose=verbose)
+            win_str: ADD = min_max_handle.solve(verbose=verbose, print_layers=print_layers)
 
             stop = time.time()
             print("Time for solving the game: ", stop - start)
@@ -675,7 +676,7 @@ class FrankaPartitionedWorld(FrankaWorld):
                                              cudd_manager=self.manager,
                                              monolithic_tr=monolithic_tr)
             
-            win_str: ADD = min_min_handle.solve(verbose=verbose)
+            win_str: ADD = min_min_handle.solve(verbose=verbose, print_layers=print_layers)
             # sys.exit(-1)
             stop = time.time()
             print("Time for solving the game: ", stop - start)
@@ -684,48 +685,20 @@ class FrankaPartitionedWorld(FrankaWorld):
                 min_min_handle.roll_out_strategy(strategy=win_str, verbose=True)
         
         elif self.algorithm == 'quant-be-reach':
-            # first we play adversarial game and then we play cooperative game
-            min_max_handle = AdversarialGame(ts_handle=self.ts_handle,
-                                             dfa_handle=self.dfa_handle,
-                                             ts_curr_vars=self.ts_x_list,
-                                             dfa_curr_vars=self.dfa_x_list,
-                                             ts_obs_vars=self.ts_obs_list,
-                                             sys_act_vars=self.ts_robot_vars,
-                                             env_act_vars=self.ts_human_vars,
-                                             cudd_manager=self.manager, 
-                                             monolithic_tr=monolithic_tr)
-
-            adv_win_str: ADD = min_max_handle.solve(verbose=verbose)
-            adv_win_states: ADD = min_max_handle.winning_states[max(min_max_handle.winning_states.keys())]
-            stop = time.time()
-            print("Time for solving the Adversarial game: ", stop - start)
-
-            start = time.time()
-            min_min_handle = CooperativeGame(ts_handle=self.ts_handle,
-                                             dfa_handle=self.dfa_handle,
-                                             ts_curr_vars=self.ts_x_list,
-                                             dfa_curr_vars=self.dfa_x_list,
-                                             ts_obs_vars=self.ts_obs_list,
-                                             sys_act_vars=self.ts_robot_vars,
-                                             env_act_vars=self.ts_human_vars,
-                                             cudd_manager=self.manager,
-                                             monolithic_tr=monolithic_tr)
+            be_reach_handle = QuantitativeBestEffortReachSyn(ts_handle=self.ts_handle,
+                                                             dfa_handle=self.dfa_handle,
+                                                             ts_curr_vars=self.ts_x_list,
+                                                             dfa_curr_vars=self.dfa_x_list,
+                                                             ts_obs_vars=self.ts_obs_list,
+                                                             sys_act_vars=self.ts_robot_vars,
+                                                             env_act_vars=self.ts_human_vars,
+                                                             cudd_manager=self.manager, 
+                                                             monolithic_tr=monolithic_tr)
             
-            coop_win_str: ADD = min_min_handle.solve(verbose=verbose)
-            coop_win_states: ADD = min_min_handle.winning_states[max(min_min_handle.winning_states.keys())]
-            # sys.exit(-1)
-            stop = time.time()
-            print("Time for solving the Cooperative game: ", stop - start)
-
-            # finally merge the strategies
-            be_str: ADD = self.construct_best_effort_reach_strategies(adv_win_str=adv_win_str,
-                                                                      coop_win_str=coop_win_str,
-                                                                      adv_win_states=adv_win_states,
-                                                                      coop_win_states=coop_win_states)
+            be_str: ADD = be_reach_handle.solve(verbose=verbose, print_layers=print_layers)
 
             # BE always exists so we can always roll them out
-            min_min_handle.roll_out_strategy(strategy=be_str, verbose=True, no_intervention=True)
-
+            be_reach_handle.roll_out_strategy(verbose=True, no_intervention=True)
 
         else:
             warnings.warn("Please enter either 'qual', 'quant-adv', or 'quant-coop' for Two player game strategy synthesis.")
