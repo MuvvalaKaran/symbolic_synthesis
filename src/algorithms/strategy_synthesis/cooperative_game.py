@@ -859,12 +859,12 @@ class TopologicalSymbolicGraphOfUtlCooperativeGame(SymbolicGraphOfUtlCooperative
 
     def solve(self, verbose: bool = False, print_layers: bool = False) -> ADD:
         """
-         Compute cVals on the Symbolic Graph of utility. In this class we proceed an optimal backup order to compute the cVals. 
+         Compute cVals on the Symbolic Graph of utility. In this class we proccess states over an optimal backup order to compute the cVals. 
 
          print_layer: set this flag to True to see Value Iteration progress
          verbose: set this flag to True to print values of states at each iteration.
 
-         TODO: The algorithm still does not always correctly work. Is it the Backup order? or the logic to compute the preimage?
+         NOTE: The algorithm works. Need to verify implementation.
         """
         ts_states: ADD = self.obs_add
         accp_states: ADD = ts_states & self.target_DFA
@@ -995,8 +995,6 @@ class TopologicalSymbolicGraphOfUtlCooperativeGame(SymbolicGraphOfUtlCooperative
             
             # update counter
             layer += 1
-            
-        
 
         print(f"**************************Reached a Fixed Point in {layer} layers**************************")
         init_state_cube = list((self.init_prod & self.winning_states[layer]).generate_cubes())[0]

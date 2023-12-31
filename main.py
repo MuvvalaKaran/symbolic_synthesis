@@ -217,7 +217,7 @@ if __name__ == "__main__":
                                                                         plot=False)
                         
             regret_synthesis_handle.build_abstraction()
-            regret_synthesis_handle.solve(verbose=False, just_adv_game=False, run_monitor=False, monolithic_tr=MONOLITHIC_TR)
+            regret_synthesis_handle.solve(verbose=False, just_adv_game=False, run_monitor=False, monolithic_tr=MONOLITHIC_TR, topological=True)
 
             print(f"****************** # Total Boolean Variables: { cudd_manager.size()} ******************")
 

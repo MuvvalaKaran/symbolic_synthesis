@@ -958,7 +958,7 @@ class GraphofBRAdvGame(BaseSymbolicSearch):
                 self.init_state_value = init_val
                 if init_val != math.inf:
                     print(f"A Winning Strategy Exists!!. The Min Regret value is {init_val}")
-                    return strategy
+                    return strategy, self.winning_states[layer]
                 else:
                     print("No Winning Strategy Exists!!!")
                     # need to delete this dict that holds cudd object to avoid segfaults after exiting python code
@@ -1135,4 +1135,127 @@ class TopologicalGraphofBRAdvGame(GraphofBRAdvGame):
         """
          Overide the parent method to incorporate the topological value iteration.
         """
-        raise NotImplementedError()
+        accp_states = self.prod_gbr_handle.leaf_nodes
+
+        # strategy - optimal (state & robot-action) pair stored in the ADD
+        strategy: ADD  = self.manager.plusInfinity()
+
+        # initializes accepting states to be zero
+        self.winning_states[0] |= self.winning_states[0].min(accp_states)
+        strategy = strategy.min(accp_states)
+
+        if verbose:
+            print_layers = True
+
+        layer: int = 0
+
+        sym_lbl_cubes = self._create_lbl_cubes()
+
+        # setup for topological value iteration
+        pos_set_weights = set(self.prod_gou_handle.int_weight_dict.values()) - set({0})
+        min_edge_weight: int = min(pos_set_weights)
+        curr_val_order: int = max(self.prod_gou_handle.leaf_node_list.keys())
+
+        # get states with corresponding utls value
+        bookkeeping_dict: Dict[int, bool] = {}
+        for i in range(self.prod_gou_handle.energy_budget + 1):
+            bookkeeping_dict[i] =  self.prod_gbr_handle.closed & self.prod_gou_handle.predicate_sym_map_utls[i]
+            bookkeeping_dict[i] = bookkeeping_dict[i].ite(self.manager.addConst(1), self.manager.plusInfinity())
+
+        back_prop_val = curr_val_order
+
+        while back_prop_val >= 0:
+            if print_layers:
+                print(f"**************************Layer: {layer}**************************")
+            
+            # for the the initial layer we reason over the leaf nodes (accp + terminal)
+            if layer == 0:
+                win_sval_topo = self.winning_states[layer]
+            else:   
+                win_sval_topo = bookkeeping_dict[back_prop_val] & self.winning_states[layer]
+
+            _win_state_bucket: Dict[BDD] = defaultdict(lambda: self.manager.bddZero())
+
+            # convert the winning states into buckets of BDD
+            for sval in self.prod_gbr_handle.leaf_vals:
+                # get the states with state value equal to sval and store them in their respective bukcets
+                win_sval = win_sval_topo.bddInterval(sval, sval)
+
+                if not win_sval.isZero():
+                    _win_state_bucket[sval] |= win_sval
+            
+            
+            _pre_buckets: Dict[ADD] = defaultdict(lambda: self.manager.addZero())
+
+            # compute the predecessor and store them by successor cost
+            for sval, succ_states in _win_state_bucket.items():
+                pre_states: BDD = self.get_pre_states(From=succ_states)
+
+                if not pre_states.isZero():
+                    _pre_buckets[sval] |= pre_states.toADD()
+            
+            # unions of all predecessors
+            if bool(_pre_buckets) is False:
+                layer += 1
+                continue
+            
+            # unions of all predecessors
+            pre_states: ADD = reduce(lambda x, y: x | y, _pre_buckets.values())
+
+            # now take univ abstraction to remove edges to states with infinity value
+            upre_states: ADD = pre_states.univAbstract(self.env_cube)
+
+            tmp_strategy: ADD = upre_states.ite(self.manager.addZero(), self.manager.plusInfinity())
+
+            for sval, apre_s in _pre_buckets.items():
+                # we skip the zero states
+                if sval != 0:
+                    tmp_strategy = tmp_strategy.max(apre_s.ite(self.manager.addConst(int(sval)), self.manager.addZero()))
+
+            new_tmp_strategy: ADD = tmp_strategy
+
+            # go over all the human actions and preserve the minimum one
+            for human_tr_dd in self.ts_sym_to_human_act_map.keys():
+                new_tmp_strategy = new_tmp_strategy.max(tmp_strategy.restrict(human_tr_dd)) 
+
+            # compute the minimum of state action pairs
+            strategy = strategy.min(new_tmp_strategy)
+
+            self.winning_states[layer + 1] |= self.winning_states[layer]
+
+            for tr_dd in self.ts_sym_to_robot_act_map.keys():
+                # remove the dependency for that action and preserve the minimum value for every state
+                self.winning_states[layer + 1] = self.winning_states[layer  + 1].min(strategy.restrict(tr_dd))
+            
+            if verbose:
+                print(f"Minimum State value at Iteration {layer + 1}")
+                # we know the set of values that can possible prpagate value. So we only print states with those values
+                for lval in self.prod_gbr_handle.leaf_vals:
+                    dd_func = self.winning_states[layer + 1].bddInterval(lval, lval).toADD()
+                    self.get_state_value_from_dd(dd_func=dd_func, sym_lbl_cubes=sym_lbl_cubes, state_val=lval)
+                    print("===================================================================================")
+                print("********************************************************************************************")
+            
+            if layer > 0:
+                back_prop_val -= min_edge_weight
+
+            # update counter 
+            layer += 1
+        
+        print(f"**************************Reached a Fixed Point in {layer} layers**************************")
+        if self.init_prod & self.winning_states[layer] == self.manager.addZero():
+            self.init_state_value = 0
+            print(f"A Winning Strategy Exists!!. The Min Regret value is {self.init_state_value}")
+            return strategy
+        
+        init_state_cube = list((self.init_prod & self.winning_states[layer]).generate_cubes())[0]
+        init_val: int = init_state_cube[1]
+        self.init_state_value = init_val
+        if init_val != math.inf:
+            print(f"A Winning Strategy Exists!!. The Min Regret value is {init_val}")
+            return strategy, self.winning_states[layer]
+        else:
+            print("No Winning Strategy Exists!!!")
+            # need to delete this dict that holds cudd object to avoid segfaults after exiting python code
+            # del self.winning_states
+            return strategy

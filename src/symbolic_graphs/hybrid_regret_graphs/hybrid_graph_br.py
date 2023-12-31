@@ -122,7 +122,6 @@ class HybridGraphOfBR(DynWeightedPartitionedFrankaAbs):
         
         self.predicate_sym_map_ba = bidict(_node_int_map)
     
-
     def add_edge_to_trap_state(self,
                                curr_prod_tuple: tuple,
                                curr_prod_sym_state: ADD,
@@ -155,9 +154,6 @@ class HybridGraphOfBR(DynWeightedPartitionedFrankaAbs):
             print(f"Adding Trap edge: " \
                 f"({curr_ts_exp_states}, {curr_prod_tuple[1]}, {curr_prod_tuple[2]}, {curr_prod_tuple[3]})" \
                 f"-------{robot_act_name}------> (vT)")
-        
-        
-
 
     def add_state_to_leaf_node(self,
                                curr_utls_tuple: int,

@@ -11,7 +11,8 @@ from typing import Union, List, Tuple, Dict
 
 from cudd import Cudd, BDD, ADD
 
-from src.algorithms.strategy_synthesis import SymbolicGraphOfUtlCooperativeGame, GraphofBRAdvGame, TopologicalSymbolicGraphOfUtlCooperativeGame
+from src.algorithms.strategy_synthesis import SymbolicGraphOfUtlCooperativeGame, GraphofBRAdvGame
+from src.algorithms.strategy_synthesis import TopologicalSymbolicGraphOfUtlCooperativeGame, TopologicalGraphofBRAdvGame
 
 from src.symbolic_graphs.symbolic_regret_graphs import SymbolicGraphOfUtility
 from src.symbolic_graphs.hybrid_regret_graphs import HybridGraphOfBR
@@ -151,7 +152,7 @@ class FrankaSymbolicRegretSynthesis(FrankaRegretSynthesis):
 
     
 
-    def solve(self, verbose: bool = False, just_adv_game: bool = False, run_monitor: bool = False, monolithic_tr: bool = False, topological: bool = True):
+    def solve(self, verbose: bool = False, just_adv_game: bool = False, run_monitor: bool = False, monolithic_tr: bool = False, topological: bool = False):
         """
          Overrides base method to first construct the required graph and then run Value Iteration. 
 
@@ -205,12 +206,14 @@ class FrankaSymbolicRegretSynthesis(FrankaRegretSynthesis):
         stop: float = time.time()
         print("Time took for computing cVals is: ", stop - start)
         
+        # TODO: Need to verify the implementation of topological VI. 
         # 3 means != and 2 means ==
-        # if tmp_cvals.compare(cvals, 3):
-            # print("Not equal!!!!")
-            # self.sanity_check_topological_vi(tmp_cvals, cvals)
+        if topological and tmp_cvals.compare(cvals, 3):
+            print("Not equal!!!!")
+            self.sanity_check_topological_vi(tmp_cvals, cvals)
             # sys.exit(-1)
-        cvals = topo_str_cvals
+        if topological:
+            cvals = tmp_cvals
         # sys.exit(-1)
 
         # sanity checking
@@ -260,6 +263,24 @@ class FrankaSymbolicRegretSynthesis(FrankaRegretSynthesis):
         stop: float = time.time()
         print("Time took for costructing the Graph of Best Response: ", stop - start)
 
+        if topological:
+            topo_gbr_min_max_handle = TopologicalGraphofBRAdvGame(prod_gbr_handle=graph_of_br_handle,
+                                                                  prod_gou_handle=self.graph_of_utls_handle,
+                                                                  ts_handle=self.ts_handle,
+                                                                  dfa_handle=self.dfa_handle,
+                                                                  ts_curr_vars=self.ts_x_list,
+                                                                  dfa_curr_vars=self.dfa_x_list,
+                                                                  ts_obs_vars=self.ts_obs_list,
+                                                                  prod_utls_vars=self.prod_utls_vars,
+                                                                  prod_ba_vars=self.prod_ba_vars,
+                                                                  sys_act_vars=self.ts_robot_vars,
+                                                                  env_act_vars=self.ts_human_vars,
+                                                                  cudd_manager=self.manager,
+                                                                  monolithic_tr=monolithic_tr)
+            start: float = time.time()
+            topo_reg_str, topo_reg_vals = topo_gbr_min_max_handle.solve(verbose=False,  print_layers=self.print_layers)
+            stop: float = time.time()
+            print("Time took for computing topological min-max strs on the Graph of best Response: ", stop - start)
 
         # compute regret-minmizing strategies
         gbr_min_max_handle =  GraphofBRAdvGame(prod_gbr_handle=graph_of_br_handle,
@@ -278,11 +299,19 @@ class FrankaSymbolicRegretSynthesis(FrankaRegretSynthesis):
         
         print("******************Computing Regret Minimizing strategies on Graph of Best Response******************")
         start: float = time.time()
-        reg_str: ADD = gbr_min_max_handle.solve(verbose=False,  print_layers=self.print_layers)
+        reg_str, reg_vals = gbr_min_max_handle.solve(verbose=False,  print_layers=self.print_layers)
         stop: float = time.time()
         print("Time took for computing min-max strs on the Graph of best Response: ", stop - start)
 
         if reg_str:
-            gbr_min_max_handle.roll_out_strategy(strategy=reg_str, verbose=True, ask_usr_input=run_monitor)
+            if topological:
+                # 3 means != and 2 means ==
+                if topo_reg_vals.compare(reg_vals, 3):
+                    print("Reg Values are Not equal!!!!")
+                    # self.sanity_check_topological_vi(tmp_cvals, cvals)
+                    # sys.exit(-1)
+                topo_gbr_min_max_handle.roll_out_strategy(strategy=topo_reg_str, verbose=True, ask_usr_input=run_monitor)
+            else:
+                gbr_min_max_handle.roll_out_strategy(strategy=reg_str, verbose=True, ask_usr_input=run_monitor)
             print("Done Rolling out.")
 
