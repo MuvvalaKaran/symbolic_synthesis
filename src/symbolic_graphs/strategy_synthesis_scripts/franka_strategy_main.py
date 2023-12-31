@@ -662,7 +662,7 @@ class FrankaPartitionedWorld(FrankaWorld):
             stop = time.time()
             print("Time for solving the game: ", stop - start)
             # sys.exit(-1)
-            if win_str:
+            if min_max_handle.is_winning():
                 min_max_handle.roll_out_strategy(strategy=win_str, verbose=True)
         
         elif self.algorithm == 'quant-coop':
@@ -681,7 +681,7 @@ class FrankaPartitionedWorld(FrankaWorld):
             stop = time.time()
             print("Time for solving the game: ", stop - start)
             
-            if win_str:
+            if min_min_handle.is_winning():
                 min_min_handle.roll_out_strategy(strategy=win_str, verbose=True)
         
         elif self.algorithm == 'quant-be-reach':
@@ -698,7 +698,11 @@ class FrankaPartitionedWorld(FrankaWorld):
             be_str: ADD = be_reach_handle.solve(verbose=verbose, print_layers=print_layers)
 
             # BE always exists so we can always roll them out
-            be_reach_handle.roll_out_strategy(verbose=True, no_intervention=True)
+            # count = 0
+            # while count < 2:
+                # print(f"Trial {count}")
+            be_reach_handle.roll_out_strategy(verbose=True, intervene=True)
+                # count += 1
 
         else:
             warnings.warn("Please enter either 'qual', 'quant-adv', or 'quant-coop' for Two player game strategy synthesis.")

@@ -42,6 +42,8 @@ class AdversarialGame(BaseSymbolicSearch):
         self.target_DFA = dfa_handle.sym_goal_state
         self.init_DFA = dfa_handle.sym_init_state
 
+        self.init_prod: ADD = self.init_TS & self.init_DFA
+
         self.ts_x_list = ts_curr_vars
         self.dfa_x_list = dfa_curr_vars
 
@@ -139,6 +141,15 @@ class AdversarialGame(BaseSymbolicSearch):
         self.ts_bdd_transition_fun_list = self.mono_ts_bdd_transition_fun_list
         self.mono_ts_action_idx_wgt_map = {idx: wgt for idx, wgt in enumerate(edge_weights)}
     
+
+    def is_winning(self) -> bool:
+        """
+         A function that return True, if the initial state is part of the winning region else False.
+        """
+        if self.init_state_value != math.inf:
+            return True
+        return False
+        
 
     def _create_lbl_cubes(self) -> List[ADD]:
         """
@@ -291,7 +302,7 @@ class AdversarialGame(BaseSymbolicSearch):
         return pre_prod_state
     
     
-    def evolve_as_per_human(self, curr_state_tuple: tuple, curr_dfa_state: ADD, ract_name: str, valid_human_act: str) -> ADD:
+    def evolve_as_per_human(self, curr_state_tuple: tuple, curr_dfa_state: ADD, ract_name: str, valid_human_act: str) -> Tuple[ADD, tuple]:
         """
          A function that compute the next state tuple given the current state tuple. 
         """
@@ -382,7 +393,7 @@ class AdversarialGame(BaseSymbolicSearch):
         while True: 
             if self.winning_states[layer].compare(self.winning_states[layer - 1], 2):
                 print(f"**************************Reached a Fixed Point in {layer} layers**************************")
-                init_state_cube = list(((self.init_TS & self.init_DFA) & self.winning_states[layer]).generate_cubes())[0]
+                init_state_cube = list((self.init_prod & self.winning_states[layer]).generate_cubes())[0]
                 init_val: int = init_state_cube[1]
                 self.init_state_value = init_val
                 if init_val != math.inf:
@@ -551,7 +562,7 @@ class AdversarialGame(BaseSymbolicSearch):
             # convert the 0-1 ADD to BDD for DFA edge checking
             curr_ts_lbl: BDD = curr_ts_state.existAbstract(self.ts_xcube).bddPattern()
 
-            # create DFA edge and check if it satisfies any of the dges or not
+            # create DFA edge and check if it satisfies any of the edges or not
             for dfa_state in self.dfa_sym_to_curr_state_map.keys():
                 bdd_dfa_state: BDD = dfa_state.bddPattern()
                 dfa_pre: BDD = bdd_dfa_state.vectorCompose(self.dfa_bdd_x_list, self.dfa_bdd_transition_fun_list)
