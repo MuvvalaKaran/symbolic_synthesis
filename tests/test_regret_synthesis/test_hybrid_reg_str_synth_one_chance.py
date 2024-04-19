@@ -265,7 +265,7 @@ class TestRegretStrSynth(unittest.TestCase):
                                                     monolithic_tr=MONOLITHIC_TR)
 
         # calling the solve() method
-        self.reg_str: ADD = self.gbr_min_max_handle.solve(verbose=False, print_layers=False)
+        self.reg_str, _ = self.gbr_min_max_handle.solve(verbose=False, print_layers=False)
 
         self.assertEqual(self.gbr_min_max_handle.init_state_value, 7, "Error computing optimal regret value on the Graph of Best Response.")
 

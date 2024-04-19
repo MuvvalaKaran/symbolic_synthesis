@@ -538,7 +538,7 @@ class FrankaRegretSynthesis(FrankaPartitionedWorld):
         
         print("******************Computing Regret Minimizing strategies on Graph of Best Response******************")
         start: float = time.time()
-        reg_str: ADD = gbr_min_max_handle.solve(verbose=False, print_layers=self.print_layers)
+        reg_str, _ = gbr_min_max_handle.solve(verbose=False, print_layers=self.print_layers)
         stop: float = time.time()
         print("Time took for computing min-max strs on the Graph of best Response: ", stop - start)
 

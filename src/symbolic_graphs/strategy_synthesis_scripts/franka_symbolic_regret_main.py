@@ -189,16 +189,16 @@ class FrankaSymbolicRegretSynthesis(FrankaRegretSynthesis):
         # else:
         # compute the min-min value from each state
         gou_min_min_handle = SymbolicGraphOfUtlCooperativeGame(gou_handle=self.graph_of_utls_handle,
-                                                            ts_handle=self.ts_handle,
-                                                            dfa_handle=self.dfa_handle,
-                                                            ts_curr_vars=self.ts_x_list,
-                                                            dfa_curr_vars=self.dfa_x_list,
-                                                            sys_act_vars=self.ts_robot_vars,
-                                                            env_act_vars=self.ts_human_vars,
-                                                            ts_obs_vars=self.ts_obs_list,
-                                                            ts_utls_vars=self.prod_utls_vars,
-                                                            cudd_manager=self.manager,
-                                                            monolithic_tr=monolithic_tr)
+                                                               ts_handle=self.ts_handle,
+                                                               dfa_handle=self.dfa_handle,
+                                                               ts_curr_vars=self.ts_x_list,
+                                                               dfa_curr_vars=self.dfa_x_list,
+                                                               sys_act_vars=self.ts_robot_vars,
+                                                               env_act_vars=self.ts_human_vars,
+                                                               ts_obs_vars=self.ts_obs_list,
+                                                               ts_utls_vars=self.prod_utls_vars,
+                                                               cudd_manager=self.manager,
+                                                               monolithic_tr=monolithic_tr)
         
         # compute the cooperative value from each prod state in the graph of utility
         start: float = time.time()

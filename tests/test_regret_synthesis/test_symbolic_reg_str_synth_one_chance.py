@@ -107,7 +107,7 @@ class TestSymbolicRegretStrSynth(TestRegretStrSynth):
                                                                cudd_manager=self.cudd_manager,
                                                                monolithic_tr=MONOLITHIC_TR)
 
-        self.cvals: ADD = gou_min_min_handle.solve(verbose=False, print_layers=False)
+        self.cvals, _ = gou_min_min_handle.solve(verbose=False, print_layers=False)
 
         self.assertEqual(gou_min_min_handle.init_state_value, 1, "Error computing cVal on the Graph of Utility constrcuted by explicitly rolling out the original graph.")
 
@@ -134,7 +134,7 @@ class TestSymbolicRegretStrSynth(TestRegretStrSynth):
                                                                cudd_manager=self.cudd_manager,
                                                                monolithic_tr=MONOLITHIC_TR)
 
-        cvals: ADD = gou_min_min_handle.solve(verbose=False, print_layers=False)
+        cvals, _ = gou_min_min_handle.solve(verbose=False, print_layers=False)
 
         # compute the best alternative from each edge for cumulative payoff
         self.regret_synthesis_handle.graph_of_utls_handle.get_best_alternatives(cooperative_vals=cvals,
