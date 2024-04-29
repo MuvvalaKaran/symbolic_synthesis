@@ -107,7 +107,7 @@ In all the experiments we have `Robot Region` and `Human Region`.
 
 Refer to `pddl_files` folder's [README](https://github.com/aria-systems-group/sym_quant_reactive_synth/tree/master/pddl_files) for more details about the semantics of domain and how it is encoded in the domain and problem files.
 
-**Note on formulas**: The formulas must be correctly written in the `config.py` script (as List[str]) for the code to run correctly. For e.g., formula `F(p01 & p22)` indicates that ''eventually box 0 should be at location 1 and box 1 should be at location 2''. The predicates `pij` correspond to `box i` being placed at `location j`. 
+**Note on formulas**: The formulas must be correctly written in the `config.py` script (as List[str]) for the code to run correctly. For e.g., formula `F(p01 & p22)` indicates that ''eventually box 0 should be at location 1 and box 2 should be at location 2''. The predicates `pij` correspond to `box i` being placed at `location j`. 
 
 We follow Spot's syntax, i.e., `and: &,`; `or: |, ||`; `implies: ->, -->`; `equivalent: <->, ,<-->`; `not: ~, !`. For more details click on `Help` [button](https://spot.lre.epita.fr/app/) on this website.     
 
