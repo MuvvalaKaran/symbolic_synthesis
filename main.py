@@ -165,11 +165,17 @@ if __name__ == "__main__":
             # domain_file_path = PROJECT_ROOT + "/pddl_files/franka_regret_world/two_blocks/domain.pddl"
             # problem_file_path = PROJECT_ROOT + "/pddl_files/franka_regret_world/two_blocks/problem.pddl"
 
+            ##### ARCH CONSTRUCTION DOMAIN
             # domain_file_path = PROJECT_ROOT + "/pddl_files/franka_regret_world/arch/domain.pddl"
             # problem_file_path = PROJECT_ROOT + "/pddl_files/franka_regret_world/arch/problem.pddl"
 
-            domain_file_path = PROJECT_ROOT + "/pddl_files/franka_regret_world/test/domain.pddl"
-            problem_file_path = PROJECT_ROOT + "/pddl_files/franka_regret_world/test/problem.pddl"
+            ##### Simple Test domain - formula on line 75 in config.py script
+            # domain_file_path = PROJECT_ROOT + "/pddl_files/franka_regret_world/test/domain.pddl"
+            # problem_file_path = PROJECT_ROOT + "/pddl_files/franka_regret_world/test/problem.pddl"
+
+            ##### IROS 23 benchmark - varying boxes domain
+            domain_file_path = PROJECT_ROOT + "/pddl_files/iros23_pddl_files/domain.pddl"
+            problem_file_path = PROJECT_ROOT + "/pddl_files/iros23_pddl_files/varying_boxes/p00.pddl"
 
             wgt_dict = {
                 "transit" : 1,
