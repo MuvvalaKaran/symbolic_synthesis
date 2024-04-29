@@ -293,7 +293,7 @@ class TestRegretStrSynth(unittest.TestCase):
                                                                    max_layer=self.max_layer,
                                                                    curr_prod_state=self.gbr_min_max_handle.init_prod,
                                                                    curr_prod_tuple=None,
-                                                                   print_all_act_vals=False)
+                                                                   print_all_act_vals=True)
         
         self.assertNotEqual(self.gbr_min_max_handle.ts_sym_to_robot_act_map.inv[expected_strategy[0]] & act_cube,
                             self.cudd_manager.addZero(),

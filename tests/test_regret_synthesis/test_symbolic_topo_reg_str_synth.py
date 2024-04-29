@@ -1,6 +1,7 @@
 '''
  This files tests all steps executed during synthesis of regret-minimizing strategies. 
- We override explicit Graph of Utility construction with symbolic Graph of Utility construction methods.
+ We override explicit Graph of Utility construction with symbolic Graph of Utility construction methods. 
+ For Value Iteration we use the Topological Value Iteration algorithm.
 '''
 
 import os
@@ -13,7 +14,7 @@ from src.symbolic_graphs.strategy_synthesis_scripts import FrankaSymbolicRegretS
 
 from src.symbolic_graphs.hybrid_regret_graphs import HybridGraphOfBR
 
-from src.algorithms.strategy_synthesis import SymbolicGraphOfUtlCooperativeGame
+# from src.algorithms.strategy_synthesis import SymbolicGraphOfUtlCooperativeGame
 from src.algorithms.strategy_synthesis import TopologicalSymbolicGraphOfUtlCooperativeGame, TopologicalGraphofBRAdvGame
 
 from .test_hybrid_reg_str_synth_one_chance import TestRegretStrSynth
@@ -71,6 +72,7 @@ class TestMonoSymbolicRegretStrSynth(TestRegretStrSynth):
                                                                     plot=False)
         
         cls.regret_synthesis_handle.build_abstraction()
+    
 
     def test_3_graph_of_utility_constrcution(self):
         """
@@ -90,23 +92,22 @@ class TestMonoSymbolicRegretStrSynth(TestRegretStrSynth):
 
         self.assertEqual(leaf_values, set([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]), "Error constructing Graph of Utility. Mismatch in # utility values associated with leaf nodes")
         self.assertEqual(fp_layer, 12, "Error constructing Graph of Utility. Mismatch in # of layers required to construct the graph")
-        
-
+    
     def test_4_cVal_computation(self):
         """
          Test Cooperative Value (cVal) computation. An important step in computing Best Alternative (BA) value associated with edge on Graph of Utility.
         """
-        gou_min_min_handle = SymbolicGraphOfUtlCooperativeGame(gou_handle=self.regret_synthesis_handle.graph_of_utls_handle,
-                                                               ts_handle=self.regret_synthesis_handle.ts_handle,
-                                                               dfa_handle=self.regret_synthesis_handle.dfa_handle,
-                                                               ts_curr_vars=self.regret_synthesis_handle.ts_x_list,
-                                                               dfa_curr_vars=self.regret_synthesis_handle.dfa_x_list,
-                                                               sys_act_vars=self.regret_synthesis_handle.ts_robot_vars,
-                                                               env_act_vars=self.regret_synthesis_handle.ts_human_vars,
-                                                               ts_obs_vars=self.regret_synthesis_handle.ts_obs_list,
-                                                               ts_utls_vars=self.regret_synthesis_handle.prod_utls_vars,
-                                                               cudd_manager=self.cudd_manager,
-                                                               monolithic_tr=MONOLITHIC_TR)
+        gou_min_min_handle = TopologicalSymbolicGraphOfUtlCooperativeGame(gou_handle=self.regret_synthesis_handle.graph_of_utls_handle,
+                                                                          ts_handle=self.regret_synthesis_handle.ts_handle,
+                                                                          dfa_handle=self.regret_synthesis_handle.dfa_handle,
+                                                                          ts_curr_vars=self.regret_synthesis_handle.ts_x_list,
+                                                                          dfa_curr_vars=self.regret_synthesis_handle.dfa_x_list,
+                                                                          sys_act_vars=self.regret_synthesis_handle.ts_robot_vars,
+                                                                          env_act_vars=self.regret_synthesis_handle.ts_human_vars,
+                                                                          ts_obs_vars=self.regret_synthesis_handle.ts_obs_list,
+                                                                          ts_utls_vars=self.regret_synthesis_handle.prod_utls_vars,
+                                                                          cudd_manager=self.cudd_manager,
+                                                                          monolithic_tr=MONOLITHIC_TR)
 
         self.cvals, _ = gou_min_min_handle.solve(verbose=False, print_layers=False)
 
@@ -114,29 +115,27 @@ class TestMonoSymbolicRegretStrSynth(TestRegretStrSynth):
 
         # ensure winning strategy exists assuming human to be cooperative
         self.assertNotEqual(self.cvals, self.cudd_manager.addZero(), "Could not synthesize a winning strategy for cooperative game!!!")
-
-        # ensure that you reach the fixed point correctly
-        self.assertEqual(max(gou_min_min_handle.winning_states.keys()), 4, "Mismatch in # of iterations required to reach a fixed point for Min-Min game.")
-
+    
 
     def test_5_graph_of_best_response_construction(self):
         """
          Test Graph of Best Response Construction given the Graph of Utiltiy and BA for every edge
         """
-        gou_min_min_handle = SymbolicGraphOfUtlCooperativeGame(gou_handle=self.regret_synthesis_handle.graph_of_utls_handle,
-                                                               ts_handle=self.regret_synthesis_handle.ts_handle,
-                                                               dfa_handle=self.regret_synthesis_handle.dfa_handle,
-                                                               ts_curr_vars=self.regret_synthesis_handle.ts_x_list,
-                                                               dfa_curr_vars=self.regret_synthesis_handle.dfa_x_list,
-                                                               sys_act_vars=self.regret_synthesis_handle.ts_robot_vars,
-                                                               env_act_vars=self.regret_synthesis_handle.ts_human_vars,
-                                                               ts_obs_vars=self.regret_synthesis_handle.ts_obs_list,
-                                                               ts_utls_vars=self.regret_synthesis_handle.prod_utls_vars,
-                                                               cudd_manager=self.cudd_manager,
-                                                               monolithic_tr=MONOLITHIC_TR)
+        gou_min_min_handle = TopologicalSymbolicGraphOfUtlCooperativeGame(gou_handle=self.regret_synthesis_handle.graph_of_utls_handle,
+                                                                          ts_handle=self.regret_synthesis_handle.ts_handle,
+                                                                          dfa_handle=self.regret_synthesis_handle.dfa_handle,
+                                                                          ts_curr_vars=self.regret_synthesis_handle.ts_x_list,
+                                                                          dfa_curr_vars=self.regret_synthesis_handle.dfa_x_list,
+                                                                          sys_act_vars=self.regret_synthesis_handle.ts_robot_vars,
+                                                                          env_act_vars=self.regret_synthesis_handle.ts_human_vars,
+                                                                          ts_obs_vars=self.regret_synthesis_handle.ts_obs_list,
+                                                                          ts_utls_vars=self.regret_synthesis_handle.prod_utls_vars,
+                                                                          cudd_manager=self.regret_synthesis_handle.manager,
+                                                                          monolithic_tr=MONOLITHIC_TR)
 
-        cvals, _ = gou_min_min_handle.solve(verbose=False, print_layers=False)
+        topo_str_cvals, cvals = gou_min_min_handle.solve(verbose=False, print_layers=False)
 
+        # compute the best alternative from each edge for cumulative payoff
         # compute the best alternative from each edge for cumulative payoff
         self.regret_synthesis_handle.graph_of_utls_handle.get_best_alternatives(cooperative_vals=cvals,
                                                                                 mod_act_dict=self.regret_synthesis_handle.mod_act_dict,
@@ -182,9 +181,9 @@ class TestMonoSymbolicRegretStrSynth(TestRegretStrSynth):
         leaf_values: int = self.graph_of_br_handle.leaf_vals
         fp_layer: int =  max(self.graph_of_br_handle.open_list.keys())
         
-        self.assertEqual(no_of_edges, 2223, "Error constructing Graph of Best Response. Mismatch in # of Edges")
-        self.assertEqual(no_of_states, 438, "Error constructing Graph of Best Response. Mismatch in # of states")
-        self.assertEqual(no_of_leaf_nodes, 168, "Error constructing Graph of Best Response. Mismatch in # of Leaf nodes")
+        self.assertEqual(no_of_edges, 1445, "Error constructing Graph of Best Response. Mismatch in # of Edges")
+        self.assertEqual(no_of_states, 284, "Error constructing Graph of Best Response. Mismatch in # of states")
+        self.assertEqual(no_of_leaf_nodes, 105, "Error constructing Graph of Best Response. Mismatch in # of Leaf nodes")
 
         self.assertEqual(leaf_values, set([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]), "Error constructing Graph of Best Response. Mismatch in regret values associated with leaf nodes")
         self.assertEqual(fp_layer, 12, "Error constructing Graph of Best Response. Mismatch in # of layers required to construct the graph")
@@ -192,6 +191,42 @@ class TestMonoSymbolicRegretStrSynth(TestRegretStrSynth):
         self.reg_str_synthesis()
 
 
+    def reg_str_synthesis(self):
+        """
+          Test Topological Value Iteration algorithm. We only test the final reg value at the root node is the same or not. 
+        """
+        # compute regret-minmizing strategies
+        self.topo_gbr_min_max_handle = TopologicalGraphofBRAdvGame(prod_gbr_handle=self.graph_of_br_handle,
+                                                                   prod_gou_handle=self.regret_synthesis_handle.graph_of_utls_handle,
+                                                                   ts_handle=self.regret_synthesis_handle.ts_handle,
+                                                                   dfa_handle=self.regret_synthesis_handle.dfa_handle,
+                                                                   ts_curr_vars=self.regret_synthesis_handle.ts_x_list,
+                                                                   dfa_curr_vars=self.regret_synthesis_handle.dfa_x_list,
+                                                                   ts_obs_vars=self.regret_synthesis_handle.ts_obs_list,
+                                                                   prod_utls_vars=self.regret_synthesis_handle.prod_utls_vars,
+                                                                   prod_ba_vars=self.regret_synthesis_handle.prod_ba_vars,
+                                                                   sys_act_vars=self.regret_synthesis_handle.ts_robot_vars,
+                                                                   env_act_vars=self.regret_synthesis_handle.ts_human_vars,
+                                                                   cudd_manager=self.regret_synthesis_handle.manager,
+                                                                   monolithic_tr=MONOLITHIC_TR)
+        
+        # calling the solve() method
+        self.reg_str, topo_reg_vals = self.topo_gbr_min_max_handle.solve(verbose=False,  print_layers=False)
+
+        self.assertEqual(self.topo_gbr_min_max_handle.init_state_value, 7, "Error computing optimal regret value on the Graph of Best Response.")
+
+        # ensure regret minimizing strategy exists
+        self.assertNotEqual(self.reg_str, self.cudd_manager.addZero(), "Could not synthesize a Regret Minimizing strategy!!!")
+
+        self.max_layer: int = max(self.topo_gbr_min_max_handle.winning_states.keys())
+        self.gbr_min_max_handle = self.topo_gbr_min_max_handle
+
+        # self.gbr_min_max_handle.roll_out_strategy(strategy=self.reg_str,
+        #                                           ask_usr_input=False,
+        #                                           verbose=True)
+
+        self.reg_str_optimality()
+    
 
 if __name__ == "__main__":
     unittest.main()

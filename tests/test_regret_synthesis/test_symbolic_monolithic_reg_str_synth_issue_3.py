@@ -24,7 +24,7 @@ DYNAMIC_VAR_ORDERING: bool = False
 
 USE_LTLF: bool = True # Construct DFA from LTLf
 
-MONOLITHIC_TR: bool = False
+MONOLITHIC_TR: bool = True
 
 SUP_LOC = []
 TOP_LOC = []    
