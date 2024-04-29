@@ -72,7 +72,14 @@ TOP_LOC = []
 # formulas = ['F(p00 & XF(p21)) | F(p18 & p06)']
 
 ##### Simple Formula
-formulas = ['F(p01) | F(p17)']
+# formulas = ['F(p01) | F(p17)']
+
+## VARYING BOXES Formulas
+formulas = ['F(p01)']  # p00
+# formulas = ['F(p01 & p22)']  # p01
+# formulas = ['F(p01 & p22)']  # p02
+# formulas = ['F(p01 & p22 & p43)']  # p03
+# formulas = ['F(p01 & p22 & p43)']  # p04
 
 
 ### BENCHMARKING formulas

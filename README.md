@@ -93,11 +93,42 @@ Some optimization flags:
 1.  `REGRET_HYBRID: bool = True` - Set this flag to true when you contruct graph of utility and best response explicitly (see IROS23 paper)
 2.  `MONOLITHIC_TR: bool = True` - Set this flag to true when using Monolithic TR (instead of Partitioned TR) during regret str synthesis. Monolithic has faster synthesis times than Partitioned TR approach. 
 
-Within the `main.py` script found in the root folder, on Line 220, you can manually set the arguments to True to modify the output of the framework as follows:
+Within the `main.py` script found in the root folder, on Line 226, you can manually set the arguments to True to modify the output of the framework as follows:
 
 1. `verbose: bool = True` - For more verbose output.
 2. `just_adv_game: bool = True` - To only play a min-max game where the human is viewed as an adversary.
 3. `run_monitor: bool = True` - Set this flag to True if you want the option to choose an action as a human player.
+
+
+In all the experiments we have `Robot Region` and `Human Region`. 
+
+1. `Robot Region` - Set of locations where only the robot can manipulate objects 
+2. `Human Region` - Set of location where both the robot and the human can manipulate the object. 
+
+Refer to pddl_files folder [README](https://github.com/aria-systems-group/sym_quant_reactive_synth/tree/master/pddl_files) for more details about the semantics of domain and how it is encoded in the domain and problem files.
+
+**Note on formulas**: The formulas must be correctly written in the `config.py` script (as List[str])for the code to run correctly. For e.g., formula `F(p01 & p22)` indicates that ``eventually box 0 should be at location 1 and box 1 should be at location 2". The predicated `pij` correspond to `box i` being placed at `location j`. We follow Spot's syntax, i.e., `and: &,`; `or: |, ||`; `implies: ->, -->`; `equivalent: <->, ,<-->`; `not: ~, !`. For more details click on `Help` [button](https://spot.lre.epita.fr/app/) on this website.     
+
+To run the main script use:
+
+```python
+python3 main.py
+```
+
+## Simple Pick and Place Domain
+
+For simple pick and place domain experiments run the Python `main.py` script. Make sure the Formula in `config.py` (Line 78-82) matches the problem file name in `main.py` Line 178.  You can play with the specification as long the `pij` is a valid predicate as per the problem file.
+
+
+## For arch construction - ICRA22
+
+Uncomment Lines 169-170 and comment other domain and problem file Lines in `main.py` to input the correct domain and problem files. In the `config.py` uncomment Line 33-34 and comment 35-36 to specify which locations are support and top locations of the arch. 
+
+**The corresponding LTL formula is ['( F(p01 & p20 & p12) ) | ( F(p36 & p07 & p18) )'] and should be inputed in the `config.py` before running the code**. 
+
+Experiments:
+
+ICRA 22 - Supplementary video - Robot Demos - [YouTube Link](https://www.youtube.com/watch?v=ABZb1g36Kv4)
 
 
 ## IROS23 Experiments

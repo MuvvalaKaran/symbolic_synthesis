@@ -44,6 +44,7 @@
     ;(on b6 l6)
 )
 
+; formulas = ['( F(p01 & p20 & p12) ) | ( F(p36 & p07 & p18) )']
 (:goal 
 (and
     (on b0 l0)
