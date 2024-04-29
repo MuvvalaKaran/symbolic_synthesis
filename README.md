@@ -80,6 +80,47 @@ python3 -m unittest -bv
 
 For more details see the `tests/README.md`. Note, all commands must be run from `<root/of/project>`. Additionally, I have included to shell scripts to run regret and non-regret unit tests. You can call these <test_script>.sh file with `-v` (default is False) for verbose test results.
 
+## Running the code
+
+To run the code, first make sure that you set the correct flags to `True` in config.py script. Specfically for the Robotic Manipualtion scenarios the relevant flags are:
+
+1.  `REGRET_SYNTHESIS: bool = True` - Set this flag to true when you want compute to Regret minimizing strategies in using our ADD approach - IROS 23
+2.  `formulas: List[str] = [<insert formula here>]` - The formula specified in LTLf or scLTL. Note that you can only input one formula and it should be passed as a list. 
+3.  `SIMULATE_STRATEGY: bool = True` - To rollout the strategy computed.
+
+Some optimization flags:
+
+1.  `REGRET_HYBRID: bool = True` - Set this flag to true when you contruct graph of utility and best response explicitly (see IROS23 paper)
+2.  `MONOLITHIC_TR: bool = True` - Set this flag to true when using Monolithic TR (instead of Partitioned TR) during regret str synthesis. Monolithic has faster synthesis times than Partitioned TR approach. 
+
+Within the `main.py` script found in the root folder, on Line 220, you can manually set the arguments to True to modify the output of the framework as follows:
+
+1. `verbose: bool = True` - For more verbose output.
+2. `just_adv_game: bool = True` - To only play a min-max game where the human is viewed as an adversary.
+3. `run_monitor: bool = True` - Set this flag to True if you want the option to choose an action as a human player.
+
+
+## IROS23 Experiments
+
+To run the `ARIA LAB` construction example from IROS23 paper switch to this [branch](https://github.com/aria-systems-group/sym_quant_reactive_synth/tree/exp/iros_lab_ex) and just run the main script. 
+
+**Note: Running these experiments will take around 30 minutes**. All the experiments were run single-threaded on an Intel i5 -13th Gen 3.5 GHz CPU with 32 GB RAM. The source code is in Python, and we use [Cython-based wrapper](https://github.com/MuvvalaKaran/cudd_and_wrapper/tree/4481f146001f5885b89ef7db58ae888768d7b6d8) for the CUDD package for ADD operations, MONA for LTLf to DFA translation, and SPOT for LTL to DFA translation.
+
+More Links:
+
+1. IROS23 Presentation - [YouTube Link](https://youtu.be/uy88Cc8DFfQ)
+
+Experiments:
+
+Task - Build ARIA LAB either on the left or right side
+
+1. IROS23 Exp1 - Regret Minimizing behavior where human is cooperative [YouTube Link](https://youtu.be/CAhkiot19zU)
+2. IROS23 Exp2 - Regret Minimizing behavior where human does not cooperative [YouTube Link](https://youtu.be/vwq2YFHdkcg)
+3. IROS23 Exp3 - Regret Minimizing behavior where the human is cooperative but intervenes twice. [YouTube Link](https://youtu.be/jZVrQZiVCDQ)
+4. IROS23 Exp4 - Regret Minimizing behavior where the human is cooperative but intervenes only once. [YouTube Link](https://youtu.be/9zwybF0DtrI)
+5. IROS23 Exp5 - Adversarial behavior where human does not intervene [YouTube Link](https://youtu.be/86-Z-npkfrw)
+6. IROS23 Exp6 - Adversarial behavior where human intervenes cooperatively. The robot still finishes the task away from the human [YouTube Link](https://youtu.be/i7A1aywZ-ZA)
+
 ## Directories
 
 
