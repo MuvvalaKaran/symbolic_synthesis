@@ -37,7 +37,8 @@ class CooperativeGame(AdversarialGame):
                  ts_obs_vars: List[ADD],
                  sys_act_vars: List[ADD],
                  env_act_vars: List[ADD],
-                 cudd_manager: Cudd) -> None:
+                 cudd_manager: Cudd,
+                 monolithic_tr: bool = False) -> None:
         super().__init__(ts_handle,
                          dfa_handle,
                          ts_curr_vars,
@@ -45,7 +46,8 @@ class CooperativeGame(AdversarialGame):
                          ts_obs_vars,
                          sys_act_vars,
                          env_act_vars,
-                         cudd_manager)
+                         cudd_manager,
+                         monolithic_tr)
     
 
     def solve(self, verbose: bool = False, print_layers: bool = False) -> ADD:

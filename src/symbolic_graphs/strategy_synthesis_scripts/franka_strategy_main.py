@@ -58,6 +58,8 @@ class FrankaPartitionedWorld(FrankaWorld):
                          plot_dfa=plot_dfa,
                          plot=plot,
                          create_lbls=create_lbls)
+        # maps each action to int weight
+        self.int_weight_dict: Dict[str, int]  = None
 
     
     def build_abstraction(self, draw_causal_graph: bool = False, dynamic_env: bool = False, bnd_dynamic_env: bool = False, max_human_int: int = 0):
@@ -412,6 +414,7 @@ class FrankaPartitionedWorld(FrankaWorld):
         
         if print_facts:
             print(f"******************# of Edges in Franka Abstraction: {sym_tr.ecount}******************")
+            print(f"******************# of States in the Original graph: {len(sym_tr.adj_map.keys())}******************")
 
         return sym_tr, ts_curr_vars, ts_robot_vars, ts_human_vars, ts_lbl_vars
     
@@ -430,10 +433,10 @@ class FrankaPartitionedWorld(FrankaWorld):
         org_to_mod_act: dict = self.get_act_to_mod_act_dict(task=task)
         
         # get the actual parameterized actions and add their corresponding weights
-        new_weight_dict = self._create_weight_dict(mod_action=modified_actions['robot'], task=task)
+        self.int_weight_dict = self._create_weight_dict(mod_action=modified_actions['robot'], task=task)
 
         # sort them according to their weights and then convert them in to addConst; reverse will sort the weights in descending order
-        weight_dict = {k: v for k, v in sorted(new_weight_dict.items(), key=lambda item: item[1], reverse=True)}
+        weight_dict = {k: v for k, v in sorted(self.int_weight_dict.items(), key=lambda item: item[1], reverse=True)}
         for action, w in weight_dict.items():
             weight_dict[action] = self.manager.addConst(int(w))
         
@@ -442,6 +445,7 @@ class FrankaPartitionedWorld(FrankaWorld):
                                                  robot_action_vars=ts_robot_vars,
                                                  human_action_vars=ts_human_vars,
                                                  weight_dict=weight_dict,
+                                                 int_weight_dict=self.int_weight_dict,
                                                  task=task,
                                                  domain=domain,
                                                  seg_actions=modified_actions,
@@ -467,6 +471,7 @@ class FrankaPartitionedWorld(FrankaWorld):
         
         if print_facts:
             print(f"******************# of Edges in Franka Abstraction: {sym_tr.ecount}******************")
+            print(f"******************# of States in the Original graph: {len(sym_tr.adj_map.keys())}******************")
 
         return sym_tr, ts_curr_vars, ts_robot_vars, ts_human_vars, ts_lbl_vars
     
@@ -519,6 +524,7 @@ class FrankaPartitionedWorld(FrankaWorld):
         # sys.exit(-1)
         if print_facts:
             print(f"******************# of Edges in Franka Abstraction: {sym_tr.ecount}******************")
+            print(f"******************# of States in the Original graph: {len(sym_tr.adj_map.keys())}******************")
 
         return sym_tr, ts_curr_vars, ts_robot_vars, ts_human_vars, ts_lbl_vars
     
@@ -590,10 +596,13 @@ class FrankaPartitionedWorld(FrankaWorld):
             self.manager.enableReorderingReporting()
     
 
-    def solve(self, verbose: bool = False) -> BDD:
+    def solve(self, verbose: bool = False, monolithic_tr: bool = False) -> BDD:
         """
          A function that call the winning strategy synthesis code and compute the set of winnign states and winning strategy for robot. 
         """
+        print("**********************************************************************************************************")
+        print("******************************************** TR: {approach} ***********************************************".format(approach='Monolithic' if monolithic_tr else 'Partitioned'))
+        print("**********************************************************************************************************")
         start = time.time()
         if self.algorithm == 'qual':
             
@@ -637,7 +646,8 @@ class FrankaPartitionedWorld(FrankaWorld):
                                              ts_obs_vars=self.ts_obs_list,
                                              sys_act_vars=self.ts_robot_vars,
                                              env_act_vars=self.ts_human_vars,
-                                             cudd_manager=self.manager)
+                                             cudd_manager=self.manager, 
+                                             monolithic_tr=monolithic_tr)
 
             win_str: ADD = min_max_handle.solve(verbose=verbose)
 
@@ -655,7 +665,8 @@ class FrankaPartitionedWorld(FrankaWorld):
                                              ts_obs_vars=self.ts_obs_list,
                                              sys_act_vars=self.ts_robot_vars,
                                              env_act_vars=self.ts_human_vars,
-                                             cudd_manager=self.manager)
+                                             cudd_manager=self.manager,
+                                             monolithic_tr=monolithic_tr)
             
             win_str: ADD = min_min_handle.solve(verbose=verbose)
             # sys.exit(-1)

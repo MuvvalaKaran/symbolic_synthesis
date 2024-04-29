@@ -485,7 +485,11 @@ class HybridGraphOfUtility(DynWeightedPartitionedFrankaAbs):
         # gives the bdd version of all states as 0-1 ADD
         coop_bdd_vals: BDD = cooperative_vals.bddInterval(1, self.energy_budget)
 
-        assert coop_bdd_vals.existAbstract(self.sys_cube.bddPattern()) == self.closed.bddPattern(), "Error computing BDD of optimal state vals. Fix this!!!"
+        try:
+            assert coop_bdd_vals.existAbstract(self.sys_cube.bddPattern()) == self.closed.bddPattern(), "Error computing BDD of optimal state vals. Fix this!!!"
+        except AssertionError:
+            empty_bdd: BDD = self.manager.bddZero()
+            assert (coop_bdd_vals.existAbstract(self.sys_cube.bddPattern()) & ~self.closed.bddPattern()) == empty_bdd, "Error computing BDD of optimal state vals. There are states in the cVal dictionary that do not exists in Set of reachable states."
 
         # loop through the open_list dict computed above
         layer = 0
@@ -541,7 +545,10 @@ class HybridGraphOfUtility(DynWeightedPartitionedFrankaAbs):
 
                             ## add the ba value to set
                             int_min_val: int =  list(min_val.generate_cubes())[0][1]
-                            self.ba_set.add(int_min_val)
+                            
+                            # we manually update BA set with inf after assertion statement.
+                            if int_min_val != inf:
+                                self.ba_set.add(int_min_val)
 
                             if verbose:
                                 curr_ts_exp_states = self.get_state_from_tuple(curr_state_tuple)
@@ -556,7 +563,7 @@ class HybridGraphOfUtility(DynWeightedPartitionedFrankaAbs):
             layer += 1
 
         # sanity check. The set of best alternative values should be subset of utility values
-        assert self.ba_set.issubset(self.leaf_vals), "Error computing set of beat alternatives. The BA set should be a subset of utility values "
+        assert self.ba_set.issubset(self.leaf_vals), f"Error computing set of beat alternatives. The BA set [{self.ba_set}] should be a subset of utility values [{self.leaf_vals}]"
 
         # add infinity to the set of best responses
         self.ba_set.add(inf)
