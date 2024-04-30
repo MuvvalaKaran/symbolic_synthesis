@@ -81,6 +81,9 @@ formulas = ['F(p01)']  # p00
 # formulas = ['F(p01 & p22 & p43)']  # p03
 # formulas = ['F(p01 & p22 & p43)']  # p04
 
+# VARYING LOCS Formula
+# formulas = ['F(p01 & p22)']  # same formula for all problem files
+
 
 ### BENCHMARKING formulas
 # formulas = ['F(p00 & p11)']
