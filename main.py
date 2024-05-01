@@ -12,9 +12,7 @@ from config import VAR_DICT, PROJECT_ROOT
 
 
 if  __name__ == "__main__":
-    # tmp for testing purposes
     setup()
-    # sys.exit(-1)
 
     for iteration in range(1):
         print("**********************************************************************************************************")
@@ -46,8 +44,8 @@ if  __name__ == "__main__":
                 }
 
 
-            gridworld_handle = SimpleGridWorld(domain_file=domain_file_path,
-                                            problem_file=problem_file_path,
+            gridworld_handle = SimpleGridWorld(domain_file=VAR_DICT['domain'],
+                                            problem_file=VAR_DICT['problem'],
                                             formulas=VAR_DICT['formulas'],
                                             manager=cudd_manager,
                                             algorithm=algo,
@@ -85,8 +83,8 @@ if  __name__ == "__main__":
                 }
 
             # frankaworld stuff
-            frankaworld_handle = FrankaWorld(domain_file=domain_file_path,
-                                            problem_file=problem_file_path,
+            frankaworld_handle = FrankaWorld(domain_file=VAR_DICT['domain'],
+                                            problem_file=VAR_DICT['problem'],
                                             formulas=VAR_DICT['formulas'],
                                             manager=cudd_manager,
                                             sup_locs=VAR_DICT['SUP_LOC'],
@@ -134,8 +132,8 @@ if  __name__ == "__main__":
 
 
             # partitioned frankaworld stuff
-            frankapartition_handle = FrankaPartitionedWorld(domain_file=domain_file_path,
-                                                            problem_file=problem_file_path,
+            frankapartition_handle = FrankaPartitionedWorld(domain_file=VAR_DICT['domain'],
+                                                            problem_file=VAR_DICT['problem'],
                                                             formulas=VAR_DICT['formulas'],
                                                             manager=cudd_manager,
                                                             sup_locs=VAR_DICT['SUP_LOC'],
@@ -191,8 +189,8 @@ if  __name__ == "__main__":
                 }
             
             if VAR_DICT['REGRET_HYBRID']:
-                regret_synthesis_handle = FrankaRegretSynthesis(domain_file=domain_file_path,
-                                                                problem_file=problem_file_path,
+                regret_synthesis_handle = FrankaRegretSynthesis(domain_file=VAR_DICT['domain'],
+                                                                problem_file=VAR_DICT['problem'],
                                                                 formulas=VAR_DICT['formulas'],
                                                                 manager=cudd_manager,
                                                                 sup_locs=VAR_DICT['SUP_LOC'],
@@ -209,8 +207,8 @@ if  __name__ == "__main__":
                                                                 plot_obs=False,
                                                                 plot=False)
             else:
-                regret_synthesis_handle = FrankaSymbolicRegretSynthesis(domain_file=domain_file_path,
-                                                                        problem_file=problem_file_path,
+                regret_synthesis_handle = FrankaSymbolicRegretSynthesis(domain_file=VAR_DICT['domain'],
+                                                                        problem_file=VAR_DICT['problem'],
                                                                         formulas=VAR_DICT['formulas'],
                                                                         manager=cudd_manager,
                                                                         sup_locs=VAR_DICT['SUP_LOC'],
