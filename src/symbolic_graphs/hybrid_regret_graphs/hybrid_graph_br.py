@@ -244,7 +244,7 @@ class HybridGraphOfBR(DynWeightedPartitionedFrankaAbs):
             self.mono_tr_bdd |= curr_state_sym & robot_move & no_human_move
 
         # generate all the cubes, with their corresponding string repr and leaf value (state value should be 1)
-        add_cube: List[Tuple(list, int)] = list(nxt_state_sym.generate_cubes())   
+        add_cube: List[Tuple[list, int]] = list(nxt_state_sym.generate_cubes())   
         assert len(add_cube) == 1, "Error computing cube string for next state's symbolic representation. FIX THIS!!!"
         assert add_cube[0][1] == 1, "Error computing next state cube. The integer value of the leaf node in the ADD is not 1. FIX THIS!!!"
 
@@ -373,7 +373,7 @@ class HybridGraphOfBR(DynWeightedPartitionedFrankaAbs):
                         # get the corresponding ba values
                         ba_sym: ADD = curr_ts_sym_state & curr_dfa_sym_state & curr_utls_sym & robot_move & self.gou_handle.ba_strategy
 
-                        ba_cube: List[Tuple(list, int)] = list(ba_sym.generate_cubes())   
+                        ba_cube: List[Tuple[list, int]] = list(ba_sym.generate_cubes())   
                         assert len(ba_cube) == 1, "Error computing cube string for the symbolic representation of the next state's best alternate response. FIX THIS!!!"
 
                         next_ba_int = min(ba_cube[0][1], curr_br_tuple)

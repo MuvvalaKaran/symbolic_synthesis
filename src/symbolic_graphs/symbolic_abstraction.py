@@ -11,7 +11,7 @@ from itertools import product
 
 from bidict import bidict
 
-from config import *
+from config import PROJECT_ROOT
 from utls import *
 
 

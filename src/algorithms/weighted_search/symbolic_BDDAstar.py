@@ -6,7 +6,6 @@ from functools import reduce
 
 from cudd import Cudd, BDD, ADD
 from typing import Union, List, Tuple
-from config import GRID_WORLD_SIZE
 
 from src.algorithms.base import BaseSymbolicSearch
 from src.symbolic_graphs import SymbolicAddDFA, SymbolicWeightedTransitionSystem

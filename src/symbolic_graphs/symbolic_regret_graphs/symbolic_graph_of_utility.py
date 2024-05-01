@@ -163,7 +163,7 @@ class SymbolicGraphOfUtility(DynWeightedPartitionedFrankaAbs):
         _tr_idx: int = self.tr_action_idx_map.get(robot_action_name)
 
         # generate all the cubes, with their corresponding string repr and leaf value (state value should be 1)
-        add_cube: List[Tuple(list, int)] = list(nxt_utls_sym.generate_cubes())   
+        add_cube: List[Tuple[list, int]] = list(nxt_utls_sym.generate_cubes())   
         assert len(add_cube) == 1, "Error computing cube string for next state's symbolic representation. FIX THIS!!!"
         assert add_cube[0][1] == 1, "Error computing next state cube. The integer value of the leaf node in the ADD is not 1. FIX THIS!!!"
 

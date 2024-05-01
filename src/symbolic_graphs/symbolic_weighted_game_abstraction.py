@@ -11,8 +11,6 @@ from itertools import product
 from typing import Tuple, List, Dict
 from cudd import Cudd, BDD, ADD
 
-from config import *
-
 from bidict import bidict 
 
 
@@ -656,7 +654,7 @@ class DynWeightedPartitionedFrankaAbs():
                 self.mono_tr_bdd |= curr_state_sym & robot_move & no_human_move          
 
         # generate all the cubes, with their corresponding string repr and leaf value (state value should be 1)
-        add_cube: List[Tuple(list, int)] = list(nxt_state_sym.generate_cubes())   
+        add_cube: List[Tuple[list, int]] = list(nxt_state_sym.generate_cubes())   
         assert len(add_cube) == 1, "Error computing cube string for next state's symbolic representation. FIX THIS!!!"
         assert add_cube[0][1] == 1, "Error computing next state cube. The integer value of the leaf node in the ADD is not 1. FIX THIS!!!"
 

@@ -10,7 +10,7 @@ from typing import List, Union
 from cudd import Cudd, BDD, ADD
 from functools import reduce
 
-from config import PROJECT_ROOT, GRID_WORLD_SIZE, OBSTACLE
+from config import PROJECT_ROOT, VAR_DICT
 
 
 from src.symbolic_graphs import SymbolicDFA, SymbolicAddDFA
@@ -102,7 +102,7 @@ def create_gridworld(size: int, strategy: list, file_name: str = ' ', init_pos: 
         strategy = [gridworld_handle.E, gridworld_handle.N, gridworld_handle.N,
                     gridworld_handle.N, gridworld_handle.N, gridworld_handle.W, 
                     gridworld_handle.W, gridworld_handle.W]
-    if OBSTACLE:
+    if VAR_DICT['OBSTACLE']:
         svg = gridworld_handle.gridworld(n=size, tile2classes=tile2classes_obstacle, actions=strategy, init_pos=init_pos)
     else:
         svg = gridworld_handle.gridworld(n=size, tile2classes=tile2classes, actions=strategy, init_pos=init_pos)

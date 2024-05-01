@@ -15,7 +15,7 @@ from src.symbolic_graphs import DynamicFrankaTransitionSystem, BndDynamicFrankaT
 from regret_synthesis_toolbox.src.graph import DFAGraph
 
 from utls import *
-from config import *
+from config import PROJECT_ROOT
 
 
 class SymbolicDFA(object):
@@ -768,7 +768,7 @@ class ADDPartitionedDFA(SymbolicAddDFAFranka):
          A helper function that adds the edge from curr state to the next state by checking if the same variable is high in the next state
         """
         # generate all the cubes, with their corresponding string repr and leaf value (state value should be 1)
-        add_cube: List[Tuple(list, int)] = list(nxt_sym.generate_cubes())   
+        add_cube: List[Tuple[list, int]] = list(nxt_sym.generate_cubes())   
         assert len(add_cube) == 1, "Error computing cube string for next state's symbolic representation. FIX THIS!!!"
         assert add_cube[0][1] == 1, "Error computing next state cube. The integer value of the leaf node in the ADD is not 1. FIX THIS!!!"
 
