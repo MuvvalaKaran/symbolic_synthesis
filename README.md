@@ -50,7 +50,7 @@ For example
 docker run -it -v $PWD:/root/symbolic_planning/src --name symbolic_planning sym_planning_image
 ```
 
-In the above `symbolic_planning` is the name of the container and `sym_planning_image` is the name of the docker image 
+In the above command `symbolic_planning` is the name of the container and `sym_planning_image` is the name of the docker image.
 
 ---
 Additionally, if you are more used to GUI and would like to edit or attach a container instance to the VSCode ([Link](https://code.visualstudio.com/docs/devcontainers/containers)) then follow the instructions below:
@@ -177,7 +177,7 @@ Task - Build ARIA LAB either on the left or right side
 ### Submodules
 
 * Cudd_and_wrapper - A cython-based wrapper for the CUDD decision diagram package.
-* Regret_synthesis_toolbox - Source code for the explicit implementatiob of Min-max reachability algorithm and Regret-minimizing strategy synthesis. See this [paper](https://arxiv.org/pdf/2203.06861.pdf) for more information.
+* Regret_synthesis_toolbox - Source code for the explicit implementation of Min-max reachability algorithm and Regret-minimizing strategy synthesis. See this [paper](https://arxiv.org/pdf/2203.06861.pdf) for more information.
 
 
 ## Benchmarking Dataset
@@ -199,15 +199,15 @@ In addition, the following commands should help clean up space related to Docker
 docker system df # which can show disk usage and 'Build Cache'
 docker image prune # add -f or --force to not prompt for confirmation
 docker container prune # add -f or --force to not prompt for confirmation
-docker  builder prune # remove docker build cache 
+docker builder prune # remove docker build cache 
 ```
 
-**Note, above commands will permanently remove exisiting images and container. Run at your own risk.**
+**Note, above commands will permanently remove existing images and container. Run at your own risk.**
 
 
 ### Display issues
 
-Install x11 using the `sudo apt-get install xorg openbox` command and run `xhost +` in a terminal to enable GUI forwarding. This helps visualize the RVIZ simulation running from within the docker container. Please refer to [ServerGUI](https://help.ubuntu.com/community/ServerGUI) for more info.
+Install x11 using the `sudo apt-get install xorg openbox` command and run `xhost +` in a terminal to enable GUI forwarding. This enables visualizing the RVIZ simulation from within the docker container. Please refer to [ServerGUI](https://help.ubuntu.com/community/ServerGUI) for more info.
 
 
 Additionally run the docker container with explicit instruction of X11 forwarding, like
