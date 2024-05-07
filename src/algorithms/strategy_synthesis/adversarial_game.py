@@ -13,15 +13,13 @@ from collections import defaultdict
 from typing import List, DefaultDict, Union, Tuple, Dict
 from bidict import bidict
 
-from config import PROJECT_ROOT, SIM_CONFIG_PATH
 from cudd import Cudd, BDD, ADD
 
 from src.algorithms.base import BaseSymbolicSearch
 from src.symbolic_graphs import ADDPartitionedDFA
+from src.simulate_strategy.run_rviz_sim import run_rviz_sim
 from src.symbolic_graphs import DynWeightedPartitionedFrankaAbs
 from src.symbolic_graphs.hybrid_regret_graphs import HybridGraphOfUtility, HybridGraphOfBR
-# from src.simulate_strategy.run_rviz_sim import send_transport_command_to_robot, \
-    # send_transit_command_to_robot, send_grasp_command_to_robot, send_release_command_to_robot
 
 from utls import *
 
@@ -648,6 +646,9 @@ class GraphofBRAdvGame(BaseSymbolicSearch):
         # ADD that keeps track of the optimal values of state at each iteration
         self.winning_states: ADD = defaultdict(lambda: self.manager.plusInfinity())
         
+        # rviz sim handle
+        self.rviz_handle = run_rviz_sim()
+        
         # get the bdd version of the transition function as vectorComposition only works with
         for act in self.prod_trans_func_list:
             act_ls = []
@@ -684,7 +685,7 @@ class GraphofBRAdvGame(BaseSymbolicSearch):
         return sym_lbl_xcube_list
     
 
-    def get_state_value_from_dd(self, dd_func: ADD, state_val: int, **kwargs) -> Tuple[str, tuple]:
+    def get_state_value_from_dd(self, dd_func: ADD, state_val: int, **kwargs) -> tuple:
         """
          A helper function to print the value associated with each prod state.
         """
@@ -734,7 +735,7 @@ class GraphofBRAdvGame(BaseSymbolicSearch):
             
             print(f"[({_ts_name}, {_dfa_name}), {_prod_utl}, {_prod_ba}]: {state_val}")
         
-        return _ts_name, _ts_tuple
+        return _ts_tuple
     
 
     def get_sym_prod_state_from_tuple(self, prod_state_tuple: tuple) -> ADD:
@@ -852,14 +853,7 @@ class GraphofBRAdvGame(BaseSymbolicSearch):
             print(f"Act: {hact_name}")
 
             # execut intervention in sim
-            box, loc = hact_name.split()[1], hact_name.split()[2]
-            obj_id = f"object_ids: '{box}' "
-            obj_loc = f"object_locations: '{loc}'"
-            final_string = obj_id + obj_loc
-            cmd_handle = Popen(['rosservice call /manipulator_node/action_primitive/set_object_locations' + f' [{box}] ' + f'[{loc}]'], shell=True, stdout=PIPE)
-            (raw_output, err) = cmd_handle.communicate()
-            if err:
-                print(err)
+            self.rviz_handle.send_command(act_name=hact_name)
         
             return next_prod_sym
         
@@ -884,6 +878,7 @@ class GraphofBRAdvGame(BaseSymbolicSearch):
 
         if len(human_acts) > 0:
             sym_prod_list = []
+            hact_list = []
             print("===================================================================================")
             # for hidx, hact in enumerate(human_acts):
             for hidx, hact in enumerate(valid_acts):
@@ -892,7 +887,7 @@ class GraphofBRAdvGame(BaseSymbolicSearch):
                 # _ , reg_val = self.get_strategy_and_val(strategy=strategy, max_layer=max_layer, curr_prod_state=nxt_prod_sym)
                 print(f"[{hidx}] {hact}")
                 # self.get_state_value_from_dd(dd_func=nxt_prod_sym, sym_lbl_cubes=sym_lbl_cubes, state_val=reg_val)
-
+                hact_list.append(hact)
                 sym_prod_list.append(nxt_prod_sym)
             print("===================================================================================")
             # ask for user input 
@@ -901,6 +896,9 @@ class GraphofBRAdvGame(BaseSymbolicSearch):
             while nxt_state_idx > len(sym_prod_list):
                 print("Please enter a valid index")
                 nxt_state_idx = int(input("Enter Next state id: "))
+
+            # simulate huaman action 
+            self.rviz_handle.send_command(act_name=hact_list[nxt_state_idx])
 
             return sym_prod_list[nxt_state_idx]
         
@@ -1046,24 +1044,12 @@ class GraphofBRAdvGame(BaseSymbolicSearch):
             layer += 1
     
 
-    def spin_up_sim(self):
-        """
-         Helper method to spin up RVIZ sim
-        """
-        rviz_sim_handle = Popen(["roslaunch", "taskit", "manipulator_node.launch"])
-        # wait for the sim to launch
-        time.sleep(30)
-
-        return rviz_sim_handle
-    
-
     def roll_out_strategy(self, strategy: ADD, ask_usr_input: bool = False, verbose: bool = False):
         """
          A helper function to roll out the optimal regret minimizing strategy.
         """
-        sim_handle = self.spin_up_sim()
-        with open(SIM_CONFIG_PATH, 'r') as file:
-            yaml_data = yaml.safe_load(file)
+        self.rviz_handle.spin_up_sim()
+        
         counter = 0
         max_layer: int = max(self.winning_states.keys())
         ract_name: str = ''
@@ -1120,7 +1106,7 @@ class GraphofBRAdvGame(BaseSymbolicSearch):
 
             if verbose:
                 print(f"Step {counter}")
-                ts_name, ts_tuple = self.get_state_value_from_dd(dd_func=curr_prod_state, sym_lbl_cubes=sym_lbl_cubes, state_val=curr_prod_state_sval)
+                ts_tuple = self.get_state_value_from_dd(dd_func=curr_prod_state, sym_lbl_cubes=sym_lbl_cubes, state_val=curr_prod_state_sval)
                 print(f"Act: {ract_name}")
 
             # send the command to sim
@@ -1130,44 +1116,11 @@ class GraphofBRAdvGame(BaseSymbolicSearch):
                     conf: str = self.ts_handle.get_state_from_tuple([e])
                     if f'b{box_number}' in conf:
                         break
-                box_loc = conf.split()
-                
-                # [:-1] to ignore the trailing end bracker
-                final_string = f"destination_location: '{box_loc[2][:-1]}'" 
-                # if else then look up the actual location in the config file
-                if box_loc[2] == 'else':
-                    true_loc = yaml_data[f'b{box_number}']['initial_location']
-                    final_string = f"destination_location: '{true_loc}'" 
-                # final_string = "destination_location: 'HL0'"
-                cmd_handle = Popen(['rosservice', 'call', '/manipulator_node/action_primitive/linear_transit', final_string], stdout=PIPE)
-                (raw_output, err) = cmd_handle.communicate()
-                if err:
-                    print(err)
-
-                # if transit is else then check the config file from taskit package
-            elif 'transfer' in ract_name:
-                box_loc = ract_name.split()[1]
-                # send_transport_command_to_robot(box_loc[1])
-                # final_string = f"destination_location: '{box_loc[1]}'"
-                # cmd_handle = Popen(['rosservice', 'call', '/manipulator_node/action_primitive/linear_transport', final_string], stdout=PIPE)
-                cmd_handle = Popen(['rosservice call /manipulator_node/action_primitive/linear_transport ' + f'{box_loc}'], shell=True, stdout=PIPE)
-                (raw_output, err) = cmd_handle.communicate()
-                if err:
-                    print(err)
-            elif 'release' in ract_name:
-                # send_release_command_to_robot()
-                # cmd_handle = Popen(['rosservice', 'call', '/manipulator_node/action_primitive/release', '"obj_id = ''"'], stdout=PIPE)
-                cmd_handle = Popen(["rosservice call /manipulator_node/action_primitive/release '' "], shell=True, stdout=PIPE)
-                (raw_output, err) = cmd_handle.communicate()
-                if err:
-                    print(err)
+                box_loc = conf.split()[2][:-1]
+            
+                self.rviz_handle.send_command(act_name=ract_name, loc=box_loc) 
             else:
-                # send_grasp_command_to_robot()
-                # cmd_handle = Popen(['rosservice', 'call', '/manipulator_node/action_primitive/grasp', '"obj_id = ''"'], stdout=PIPE)
-                cmd_handle = Popen(["rosservice call /manipulator_node/action_primitive/grasp '' "], shell=True, stdout=PIPE)
-                (raw_output, err) = cmd_handle.communicate()
-                if err:
-                    print(err)
+                self.rviz_handle.send_command(act_name=ract_name)
                 
             
             # look up the next tuple 
@@ -1198,7 +1151,7 @@ class GraphofBRAdvGame(BaseSymbolicSearch):
             counter += 1
         
         # kill the sim
-        sim_handle.terminate()
+        self.rviz_handle.terminate_sim()
 
         # need to delete this dict that holds cudd object to avoid segfaults after exiting python code
         del self.winning_states
