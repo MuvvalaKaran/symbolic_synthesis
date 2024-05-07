@@ -1,6 +1,7 @@
 import os
 
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+SIM_CONFIG_PATH = '/root/ws/src/taskit/config/objects.yaml'
 
 EXPLICIT_GRAPH: bool = False  # set this flag to true when you want to construct Explicit graph
 
